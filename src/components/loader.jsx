@@ -2,7 +2,7 @@ import React, { useEffect, useState } from "react";
 import Spinner from "./spinner";
 import Image from "../components/AppImage";
 
-const breakDuration = 900; // ms
+const breakDuration = 1000; // ms
 
 const getBreakStyle = (triggered, direction) => {
   if (!triggered) return {};
@@ -49,7 +49,7 @@ const Loader = ({ visible = true, onBreakEnd }) => {
         >
           <Image
             src="/assets/images/school_logo-1754996036714.jpg"
-            alt="GOSHEN PRINATH ACADEMY Logo"
+            alt="ANNUNCIATION SEMINARY AMAUDARA Logo"
             className="w-full h-full object-cover"
           />
         </div>
@@ -57,13 +57,13 @@ const Loader = ({ visible = true, onBreakEnd }) => {
           className="text-2xl sm:text-3xl md:text-4xl font-heading font-bold text-primary mb-2 tracking-wide drop-shadow-lg text-center"
           style={getBreakStyle(breakApart, "left")}
         >
-          GOSHEN PRINATH ACADEMY
+          ANNUNCIATION SEMINARY AMAUDARA
         </h1>
         <p
           className="text-base sm:text-lg md:text-xl text-muted-foreground mb-6 font-body text-center"
           style={getBreakStyle(breakApart, "right")}
         >
-          Raising Life-Long Learners
+          RENOVARE FACEM TERRA
         </p>
         <div style={getBreakStyle(breakApart, "down")}>
           <Spinner message="Loading, please wait..." className="mt-2" />

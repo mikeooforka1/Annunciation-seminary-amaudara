@@ -9,7 +9,7 @@ import { useNavigate } from "react-router-dom";
 import NotFound from "pages/NotFound";
 import LandingPage from './pages/landing-page';
 import AboutPage from './pages/about-page';
-import Admissions from './pages/Admissions';
+import Announcements from './pages/announcements';
 import ExamCreationManagement from './pages/exam-creation-management';
 import ComputerBasedTestingPlatform from './pages/computer-based-testing-cbt-platform';
 import LoginAuthentication from './pages/login-authentication';
@@ -137,7 +137,7 @@ const Routes = () => {
                 <Route path="/" element={<LandingPage />} />
                 <Route path="/landing-page" element={<LandingPage />} />
                 <Route path="/about-page" element={<AboutPage />} />
-                <Route path="/admissions" element={<Admissions />} />
+                <Route path="/announcements" element={<Announcements />} />
                 <Route path="/exam-creation-management" element={<ExamCreationManagement />} />
                 <Route path="/exam-creation-management/result-portal" element={<ResultPortal />} />
                 <Route path="/computer-based-testing-cbt-platform" element={<ComputerBasedTestingPlatform />} />

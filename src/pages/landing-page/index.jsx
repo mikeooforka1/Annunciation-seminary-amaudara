@@ -50,15 +50,58 @@ const LandingPage = () => {
     }
   ];
 
-  
-
-  const founder = {
-    name: "Mr. Nnamdi Nkaru",
-    title: "Founder & Visionary Leader",
-    image: "/assets/images/founder.jpg",
-    bio: "Mr. Nnamdi Nkaru is a visionary leader whose commitment to excellence and character development has shaped the culture of Goshen Prinath Academy. With decades of experience, he inspires both staff and students to pursue greatness, embrace lifelong learning, and make a positive impact in society.",
-    quote: "Education is not just about imparting knowledge, but about nurturing minds and building character for a brighter future."
-  };
+  // Team of Formators data
+  const formators = [
+    {
+      name: "Very Rev. Fr. Chidi Obilor",
+      title: "Rector",
+      image: "/assets/images/rector-pic.WebP",
+      bio: "Very Rev. Fr. Chidi Obilor is the dedicated Rector of Annunciation Seminary Amaudara. His leadership, spiritual guidance, and commitment to holistic formation inspire both staff and seminarians to pursue excellence in academics, faith, and character.",
+      quote: "Formation is the heart of our mission—shaping minds, nurturing faith, and building leaders for the Church and society."
+    },
+    {
+      name: "Rev. Fr. Peterkevin Iwundu",
+      title: "Vice Rector I",
+      image: "/assets/images/vice-rector1.jpg",
+      bio: "Rev. Fr. Peterkevin Iwundu supports the rector and oversees the day-to-day formation activities, ensuring discipline and academic excellence.",
+      quote: "Guiding young minds and hearts is a sacred trust."
+    },
+    {
+      name: "Rev. Fr. Francis Ihesiaba",
+      title: "Vice Rector II",
+      image: "/assets/images/vice-rector2.WebP",
+      bio: "Rev. Fr. Francis Ihesiaba assists in the holistic formation of seminarians, focusing on their spiritual and moral growth.",
+      quote: "Every seminarian is a seed of hope for the Church."
+    },
+    {
+      name: "Rev. Fr. Chinedu Ubani",
+      title: "Dean of Studies",
+      image: "/assets/images/dean-pic.WebP",
+      bio: "Rev. Fr. Chinedu Ubani coordinates academic programs, ensuring high standards and fostering a culture of learning.",
+      quote: "Academic excellence is the foundation for future leaders."
+    },
+    {
+      name: "Rev. Fr. Jude Okebaram",
+      title: "Spiritual Director",
+      image: "/assets/images/spiritual-director.WebP",
+      bio: "Rev. Fr. Jude Okebaram provides spiritual guidance and support to all seminarians, nurturing their faith and vocation.",
+      quote: "Spiritual direction is a journey of faith and growth."
+    },
+    {
+      name: "Rev. Fr. Ignatius Onyekwere",
+      title: "Parish Priest, Regina Pacis Amaudara",
+      image: "/assets/images/parish-priest.jpg",
+      bio: "Rev. Fr. Ignatius Onyekwere serves as the Parish Priest of Regina Pacis Amaudara, fostering a vibrant parish community and supporting the seminary.",
+      quote: "A strong parish is the heart of a thriving seminary."
+    },
+    {
+      name: "Rev. Paschal Chigozie",
+      title: "Pastoral Internship",
+      image: "/assets/images/pastoral-intern.jpg",
+      bio: "Rev. Paschal Chigozie is on pastoral internship, assisting in formation and parish activities with dedication and zeal.",
+      quote: "Pastoral service is a call to love and serve."
+    }
+  ];
 
   const handleNavigation = (path) => {
     window.location.href = path;
@@ -94,10 +137,10 @@ const LandingPage = () => {
                 About
               </button>
               <button 
-                onClick={() => handleNavigation('/admissions')}
+                onClick={() => handleNavigation('/announcements')}
                 className="font-body text-sm text-foreground hover:text-primary transition-colors"
               >
-                Admissions
+                Announcement & Updates
               </button>
               <button 
                 onClick={() => handleNavigation('/contact')}
@@ -143,10 +186,10 @@ const LandingPage = () => {
                   About
                 </button>
                 <button 
-                  onClick={() => handleNavigation('/admissions')}
+                  onClick={() => handleNavigation('/announcements')}
                   className="text-left font-body text-sm text-foreground hover:text-primary"
                 >
-                  Admissions
+                  Announcement & Updates
                 </button>
                 <button 
                   onClick={() => handleNavigation('/contact')}
@@ -169,107 +212,60 @@ const LandingPage = () => {
         </div>
       </header>
       {/* Hero Section */}
-      <section className="relative pt-16 min-h-screen flex items-center text-white">
+      <section className="relative pt-20 min-h-[80vh] flex items-center justify-center text-white">
         {/* Background Image Container */}
         <div 
           className="absolute inset-0 bg-cover bg-center" 
-          style={{ backgroundImage: `url('/assets/images/school-building-pic1.jpg')` }}
+          style={{ backgroundImage: `url('/assets/images/chapel-pic.WebP')` }}
         >
-          {/* Overlay to darken image */}
-          <div className="absolute inset-0 bg-black/60"></div>
+          <div className="absolute inset-0 bg-black/30"></div>
         </div>
         
-        {/* Content Container with z-index to be on top of the background */}
-        <div className="container mx-auto px-4 lg:px-6 relative z-10">
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-12 items-center">
-            {/* Left Content */}
-            <motion.div 
-              initial={{ opacity: 0, x: -50 }}
-              animate={{ opacity: 1, x: 0 }}
-              transition={{ duration: 0.8 }}
-              className="text-center lg:text-left"
-            >
-              <div className="mb-8">
-                <div className="w-32 h-32 mx-auto lg:mx-0 mb-6 rounded-full overflow-hidden shadow-xl">
-                  <Image 
-                    src="/assets/images/school_logo-1754996036714.jpg"
-                    alt="GOSHEN PRINATH ACADEMY Logo"
-                    className="w-full h-full object-cover"
-                  />
-                </div>
-                <h1 className="text-4xl lg:text-6xl font-heading font-bold text-white mb-4">
-                 ANNUNCIATION SEMINARY AMAUDARA
-                </h1>
-                <p className="text-xl lg:text-2xl font-body text-primary-light mb-6">
-                 RENOVARE FACEM TERRA
-                </p>
-                <p className="text-lg text-white/80 max-w-xl mx-auto lg:mx-0 mb-8">
-                  Empowering students with excellence in education, fostering critical thinking, and building character for a successful future in an ever-evolving world.
-                </p>
+        {/* Centered Content */}
+        <div className="container mx-auto px-4 sm:px-6 relative z-10 flex flex-col items-center justify-center">
+          <div className="flex flex-col items-center w-full">
+            <div className="w-32 h-32 mx-auto mb-8 rounded-full overflow-hidden shadow-xl bg-white flex items-center justify-center">
+              <Image 
+                src="/assets/images/school_logo-1754996036714.jpg"
+                alt="ANNUNCIATION SEMINARY AMAUDARA Logo"
+                className="w-full h-full object-cover"
+              />
+            </div>
+            <h1 className="text-3xl sm:text-4xl lg:text-6xl font-heading font-bold text-white mb-3 sm:mb-4 text-center leading-tight">
+              ANNUNCIATION SEMINARY AMAUDARA
+            </h1>
+            <p className="text-lg sm:text-xl lg:text-2xl font-body text-primary-light mb-4 sm:mb-6 text-center">
+              RENOVARE FACEM TERRA
+            </p>
+            <p className="text-base sm:text-lg text-white/90 max-w-md sm:max-w-2xl mx-auto mb-6 sm:mb-8 text-center">
+              Empowering students with excellence in education, fostering critical thinking, and building character for a successful future in an ever-evolving world.
+            </p>
+            <div className="flex flex-col sm:flex-row gap-4 justify-center w-full">
+              <Button 
+                variant="outline" 
+                size="lg"
+                onClick={() => handleNavigation('/login-authentication')}
+                className="font-body text-white border-white hover:bg-white hover:text-primary w-full sm:w-auto"
+              >
+                <Icon name="LogIn" size={20} className="mr-2" />
+                Login
+              </Button>
+            </div>
+            {/* Quick Stats */}
+            <div className="flex flex-wrap gap-6 justify-center mt-8 sm:mt-12 w-full">
+              <div className="text-center flex-1 min-w-[90px]">
+                <p className="text-xl sm:text-2xl font-heading font-bold text-primary">500+</p>
+                <p className="text-xs sm:text-sm font-body text-white/80">Students</p>
               </div>
-
-              {/* CTA Buttons */}
-              <div className="flex flex-col sm:flex-row gap-4 justify-center lg:justify-start">
-                <Button 
-                  variant="outline" 
-                  size="lg"
-                  onClick={() => handleNavigation('/login-authentication')}
-                  className="font-body text-white border-white hover:bg-white hover:text-primary"
-                >
-                  <Icon name="LogIn" size={20} className="mr-2" />
-                  Login
-                </Button>
+              <div className="text-center flex-1 min-w-[90px]">
+                <p className="text-xl sm:text-2xl font-heading font-bold text-primary">50+</p>
+                <p className="text-xs sm:text-sm font-body text-white/80">Teachers</p>
               </div>
-
-              {/* Quick Stats */}
-              <div className="flex flex-wrap gap-6 justify-center lg:justify-start mt-12">
-                <div className="text-center">
-                  <p className="text-2xl font-heading font-bold text-primary">500+</p>
-                  <p className="text-sm font-body text-white/80">Students</p>
-                </div>
-                <div className="text-center">
-                  <p className="text-2xl font-heading font-bold text-primary">50+</p>
-                  <p className="text-sm font-body text-white/80">Teachers</p>
-                </div>
-                <div className="text-center">
-                  <p className="text-2xl font-heading font-bold text-primary">95%</p>
-                  <p className="text-sm font-body text-white/80">Success Rate</p>
-                </div>
+              <div className="text-center flex-1 min-w-[90px]">
+                <p className="text-xl sm:text-2xl font-heading font-bold text-primary">95%</p>
+                <p className="text-xs sm:text-sm font-body text-white/80">Success Rate</p>
               </div>
-            </motion.div>
-
-            {/* Right Content */}
-            <motion.div 
-              initial={{ opacity: 0, x: 50 }}
-              animate={{ opacity: 1, x: 0 }}
-              transition={{ duration: 0.8, delay: 0.2 }}
-              className="hidden lg:block"
-            >
-              <div className="relative">
-                <div className="w-full h-96 bg-card/50 backdrop-blur-sm rounded-2xl p-8 flex items-center justify-center">
-                  <div className="text-center text-white">
-                    <div className="w-24 h-24 mx-auto mb-6 rounded-full overflow-hidden border-4 border-white/20">
-                      <Image 
-                        src="/assets/images/school_logo-1754996036714.jpg"
-                        alt="GOSHEN PRINATH ACADEMY"
-                        className="w-full h-full object-cover"
-                      />
-                    </div>
-                    <h3 className="text-2xl font-heading font-bold mb-4">Virtual Campus Tour</h3>
-                    <p className="text-white/80 mb-6">
-                      Explore our state-of-the-art facilities and vibrant campus life
-                    </p>
-                    <Button 
-                      variant="primary"
-                      onClick={() => handleNavigation('/about-page')}
-                    >
-                      <Icon name="Play" size={20} className="mr-2" />
-                      Start Tour
-                    </Button>
-                  </div>
-                </div>
-              </div>
-            </motion.div>
+            </div>
           </div>
         </div>
       </section>
@@ -279,13 +275,13 @@ const LandingPage = () => {
           <motion.div
             initial={{ opacity: 0, y: 50 }}
             whileInView={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.8 }}
+            transition={{ duration: 0.1 }}
             className="flex flex-col items-center justify-center w-full"
           >
-            <div className="w-full h-[300px] sm:h-[400px] md:h-[500px] lg:h-[600px] xl:h-[700px] 2xl:h-[800px] rounded-xl overflow-hidden shadow-lg">
+            <div className="w-full max-w-3xl mx-auto aspect-[16/9] rounded-3xl border-4 border-primary/40 bg-white shadow-2xl flex items-center justify-center overflow-hidden">
               <Image
-                src="/assets/images/student-pic.jpg"
-                alt="GOSHEN PRINATH ACADEMY Promo"
+                src="/assets/images/seminarians-pic.WebP"
+                alt="Seminarians Group"
                 className="w-full h-full object-cover"
                 style={{ width: '100%', height: '100%' }}
               />
@@ -293,48 +289,153 @@ const LandingPage = () => {
           </motion.div>
         </div>
       </section>
-      {/* Founder Section (increase card and icon size for fuller look) */}
+
+      {/* Jesus Image Section */}
+      <section className="py-12 bg-muted/10">
+        <div className="container mx-auto px-0 lg:px-0">
+          <motion.div
+            initial={{ opacity: 0, y: 50 }}
+            whileInView={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.1 }}
+            className="flex flex-col items-center justify-center w-full"
+          >
+            <div className="w-full max-w-2xl mx-auto aspect-[4/5] rounded-3xl border-4 border-accent/40 bg-white shadow-2xl flex items-center justify-center overflow-hidden">
+              <Image
+                src="/assets/images/jesus-pic.jpg"
+                alt="Sacred Heart of Jesus"
+                className="w-full h-full object-contain"
+                style={{ width: '100%', height: '100%' }}
+              />
+            </div>
+          </motion.div>
+        </div>
+      </section>
+
+      {/* Mary Image Section */}
+      <section className="py-12 bg-muted/10">
+        <div className="container mx-auto px-0 lg:px-0">
+          <motion.div
+            initial={{ opacity: 0, y: 50 }}
+            whileInView={{ opacity: 1, y: 0 }} 
+            transition={{ duration: 0.1 }}
+            className="flex flex-col items-center justify-center w-full"
+          >
+            <div className="w-full max-w-2xl mx-auto aspect-[4/5] rounded-3xl border-4 border-primary/40 bg-white shadow-2xl flex items-center justify-center overflow-hidden">
+              <Image
+                src="/assets/images/mary-pic.webp"
+                alt="Immaculate Heart of Mary"
+                className="w-full h-full object-contain"
+                style={{ width: '100%', height: '100%' }}
+              />
+            </div>
+          </motion.div>
+        </div>
+      </section>
+      {/* Pope Picture Section */}
+      <section className="py-12 bg-muted/10">
+        <div className="container mx-auto px-0 lg:px-0">
+          <motion.div
+            initial={{ opacity: 0, y: 50 }}
+            whileInView={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.1 }}
+            className="flex flex-col items-center justify-center w-full"
+          >
+            <div className="w-full flex justify-center items-center">
+              <div className="flex flex-col items-center w-full max-w-xs sm:max-w-sm md:max-w-md lg:max-w-lg xl:max-w-xl 2xl:max-w-2xl">
+                <div className="relative w-full aspect-[4/5]">
+                  {/* Frame (no bg-white) */}
+                  <div className="absolute inset-0 rounded-2xl border-4 border-accent/40 shadow-xl pointer-events-none z-10"></div>
+                  {/* Image fills the card */}
+                  <Image
+                    src="/assets/images/pope-pic1.WebP"
+                    alt="His Holiness, Pope Leo XIV"
+                    className="w-full h-full object-cover rounded-2xl"
+                    style={{ position: 'absolute', inset: 0 }}
+                  />
+                </div>
+              </div>
+            </div>
+            <p className="text-center text-base font-semibold text-primary mt-4">
+              His Holiness, Pope Leo XIV
+            </p>
+          </motion.div>
+        </div>
+      </section>
+      {/* Bishop Picture Section */}
+      <section className="py-12 bg-muted/10">
+        <div className="container mx-auto px-0 lg:px-0">
+          <motion.div
+            initial={{ opacity: 0, y: 50 }}
+            whileInView={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.1 }}
+            className="flex flex-col items-center justify-center w-full"
+          >
+            <div className="w-full flex justify-center items-center">
+              <div className="flex flex-col items-center w-full max-w-xs sm:max-w-sm md:max-w-md lg:max-w-lg xl:max-w-xl 2xl:max-w-2xl">
+                <div className="relative w-full aspect-[4/5]">
+                  {/* Frame (no bg-white) */}
+                  <div className="absolute inset-0 rounded-2xl border-4 border-primary/40 shadow-xl pointer-events-none z-10"></div>
+                  {/* Image fills the card */}
+                  <Image
+                    src="/assets/images/bishop-pic.WebP"
+                    alt="His Lordship, Most Rev. Prof. Augustine Ndubueze Echema, Bishop, Catholic Diocese of Aba"
+                    className="w-full h-full object-cover rounded-2xl"
+                    style={{ position: 'absolute', inset: 0 }}
+                  />
+                </div>
+              </div>
+            </div>
+            <p className="text-center text-base font-semibold text-primary mt-4">
+              His Lordship, Most Rev. Prof. Augustine Ndubueze Echema<br />
+              Bishop, Catholic Diocese of Aba
+            </p>
+          </motion.div>
+        </div>
+      </section>
+      {/* Team of Formators Section */}
       <section className="py-20 bg-gradient-to-br from-primary/10 via-background to-accent/10">
         <div className="container mx-auto px-4 lg:px-6">
           <motion.div
             initial={{ opacity: 0, y: 50 }}
             whileInView={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.8 }}
+            transition={{ duration: 0.1 }}
             className="max-w-3xl mx-auto mb-16 text-center"
           >
             <h2 className="text-3xl lg:text-4xl font-heading font-bold text-foreground mb-4">
-              Founder
+              Team of Formators
             </h2>
             <p className="text-lg text-muted-foreground">
-              The driving force behind our vision and values.
+              Meet the spiritual and academic leaders guiding our seminarians.
             </p>
           </motion.div>
-          <div className="flex flex-col items-center justify-center">
-            <motion.div
-              initial={{ opacity: 0, scale: 0.95 }}
-              whileInView={{ opacity: 1, scale: 1 }}
-              transition={{ duration: 0.7 }}
-              className="bg-card border border-border rounded-2xl shadow-2xl p-12 w-full max-w-xl flex flex-col items-center"
-            >
-              <div
-                className="w-72 h-72 rounded-full overflow-hidden mb-8 border-4 border-primary/30 shadow-xl flex items-center justify-center"
-                style={{ boxShadow: '0 0 48px #2563eb33', background: '#fff' }}
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-10">
+            {formators.map((formator, idx) => (
+              <motion.div
+                key={formator.name}
+                initial={{ opacity: 0, y: 40 }}
+                whileInView={{ opacity: 1, y: 0 }}
+                transition={{ duration: 0.1, delay: idx * 0.07 }}
+                className="bg-card border border-border rounded-2xl shadow-2xl p-8 flex flex-col items-center text-center"
               >
-                <img
-                  src={founder.image}
-                  alt={founder.name}
-                  className="w-full h-full object-cover object-top"
-                  style={{ objectPosition: 'top center' }}
-                />
-              </div>
-              <Icon name="Award" size={48} className="text-primary mb-4" />
-              <h3 className="text-3xl font-heading font-bold text-primary mb-2">{founder.name}</h3>
-              <p className="text-xl font-semibold text-muted-foreground mb-4">{founder.title}</p>
-              <p className="text-lg text-foreground mb-8">{founder.bio}</p>
-              <blockquote className="italic text-primary border-l-4 border-primary pl-4 mb-2 text-lg">
-                "{founder.quote}"
-              </blockquote>
-            </motion.div>
+                <div
+                  className="w-36 h-36 sm:w-40 sm:h-40 rounded-full overflow-hidden mb-6 border-4 border-primary/30 shadow-xl flex items-center justify-center"
+                  style={{ boxShadow: '0 0 32px #2563eb33', background: '#fff' }}
+                >
+                  <img
+                    src={formator.image}
+                    alt={formator.name}
+                    className="w-full h-full object-cover object-top"
+                  />
+                </div>
+                <Icon name="Award" size={36} className="text-primary mb-2" />
+                <h3 className="text-lg sm:text-xl font-heading font-bold text-primary mb-1">{formator.name}</h3>
+                <p className="text-sm sm:text-base font-semibold text-muted-foreground mb-2">{formator.title}</p>
+                <p className="text-xs sm:text-sm text-foreground mb-4">{formator.bio}</p>
+                <blockquote className="italic text-primary border-l-4 border-primary pl-3 mb-0 text-xs sm:text-sm">
+                  "{formator.quote}"
+                </blockquote>
+              </motion.div>
+            ))}
           </div>
         </div>
       </section>
@@ -344,94 +445,220 @@ const LandingPage = () => {
           <motion.div 
             initial={{ opacity: 0, y: 50 }}
             whileInView={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.8 }}
+            transition={{ duration: 0.1 }}
             className="text-center mb-16"
           >
             <h2 className="text-3xl lg:text-4xl font-heading font-bold text-foreground mb-4">
-              Why Choose GOSHEN PRINATH ACADEMY?
+              Why Choose ANNUNCIATION SEMINARY AMAUDARA?
             </h2>
             <p className="text-lg text-muted-foreground max-w-3xl mx-auto">
-              Our commitment to academic excellence and character development sets us apart as a premier educational institution.
+              Our commitment to academic excellence, spiritual formation, and character development sets us apart as a premier Catholic seminary dedicated to nurturing future leaders of the Church and society.
             </p>
           </motion.div>
 
           <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
-            {achievements?.map((achievement, index) => (
-              <motion.div
-                key={achievement?.title}
-                initial={{ opacity: 0, y: 50 }}
-                whileInView={{ opacity: 1, y: 0 }}
-                transition={{ duration: 0.8, delay: index * 0.2 }}
-                className="bg-card border border-border rounded-xl p-6 text-center hover:shadow-lg transition-shadow"
-              >
-                <div className="w-16 h-16 bg-primary/10 rounded-full flex items-center justify-center mx-auto mb-4">
-                  <Icon name={achievement?.icon} size={28} className="text-primary" />
-                </div>
-                <h3 className="text-xl font-heading font-semibold text-foreground mb-3">
-                  {achievement?.title}
-                </h3>
-                <p className="text-muted-foreground mb-4 font-body">
-                  {achievement?.description}
-                </p>
-                <div className="text-2xl font-heading font-bold text-primary">
-                  {achievement?.stats}
-                </div>
-              </motion.div>
-            ))}
+            <motion.div
+              key="Academic Excellence"
+              initial={{ opacity: 0, y: 50 }}
+              whileInView={{ opacity: 1, y: 0 }}
+              transition={{ duration: 0.1, delay: 0.1 }}
+              className="bg-card border border-border rounded-xl p-6 text-center hover:shadow-lg transition-shadow"
+            >
+              <div className="w-16 h-16 bg-primary/10 rounded-full flex items-center justify-center mx-auto mb-4">
+                <Icon name="Award" size={28} className="text-primary" />
+              </div>
+              <h3 className="text-xl font-heading font-semibold text-foreground mb-3">
+                Academic & Spiritual Excellence
+              </h3>
+              <p className="text-muted-foreground mb-4 font-body">
+                Renowned for outstanding academic performance and deep spiritual formation, preparing seminarians for priestly and lay leadership.
+              </p>
+              <div className="text-2xl font-heading font-bold text-primary">
+                95% Pass Rate
+              </div>
+            </motion.div>
+            <motion.div
+              key="Modern Facilities"
+              initial={{ opacity: 0, y: 50 }}
+              whileInView={{ opacity: 1, y: 0 }}
+              transition={{ duration: 0.1, delay: 0.2 }}
+              className="bg-card border border-border rounded-xl p-6 text-center hover:shadow-lg transition-shadow"
+            >
+              <div className="w-16 h-16 bg-primary/10 rounded-full flex items-center justify-center mx-auto mb-4">
+                <Icon name="Building" size={28} className="text-primary" />
+              </div>
+              <h3 className="text-xl font-heading font-semibold text-foreground mb-3">
+                Modern & Sacred Facilities
+              </h3>
+              <p className="text-muted-foreground mb-4 font-body">
+                State-of-the-art classrooms, serene chapel, library, and sports facilities to enhance holistic formation and learning.
+              </p>
+              <div className="text-2xl font-heading font-bold text-primary">
+                20+ Facilities
+              </div>
+            </motion.div>
+            <motion.div
+              key="Student Success"
+              initial={{ opacity: 0, y: 50 }}
+              whileInView={{ opacity: 1, y: 0 }}
+              transition={{ duration: 0.1, delay: 0.3 }}
+              className="bg-card border border-border rounded-xl p-6 text-center hover:shadow-lg transition-shadow"
+            >
+              <div className="w-16 h-16 bg-primary/10 rounded-full flex items-center justify-center mx-auto mb-4">
+                <Icon name="Users" size={28} className="text-primary" />
+              </div>
+              <h3 className="text-xl font-heading font-semibold text-foreground mb-3">
+                Formation for Life & Mission
+              </h3>
+              <p className="text-muted-foreground mb-4 font-body">
+                Dedicated to nurturing future priests and lay leaders with personalized attention, discipline, and comprehensive development.
+              </p>
+              <div className="text-2xl font-heading font-bold text-primary">
+                1000+ Alumni
+              </div>
+            </motion.div>
           </div>
         </div>
       </section>
+      {/* --- Special Seminary Moments Section --- */}
+      <section className="py-12 bg-muted/10">
+        <div className="container mx-auto px-0 lg:px-0">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-10">
+            {/* Peter Obi with Bishop */}
+            <motion.div
+              initial={{ opacity: 0, y: 40 }}
+              whileInView={{ opacity: 1, y: 0 }}
+              transition={{ duration: 0.1 }}
+              className="flex flex-col items-center"
+            >
+              <div className="w-full max-w-lg rounded-2xl overflow-hidden shadow-xl border-4 border-primary/30 bg-white">
+                <Image
+                  src="/assets/images/bishop123.jpg"
+                  alt="Peter Obi with Bishop at Annunciation Seminary"
+                  className="w-full h-80 object-cover"
+                />
+              </div>
+              <p className="mt-4 text-center text-base font-semibold text-primary">
+                <span className="block">A Memorable Visit:</span>
+                <span className="block">Peter Obi with His Lordship, Most Rev. Prof. Augustine Ndubueze Echema,</span>
+                <span className="block">Bishop of Catholic Diocese of Aba, at Annunciation Seminary Amaudara</span>
+              </p>
+            </motion.div>
+            {/* Seminary Main Gate or Grotto */}
+            <motion.div
+              initial={{ opacity: 0, y: 40 }}
+              whileInView={{ opacity: 1, y: 0 }}
+              transition={{ duration: 0.1, delay: 0.1 }}
+              className="flex flex-col items-center"
+            >
+              <div className="w-full max-w-lg rounded-2xl overflow-hidden shadow-xl border-4 border-accent/30 bg-white">
+                <Image
+                  src="/assets/images/front-gate.jpg"
+                  alt="Annunciation Seminary Main Gate"
+                  className="w-full h-80 object-cover"
+                />
+              </div>
+              <p className="mt-4 text-center text-base font-semibold text-accent">
+                <span className="block">The Iconic Main Gate:</span>
+                <span className="block">Welcoming all to a place of faith, learning, and transformation</span>
+              </p>
+            </motion.div>
+          </div>
+          {/* Grotto and Seminary Field (optional, add more images if needed) */}
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-10 mt-10">
+            {/* Seminary Grotto */}
+            <motion.div
+              initial={{ opacity: 0, y: 40 }}
+              whileInView={{ opacity: 1, y: 0 }}
+              transition={{ duration: 0.1, delay: 0.2 }}
+              className="flex flex-col items-center"
+            >
+              <div className="w-full max-w-lg rounded-2xl overflow-hidden shadow-xl border-4 border-primary/20 bg-white">
+                <Image
+                  src="/assets/images/mary-grotto.jpg"
+                  alt="Annunciation Seminary Grotto"
+                  className="w-full h-80 object-cover"
+                />
+              </div>
+              <p className="mt-4 text-center text-base font-semibold text-primary">
+                <span className="block">The New Annunciation Grotto:</span>
+                <span className="block">A serene spot for prayer and reflection within the seminary grounds</span>
+              </p>
+            </motion.div>
+            {/* Seminary Field */}
+            <motion.div
+              initial={{ opacity: 0, y: 40 }}
+              whileInView={{ opacity: 1, y: 0 }}
+              transition={{ duration: 0.1, delay: 0.2 }}
+              className="flex flex-col items-center"
+            >
+              <div className="w-full max-w-lg rounded-2xl overflow-hidden shadow-xl border-4 border-accent/20 bg-white">
+                <Image
+                  src="/assets/images/main-football-field.jpg"
+                  alt="Seminary Football Field"
+                  className="w-full h-80 object-cover"
+                />
+              </div>
+              <p className="mt-4 text-center text-base font-semibold text-accent">
+                <span className="block">Vibrant Seminary Life:</span>
+                <span className="block">Sports and brotherhood on the lush football field</span>
+              </p>
+            </motion.div>
+          </div>
+        </div>
+      </section>
+
       {/* Value Proposition Section */}
       <section className="py-20 bg-gradient-to-br from-accent/10 via-background to-primary/10">
         <div className="container mx-auto px-4 lg:px-6">
           <motion.div
             initial={{ opacity: 0, y: 50 }}
             whileInView={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.8 }}
+            transition={{ duration: 0.1 }}
             className="max-w-2xl mx-auto mb-16 text-center"
           >
             <h2 className="text-3xl lg:text-4xl font-heading font-bold text-primary mb-4">
-              Our Promise to Every Student
+              Our Promise to Every Seminarian
             </h2>
             <p className="text-lg text-muted-foreground">
-              At Goshen Prinath Academy, we believe every child deserves a nurturing environment, innovative learning, and opportunities to shine.
+              At Annunciation Seminary Amaudara, we believe every seminarian deserves a nurturing environment, deep spiritual formation, and opportunities to grow in knowledge, faith, and service.
             </p>
           </motion.div>
           <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
             <motion.div
               initial={{ opacity: 0, y: 50 }}
               whileInView={{ opacity: 1, y: 0 }}
-              transition={{ duration: 0.8, delay: 0.1 }}
+              transition={{ duration: 0.1, delay: 0.1 }}
               className="bg-card border border-primary/20 rounded-xl p-6 text-center shadow hover:shadow-lg transition-shadow"
             >
               <Icon name="Heart" size={32} className="text-primary mx-auto mb-4" />
               <h3 className="text-xl font-heading font-semibold text-primary mb-2">Caring Community</h3>
               <p className="text-muted-foreground font-body">
-                Supportive teachers and staff who care about every student’s growth and well-being.
+                Supportive priests, formators, and staff who care about every seminarian’s growth, vocation, and well-being.
               </p>
             </motion.div>
             <motion.div
               initial={{ opacity: 0, y: 50 }}
               whileInView={{ opacity: 1, y: 0 }}
-              transition={{ duration: 0.8, delay: 0.2 }}
+              transition={{ duration: 0.1, delay: 0.2 }}
               className="bg-card border border-primary/20 rounded-xl p-6 text-center shadow hover:shadow-lg transition-shadow"
             >
               <Icon name="Lightbulb" size={32} className="text-primary mx-auto mb-4" />
-              <h3 className="text-xl font-heading font-semibold text-primary mb-2">Innovative Learning</h3>
+              <h3 className="text-xl font-heading font-semibold text-primary mb-2">Holistic Formation</h3>
               <p className="text-muted-foreground font-body">
-                Modern teaching methods and technology to spark curiosity and creativity.
+                Spiritual, academic, and human formation that prepares seminarians for priesthood and leadership in the Church and society.
               </p>
             </motion.div>
             <motion.div
               initial={{ opacity: 0, y: 50 }}
               whileInView={{ opacity: 1, y: 0 }}
-              transition={{ duration: 0.8, delay: 0.3 }}
+              transition={{ duration: 0.1, delay: 0.3 }}
               className="bg-card border border-primary/20 rounded-xl p-6 text-center shadow hover:shadow-lg transition-shadow"
             >
               <Icon name="Trophy" size={32} className="text-primary mx-auto mb-4" />
               <h3 className="text-xl font-heading font-semibold text-primary mb-2">Opportunities to Shine</h3>
               <p className="text-muted-foreground font-body">
-                Clubs, competitions, and leadership programs to help students discover and develop their talents.
+                Liturgical, academic, and leadership programs to help seminarians discover and develop their gifts for the Church.
               </p>
             </motion.div>
           </div>
@@ -443,51 +670,51 @@ const LandingPage = () => {
           <motion.div
             initial={{ opacity: 0, y: 50 }}
             whileInView={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.8 }}
+            transition={{ duration: 0.1 }}
             className="max-w-2xl mx-auto mb-16 text-center"
           >
             <h2 className="text-3xl lg:text-4xl font-heading font-bold text-primary mb-4">
-              Life Beyond the Classroom
+              Life Beyond the Chapel
             </h2>
             <p className="text-lg text-muted-foreground">
-              Our students enjoy a rich variety of clubs, sports, and creative activities that build confidence and friendships.
+              Our seminarians enjoy a rich variety of clubs, sports, and creative activities that build confidence, brotherhood, and leadership.
             </p>
           </motion.div>
           <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
             <motion.div
               initial={{ opacity: 0, y: 40 }}
               whileInView={{ opacity: 1, y: 0 }}
-              transition={{ duration: 0.7 }}
+              transition={{ duration: 0.1 }}
               className="bg-card rounded-xl shadow-lg p-6 flex flex-col items-center text-center"
             >
               <Icon name="Football" size={36} className="text-accent mb-4" />
               <h3 className="text-xl font-heading font-semibold text-primary mb-2">Sports & Fitness</h3>
               <p className="text-muted-foreground font-body">
-                Football, basketball, athletics and more—our sports programs encourage teamwork and healthy living.
+                Football, basketball, athletics and more—our sports programs encourage teamwork, discipline, and healthy living.
               </p>
             </motion.div>
             <motion.div
               initial={{ opacity: 0, y: 40 }}
               whileInView={{ opacity: 1, y: 0 }}
-              transition={{ duration: 0.7, delay: 0.1 }}
+              transition={{ duration: 0.1, delay: 0.1 }}
               className="bg-card rounded-xl shadow-lg p-6 flex flex-col items-center text-center"
             >
               <Icon name="Music" size={36} className="text-accent mb-4" />
               <h3 className="text-xl font-heading font-semibold text-primary mb-2">Music & Arts</h3>
               <p className="text-muted-foreground font-body">
-                Choir, drama, and art clubs help students express themselves and discover new talents.
+                Choir, drama, and art clubs help seminarians express themselves and discover new talents.
               </p>
             </motion.div>
             <motion.div
               initial={{ opacity: 0, y: 40 }}
               whileInView={{ opacity: 1, y: 0 }}
-              transition={{ duration: 0.7, delay: 0.2 }}
+              transition={{ duration: 0.1, delay: 0.2 }}
               className="bg-card rounded-xl shadow-lg p-6 flex flex-col items-center text-center"
             >
               <Icon name="Code" size={36} className="text-accent mb-4" />
-              <h3 className="text-xl font-heading font-semibold text-primary mb-2">STEM & Innovation</h3>
+              <h3 className="text-xl font-heading font-semibold text-primary mb-2">Intellectual & Innovation Clubs</h3>
               <p className="text-muted-foreground font-body">
-                Science, coding, and robotics clubs prepare students for the future and foster curiosity.
+                Science, debate, and technology clubs prepare seminarians for the future and foster curiosity.
               </p>
             </motion.div>
           </div>
@@ -500,51 +727,51 @@ const LandingPage = () => {
           <motion.div
             initial={{ opacity: 0, y: 50 }}
             whileInView={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.8 }}
+            transition={{ duration: 0.1 }}
             className="max-w-2xl mx-auto mb-16 text-center"
           >
             <h2 className="text-3xl lg:text-4xl font-heading font-bold text-primary mb-4">
               Our Core Values
             </h2>
             <p className="text-lg text-muted-foreground">
-              The foundation of Goshen Prinath Academy is built on values that shape our students for life.
+              The foundation of Annunciation Seminary Amaudara is built on values that shape our seminarians for life and ministry.
             </p>
           </motion.div>
           <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
             <motion.div
               initial={{ opacity: 0, y: 40 }}
               whileInView={{ opacity: 1, y: 0 }}
-              transition={{ duration: 0.7 }}
+              transition={{ duration: 0.1 }}
               className="bg-card rounded-xl shadow-lg p-6 flex flex-col items-center text-center"
             >
               <Icon name="ShieldCheck" size={36} className="text-primary mb-4" />
               <h3 className="text-xl font-heading font-semibold text-primary mb-2">Integrity</h3>
               <p className="text-muted-foreground font-body">
-                We instill honesty, responsibility, and strong moral principles in every student.
+                We instill honesty, responsibility, and strong moral principles in every seminarian.
               </p>
             </motion.div>
             <motion.div
               initial={{ opacity: 0, y: 40 }}
               whileInView={{ opacity: 1, y: 0 }}
-              transition={{ duration: 0.7, delay: 0.1 }}
+              transition={{ duration: 0.1, delay: 0.1 }}
               className="bg-card rounded-xl shadow-lg p-6 flex flex-col items-center text-center"
             >
               <Icon name="Users" size={36} className="text-primary mb-4" />
               <h3 className="text-xl font-heading font-semibold text-primary mb-2">Respect</h3>
               <p className="text-muted-foreground font-body">
-                We celebrate diversity and foster a culture of respect for self and others.
+                We celebrate diversity and foster a culture of respect for self, others, and the Church.
               </p>
             </motion.div>
             <motion.div
               initial={{ opacity: 0, y: 40 }}
               whileInView={{ opacity: 1, y: 0 }}
-              transition={{ duration: 0.7, delay: 0.2 }}
+              transition={{ duration: 0.1, delay: 0.2 }}
               className="bg-card rounded-xl shadow-lg p-6 flex flex-col items-center text-center"
             >
               <Icon name="TrendingUp" size={36} className="text-primary mb-4" />
               <h3 className="text-xl font-heading font-semibold text-primary mb-2">Excellence</h3>
               <p className="text-muted-foreground font-body">
-                We encourage our students to strive for their best in academics, character, and leadership.
+                We encourage our seminarians to strive for their best in academics, spirituality, and leadership.
               </p>
             </motion.div>
           </div>
@@ -556,70 +783,83 @@ const LandingPage = () => {
           <motion.div 
             initial={{ opacity: 0, y: 50 }}
             whileInView={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.8 }}
+            transition={{ duration: 0.1 }}
             className="text-center mb-16"
           >
             <h2 className="text-3xl lg:text-4xl font-heading font-bold text-foreground mb-4">
               What Our Community Says
             </h2>
             <p className="text-lg text-muted-foreground">
-              Hear from parents, students, and alumni about their GOSHEN PRINATH ACADEMY experience.
+              Hear from parents, seminarians, and alumni about their Annunciation Seminary Amaudara experience.
             </p>
           </motion.div>
 
           <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
-            {testimonials?.map((testimonial, index) => (
-              <motion.div
-                key={testimonial?.name}
-                initial={{ opacity: 0, y: 50 }}
-                whileInView={{ opacity: 1, y: 0 }}
-                transition={{ duration: 0.8, delay: index * 0.2 }}
-                className="bg-card border border-border rounded-xl p-6"
-              >
-                <div className="flex items-center mb-4">
-                  {[...Array(testimonial?.rating)]?.map((_, i) => (
-                    <Icon key={i} name="Star" size={16} className="text-secondary fill-current" />
-                  ))}
-                </div>
-                <p className="text-muted-foreground mb-4 font-body italic">
-                  "{testimonial?.content}"
-                </p>
-                <div>
-                  <p className="font-heading font-semibold text-foreground">{testimonial?.name}</p>
-                  <p className="text-sm text-muted-foreground">{testimonial?.role}</p>
-                </div>
-              </motion.div>
-            ))}
+            <motion.div
+              key="cynthia amaka"
+              initial={{ opacity: 0, y: 50 }}
+              whileInView={{ opacity: 1, y: 0 }}
+              transition={{ duration: 0.1, delay: 0.1 }}
+              className="bg-card border border-border rounded-xl p-6"
+            >
+              <div className="flex items-center mb-4">
+                {[...Array(5)].map((_, i) => (
+                  <Icon key={i} name="Star" size={16} className="text-secondary fill-current" />
+                ))}
+              </div>
+              <p className="text-muted-foreground mb-4 font-body italic">
+                "Annunciation Seminary Amaudara has truly transformed my child's spiritual and academic journey. The dedicated formators and excellent facilities make it outstanding."
+              </p>
+              <div>
+                <p className="font-heading font-semibold text-foreground">Cynthia Amaka</p>
+                <p className="text-sm text-muted-foreground">Parent</p>
+              </div>
+            </motion.div>
+            <motion.div
+              key="Michael chibueze"
+              initial={{ opacity: 0, y: 50 }}
+              whileInView={{ opacity: 1, y: 0 }}
+              transition={{ duration: 0.1, delay: 0.2 }}
+              className="bg-card border border-border rounded-xl p-6"
+            >
+              <div className="flex items-center mb-4">
+                {[...Array(5)].map((_, i) => (
+                  <Icon key={i} name="Star" size={16} className="text-secondary fill-current" />
+                ))}
+              </div>
+              <p className="text-muted-foreground mb-4 font-body italic">
+                "The formation I received here prepared me for seminary and beyond. The emphasis on holistic growth is remarkable."
+              </p>
+              <div>
+                <p className="font-heading font-semibold text-foreground">Michael Chibueze</p>
+                <p className="text-sm text-muted-foreground">Alumni</p>
+              </div>
+            </motion.div>
+            <motion.div
+              key="Ebuka David"
+              initial={{ opacity: 0, y: 50 }}
+              whileInView={{ opacity: 1, y: 0 }}
+              transition={{ duration: 0.1, delay: 0.3 }}
+              className="bg-card border border-border rounded-xl p-6"
+            >
+              <div className="flex items-center mb-4">
+                {[...Array(5)].map((_, i) => (
+                  <Icon key={i} name="Star" size={16} className="text-secondary fill-current" />
+                ))}
+              </div>
+              <p className="text-muted-foreground mb-4 font-body italic">
+                "I love the prayerful environment and the support from formators. This seminary truly cares about each seminarian."
+              </p>
+              <div>
+                <p className="font-heading font-semibold text-foreground">Ebuka David</p>
+                <p className="text-sm text-muted-foreground">Seminarian</p>
+              </div>
+            </motion.div>
           </div>
         </div>
       </section>
-      {/* Call to Action Section */}
-      <section className="py-16 bg-primary/5">
-        <div className="container mx-auto px-4 lg:px-6 flex flex-col items-center">
-          <motion.div
-            initial={{ opacity: 0, scale: 0.95 }}
-            whileInView={{ opacity: 1, scale: 1 }}
-            transition={{ duration: 0.7 }}
-            className="bg-card border border-primary/20 rounded-xl shadow-lg p-8 w-full max-w-2xl text-center"
-          >
-            <h2 className="text-2xl lg:text-3xl font-heading font-bold text-primary mb-4">
-              Ready to Join Our Family?
-            </h2>
-            <p className="text-lg text-muted-foreground mb-6">
-              Discover the difference at Goshen Prinath Academy. Start your journey today!
-            </p>
-            <Button
-              variant="primary"
-              size="lg"
-              onClick={() => window.location.href = '/admissions'}
-              className="font-body"
-            >
-              <Icon name="ArrowRightCircle" size={20} className="mr-2" />
-              Apply Now
-            </Button>
-          </motion.div>
-        </div>
-      </section>
+
+
       {/* Footer */}
       <footer className="bg-card border-t border-border py-12">
         <div className="container mx-auto px-4 lg:px-6">
@@ -660,7 +900,7 @@ const LandingPage = () => {
               <h4 className="font-heading font-semibold text-foreground mb-4">Quick Links</h4>
               <ul className="space-y-2 font-body text-sm">
                 <li><button onClick={() => handleNavigation('/about-page')} className="text-muted-foreground hover:text-primary">About Us</button></li>
-                <li><button onClick={() => handleNavigation('/admissions')} className="text-muted-foreground hover:text-primary">Admissions</button></li>
+                <li><button onClick={() => handleNavigation('/admissions')} className="text-muted-foreground hover:text-primary">Annuncments&updates</button></li>
                 <li><button className="text-muted-foreground hover:text-primary">Faculty</button></li>
                 <li><button onClick={() => handleNavigation('/contact')} className="text-muted-foreground hover:text-primary">Contact</button></li>
               </ul>

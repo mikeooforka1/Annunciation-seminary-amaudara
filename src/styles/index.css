@@ -16,7 +16,7 @@ body {
 
 /* Base background gradient for the landing page */
 body, .bg-background {
-  background: linear-gradient(120deg, #f8fafc 0%, #e0e7ff 40%, #f0fdf4 100%);
+  background: linear-gradient(120deg, #f8fafc 0%, #e0e7ff 40%, #f1f5f9 100%);
   animation: bgMove 12s ease-in-out infinite alternate;
 }
 @keyframes bgMove {
@@ -33,15 +33,15 @@ body, .bg-background {
 }
 
 .bg-muted\/10, .bg-muted\/30 {
-  background: linear-gradient(120deg, #f0fdf4 60%, #e0e7ff 100%);
+  background: linear-gradient(120deg, #f1f5f9 60%, #e0e7ff 100%);
 }
 
 .bg-primary\/5, .bg-primary\/10 {
-  background: linear-gradient(120deg, #e0e7ff 60%, #f0fdf4 100%);
+  background: linear-gradient(120deg, #e0e7ff 60%, #f1f5f9 100%);
 }
 
 .bg-gradient-to-br {
-  background: linear-gradient(135deg, #e0e7ff 0%, #f0fdf4 100%);
+  background: linear-gradient(135deg, #e0e7ff 0%, #f1f5f9 100%);
 }
 
 /* Section spacing and rounded corners */
@@ -53,7 +53,7 @@ section {
 
 /* Button styling for more vibrance */
 button {
-  background: linear-gradient(90deg, #2563eb 0%, #16a34a 100%);
+  background: linear-gradient(90deg, #2563eb 0%, #a3a3a3 100%);
   color: #fff !important;
   border: none;
   border-radius: 0.75rem;
@@ -66,19 +66,19 @@ button {
 }
 
 button:hover {
-  background: linear-gradient(90deg, #16a34a 0%, #2563eb 100%);
-  box-shadow: 0 4px 16px rgba(22, 163, 74, 0.12);
+  background: linear-gradient(90deg, #a3a3a3 0%, #2563eb 100%);
+  box-shadow: 0 4px 16px rgba(163, 163, 163, 0.12);
   color: #fff !important;
 }
 
 button:focus {
   outline: none;
-  box-shadow: 0 0 0 4px #16a34a44, 0 4px 16px rgba(22,163,74,0.12);
+  box-shadow: 0 0 0 4px #a3a3a344, 0 4px 16px rgba(163,163,163,0.12);
 }
 
 /* Only apply color to buttons with text, not icon-only buttons */
 button:not(.icon-btn):not([aria-label]) {
-  background: linear-gradient(90deg, #2563eb 0%, #16a34a 100%);
+  background: linear-gradient(90deg, #2563eb 0%, #a3a3a3 100%);
   color: #fff !important;
   border: none;
   border-radius: 0.75rem;
@@ -91,8 +91,8 @@ button:not(.icon-btn):not([aria-label]) {
 }
 
 button:not(.icon-btn):not([aria-label]):hover {
-  background: linear-gradient(90deg, #16a34a 0%, #2563eb 100%);
-  box-shadow: 0 4px 16px rgba(22, 163, 74, 0.12);
+  background: linear-gradient(90deg, #a3a3a3 0%, #2563eb 100%);
+  box-shadow: 0 4px 16px rgba(163, 163, 163, 0.12);
   color: #fff !important;
 }
 
@@ -127,10 +127,10 @@ h1, h2, h3, h4, h5, h6, .font-heading {
   color: #2563eb !important;
 }
 .text-secondary {
-  color: #16a34a !important;
+  color: #a3a3a3 !important;
 }
 .text-accent {
-  color: #eab308 !important;
+  color: #cbd5e1 !important;
 }
 
 /* Card hover effect */
@@ -153,7 +153,7 @@ h1, h2, h3, h4, h5, h6, .font-heading {
 
 /* Navigation header styling */
 header {
-  background: linear-gradient(90deg, #2563eb 0%, #16a34a 100%);
+  background: linear-gradient(90deg, #2563eb 0%, #a3a3a3 100%);
   color: #fff;
   box-shadow: 0 2px 12px rgba(38, 99, 235, 0.08);
 }
@@ -168,7 +168,7 @@ header .font-caption {
 
 /* Footer styling */
 footer {
-  background: linear-gradient(90deg, #e0e7ff 0%, #f0fdf4 100%);
+  background: linear-gradient(90deg, #e0e7ff 0%, #f1f5f9 100%);
   color: #334155;
   border-top: 2px solid #2563eb;
 }
@@ -183,7 +183,7 @@ footer .font-caption {
 
 /* Dynamic accent for section titles */
 section h2 {
-  background: linear-gradient(90deg, #2563eb 0%, #16a34a 100%);
+  background: linear-gradient(90deg, #2563eb 0%, #a3a3a3 100%);
   -webkit-background-clip: text;
   -webkit-text-fill-color: transparent;
   font-weight: 800;
@@ -200,7 +200,7 @@ section h2::after, .section-title::after {
   width: 60%;
   height: 4px;
   margin: 8px auto 0;
-  background: linear-gradient(90deg, #2563eb 0%, #16a34a 100%);
+  background: linear-gradient(90deg, #2563eb 0%, #a3a3a3 100%);
   border-radius: 2px;
   animation: underlineGrow 1.2s cubic-bezier(.4,0,.2,1);
 }
@@ -216,7 +216,7 @@ button {
 }
 button:focus {
   outline: none;
-  box-shadow: 0 0 0 4px #16a34a44, 0 4px 16px rgba(22,163,74,0.12);
+  box-shadow: 0 0 0 4px #a3a3a344, 0 4px 16px rgba(163,163,163,0.12);
 }
 
 /* Add a floating effect to images */
@@ -246,14 +246,14 @@ section, .bg-card, .card {
 /* Add a gradient border to the founder card */
 .founder-card {
   border: 2px solid;
-  border-image: linear-gradient(90deg, #2563eb 0%, #16a34a 100%) 1;
+  border-image: linear-gradient(90deg, #2563eb 0%, #a3a3a3 100%) 1;
   box-shadow: 0 4px 24px rgba(38,99,235,0.10);
 }
 
 /* Add a pulse animation to call-to-action buttons */
 .cta-btn {
   animation: buttonPulse 2s infinite;
-  background: linear-gradient(90deg, #2563eb 0%, #16a34a 100%);
+  background: linear-gradient(90deg, #2563eb 0%, #a3a3a3 100%);
   color: #fff !important;
   border-radius: 1rem;
   font-weight: 700;
@@ -264,7 +264,7 @@ section, .bg-card, .card {
 
 /* Add a soft highlight to testimonials or quotes */
 blockquote, .quote {
-  background: linear-gradient(90deg, #e0e7ff 0%, #f0fdf4 100%);
+  background: linear-gradient(90deg, #e0e7ff 0%, #f1f5f9 100%);
   border-left: 4px solid #2563eb;
   padding: 1rem 1.5rem;
   font-style: italic;

@@ -99,15 +99,15 @@ const RoleBasedHeader = ({
 
           {/* Logo */}
           <div className="flex items-center space-x-3">
-            <div className="w-10 h-10 rounded-full overflow-hidden">
+            <div className="w-12 h-12 bg-white rounded-full overflow-visible flex items-center justify-center p-1 shadow">
               <Image 
                 src="/assets/images/school_logo-1754996036714.jpg"
-                alt="GOSHEN PRINATH ACADEMY Logo"
-                className="w-full h-full object-cover"
+                alt="ANNUNCIATION SEMINARY AMAUDARA Logo"
+                className="w-full h-full object-contain"
               />
             </div>
             <div className="hidden sm:block">
-              <h1 className="font-heading font-semibold text-lg text-black">ANNUCIATION SEMINARY AMAUDARA</h1>
+              <h1 className="font-heading font-semibold text-lg text-black">ANNUNCIATION SEMINARY AMAUDARA</h1>
               <p className="font-caption text-xs text-black">Educational Portal</p>
             </div>
           </div>

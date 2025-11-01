@@ -60,18 +60,18 @@ const LandingPage = () => {
       quote: "Formation is the heart of our mission—shaping minds, nurturing faith, and building leaders for the Church and society."
     },
     {
-      name: "Rev. Fr. Peterkevin Iwundu",
-      title: "Vice Rector I",
-      image: "/assets/images/vice-rector1.jpg",
-      bio: "Rev. Fr. Peterkevin Iwundu supports the rector and oversees the day-to-day formation activities, ensuring discipline and academic excellence.",
-      quote: "Guiding young minds and hearts is a sacred trust."
-    },
-    {
       name: "Rev. Fr. Francis Ihesiaba",
-      title: "Vice Rector II",
+      title: "Vice Rector I",
       image: "/assets/images/vice-rector2.WebP",
       bio: "Rev. Fr. Francis Ihesiaba assists in the holistic formation of seminarians, focusing on their spiritual and moral growth.",
       quote: "Every seminarian is a seed of hope for the Church."
+    },
+    {
+      name: "Rev. Fr. Paschal Chigozie",
+      title: "Vice Rector II",
+      image: "/assets/images/pastoral-intern.jpg",
+      bio: "Rev. Fr. Paschal Chigozie is Vice Rector II, assisting in formation and parish activities with dedication and zeal.",
+      quote: "Pastoral service is a call to love and serve."
     },
     {
       name: "Rev. Fr. Chinedu Ubani",
@@ -93,13 +93,6 @@ const LandingPage = () => {
       image: "/assets/images/parish-priest.jpg",
       bio: "Rev. Fr. Ignatius Onyekwere serves as the Parish Priest of Regina Pacis Amaudara, fostering a vibrant parish community and supporting the seminary.",
       quote: "A strong parish is the heart of a thriving seminary."
-    },
-    {
-      name: "Rev. Paschal Chigozie",
-      title: "Pastoral Internship",
-      image: "/assets/images/pastoral-intern.jpg",
-      bio: "Rev. Paschal Chigozie is on pastoral internship, assisting in formation and parish activities with dedication and zeal.",
-      quote: "Pastoral service is a call to love and serve."
     }
   ];
 
@@ -269,6 +262,53 @@ const LandingPage = () => {
           </div>
         </div>
       </section>
+
+      {/* Grotto and Main Gate Section (moved and reordered) */}
+      <section className="py-12 bg-muted/10">
+        <div className="container mx-auto px-0 lg:px-0">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-10">
+            {/* Seminary Grotto FIRST */}
+            <motion.div
+              initial={{ opacity: 0, y: 40 }}
+              whileInView={{ opacity: 1, y: 0 }}
+              transition={{ duration: 0.1 }}
+              className="flex flex-col items-center"
+            >
+              <div className="w-full max-w-lg rounded-2xl overflow-hidden shadow-xl border-4 border-primary/20 bg-white">
+                <Image
+                  src="/assets/images/mary-grotto.jpg"
+                  alt="Annunciation Seminary Grotto"
+                  className="w-full h-80 object-cover"
+                />
+              </div>
+              <p className="mt-4 text-center text-base font-semibold text-primary">
+                <span className="block">The New Annunciation Grotto:</span>
+                <span className="block">A serene spot for prayer and reflection within the seminary grounds</span>
+              </p>
+            </motion.div>
+            {/* Seminary Main Gate SECOND */}
+            <motion.div
+              initial={{ opacity: 0, y: 40 }}
+              whileInView={{ opacity: 1, y: 0 }}
+              transition={{ duration: 0.1, delay: 0.1 }}
+              className="flex flex-col items-center"
+            >
+              <div className="w-full max-w-lg rounded-2xl overflow-hidden shadow-xl border-4 border-accent/30 bg-white">
+                <Image
+                  src="/assets/images/front-gate.jpg"
+                  alt="Annunciation Seminary Main Gate"
+                  className="w-full h-80 object-cover"
+                />
+              </div>
+              <p className="mt-4 text-center text-base font-semibold text-accent">
+                <span className="block">The Iconic Main Gate:</span>
+                <span className="block">Welcoming all to a place of faith, learning, and transformation</span>
+              </p>
+            </motion.div>
+          </div>
+        </div>
+      </section>
+
       {/* School Promo Image Section */}
       <section className="py-12 bg-muted/10">
         <div className="container mx-auto px-0 lg:px-0">
@@ -522,7 +562,7 @@ const LandingPage = () => {
       </section>
       {/* --- Special Seminary Moments Section --- */}
       <section className="py-12 bg-muted/10">
-        <div className="container mx-auto px-0 lg:px-0">
+        <div className="container mx-auto px-4 lg:px-0">
           <div className="grid grid-cols-1 md:grid-cols-2 gap-10">
             {/* Peter Obi with Bishop */}
             <motion.div
@@ -536,60 +576,20 @@ const LandingPage = () => {
                   src="/assets/images/bishop123.jpg"
                   alt="Peter Obi with Bishop at Annunciation Seminary"
                   className="w-full h-80 object-cover"
+                  style={{ objectPosition: 'center top' }}
                 />
               </div>
-              <p className="mt-4 text-center text-base font-semibold text-primary">
+              <p className="mt-4 text-center text-base font-semibold text-primary break-words max-w-xs sm:max-w-md md:max-w-lg">
                 <span className="block">A Memorable Visit:</span>
                 <span className="block">Peter Obi with His Lordship, Most Rev. Prof. Augustine Ndubueze Echema,</span>
                 <span className="block">Bishop of Catholic Diocese of Aba, at Annunciation Seminary Amaudara</span>
-              </p>
-            </motion.div>
-            {/* Seminary Main Gate or Grotto */}
-            <motion.div
-              initial={{ opacity: 0, y: 40 }}
-              whileInView={{ opacity: 1, y: 0 }}
-              transition={{ duration: 0.1, delay: 0.1 }}
-              className="flex flex-col items-center"
-            >
-              <div className="w-full max-w-lg rounded-2xl overflow-hidden shadow-xl border-4 border-accent/30 bg-white">
-                <Image
-                  src="/assets/images/front-gate.jpg"
-                  alt="Annunciation Seminary Main Gate"
-                  className="w-full h-80 object-cover"
-                />
-              </div>
-              <p className="mt-4 text-center text-base font-semibold text-accent">
-                <span className="block">The Iconic Main Gate:</span>
-                <span className="block">Welcoming all to a place of faith, learning, and transformation</span>
-              </p>
-            </motion.div>
-          </div>
-          {/* Grotto and Seminary Field (optional, add more images if needed) */}
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-10 mt-10">
-            {/* Seminary Grotto */}
-            <motion.div
-              initial={{ opacity: 0, y: 40 }}
-              whileInView={{ opacity: 1, y: 0 }}
-              transition={{ duration: 0.1, delay: 0.2 }}
-              className="flex flex-col items-center"
-            >
-              <div className="w-full max-w-lg rounded-2xl overflow-hidden shadow-xl border-4 border-primary/20 bg-white">
-                <Image
-                  src="/assets/images/mary-grotto.jpg"
-                  alt="Annunciation Seminary Grotto"
-                  className="w-full h-80 object-cover"
-                />
-              </div>
-              <p className="mt-4 text-center text-base font-semibold text-primary">
-                <span className="block">The New Annunciation Grotto:</span>
-                <span className="block">A serene spot for prayer and reflection within the seminary grounds</span>
               </p>
             </motion.div>
             {/* Seminary Field */}
             <motion.div
               initial={{ opacity: 0, y: 40 }}
               whileInView={{ opacity: 1, y: 0 }}
-              transition={{ duration: 0.1, delay: 0.2 }}
+              transition={{ duration: 0.1, delay: 0.1 }}
               className="flex flex-col items-center"
             >
               <div className="w-full max-w-lg rounded-2xl overflow-hidden shadow-xl border-4 border-accent/20 bg-white">
@@ -599,7 +599,7 @@ const LandingPage = () => {
                   className="w-full h-80 object-cover"
                 />
               </div>
-              <p className="mt-4 text-center text-base font-semibold text-accent">
+              <p className="mt-4 text-center text-base font-semibold text-accent break-words max-w-xs sm:max-w-md md:max-w-lg">
                 <span className="block">Vibrant Seminary Life:</span>
                 <span className="block">Sports and brotherhood on the lush football field</span>
               </p>

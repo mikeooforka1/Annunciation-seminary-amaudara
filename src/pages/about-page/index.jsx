@@ -198,7 +198,7 @@ const AboutPage = () => {
     {
       src: '/assets/images/mary-grotto.jpg',
       alt: 'Farm Manager',
-      caption: 'Mary Grotto'
+      caption: 'The Annunciation Grotto'
     },
     {
       src: '/assets/images/clinic.jpg',

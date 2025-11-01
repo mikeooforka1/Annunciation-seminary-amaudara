@@ -91,7 +91,7 @@ const PageTransitionWrapper = ({ children }) => {
     ) {
       setShowLoader(true);
       setShowSpinner(false);
-      const timer = setTimeout(() => setShowLoader(false), 1200); // Loader duration
+      const timer = setTimeout(() => setShowLoader(false), 1800); // Loader duration
       prevPath.current = location.pathname;
       return () => clearTimeout(timer);
     } else {

@@ -861,7 +861,7 @@ const LandingPage = () => {
 
 
       {/* Footer */}
-      <footer className="bg-card border-t border-border py-12">
+      <footer className="bg-blue-100 border-t border-border py-12">
         <div className="container mx-auto px-4 lg:px-6">
           <div className="grid grid-cols-1 md:grid-cols-4 gap-8">
             {/* School Info */}
@@ -900,7 +900,7 @@ const LandingPage = () => {
               <h4 className="font-heading font-semibold text-foreground mb-4">Quick Links</h4>
               <ul className="space-y-2 font-body text-sm">
                 <li><button onClick={() => handleNavigation('/about-page')} className="text-muted-foreground hover:text-primary">About Us</button></li>
-                <li><button onClick={() => handleNavigation('/admissions')} className="text-muted-foreground hover:text-primary">Annuncments&updates</button></li>
+                <li><button onClick={() => handleNavigation('/announcements')} className="text-muted-foreground hover:text-primary">Announcements & Updates</button></li>
                 <li><button className="text-muted-foreground hover:text-primary">Faculty</button></li>
                 <li><button onClick={() => handleNavigation('/contact')} className="text-muted-foreground hover:text-primary">Contact</button></li>
               </ul>
@@ -912,12 +912,30 @@ const LandingPage = () => {
               <ul className="space-y-2 font-body text-sm text-muted-foreground">
                 <li className="flex items-center space-x-2">
                   <Icon name="MapPin" size={16} />
-                  <span>Grace Avenue, Off Comprehensive Road Okpu Umuobo, Aba, Abia State</span>
+                  <span>Isiala Ngwa South, Abia State</span>
                 </li>
                 <li className="flex items-center space-x-2">
                   <Icon name="Phone" size={16} />
-                  <span>+234
-                  </span></li></ul></div></div></div></footer></div>
+                  <span>+2347069386013</span>
+                </li>
+                <li className="flex items-center space-x-2">
+                  <Icon name="Smartphone" size={16} />
+                  <span>+2348143316441</span>
+                </li>
+                <li className="flex items-center space-x-2">
+                  <Icon name="Briefcase" size={16} />
+                  <span>+2348039360904</span>
+                </li>
+                <li className="flex items-center space-x-2">
+                  <Icon name="Mail" size={16} />
+                  <span>ubanichristian2282@gmail.com</span>
+                </li>
+              </ul>
+            </div>
+          </div>
+        </div>
+      </footer>
+    </div>
   );
 };
 

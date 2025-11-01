@@ -8,7 +8,8 @@ const terms = [
 
 const roles = [
   { value: 'student', label: 'Student' },
-  { value: 'teacher', label: 'Teacher' }
+  { value: 'teacher', label: 'Teacher' },
+  { value: 'admin', label: 'Admin' } // Added admin role
 ];
 
 const LoginForm = ({ onLogin, isLoading }) => {
@@ -59,7 +60,7 @@ const LoginForm = ({ onLogin, isLoading }) => {
           placeholder="Enter class (e.g. SS1, JSS2)"
           value={className}
           onChange={e => setClassName(e.target.value)}
-          required
+          required={role !== 'admin'} // <-- Only required if not admin
         />
       </div>
       <div>

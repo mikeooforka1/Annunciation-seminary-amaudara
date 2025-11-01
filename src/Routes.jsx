@@ -21,6 +21,7 @@ import TeacherPortal from './pages/teacher-portal';
 import ContactPage from './pages/contact';
 import ResultPortal from './pages/exam-creation-management/components/ResultPortal';
 import PostAnnouncement from './pages/teacher-portal/components/post-announcement';
+import AdminDashboard from './pages/admin'; // Add this import
 
 const AppWrapper = ({ children }) => {
   const navigate = useNavigate();
@@ -149,6 +150,7 @@ const Routes = () => {
                 <Route path="/teacher-portal" element={<TeacherPortal />} />
                 <Route path="/contact" element={<ContactPage />} />
                 <Route path="/post-announcement" element={<PostAnnouncement />} />
+                <Route path="/admin" element={<AdminDashboard />} /> {/* <-- Add this line */}
                 <Route path="*" element={<NotFound />} />
               </RouterRoutes>
             </Suspense>

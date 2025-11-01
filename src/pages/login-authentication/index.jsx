@@ -22,7 +22,9 @@ const LoginAuthentication = () => {
         credentials: 'include',
         body: JSON.stringify({
           name: credentials.name.trim(),
-          className: credentials.className.trim(),
+          className: String(credentials.role).trim().toLowerCase() === 'admin'
+            ? ''
+            : credentials.className.trim(),
           role: String(credentials.role).trim().toLowerCase(),
           token: credentials.token,
           term: String(credentials.term).trim().toLowerCase()
@@ -75,6 +77,17 @@ const LoginAuthentication = () => {
           _id: result.user._id // Ensure _id is present
         }));
         window.location.replace('/student-dashboard');
+        setIsLoading(false);
+        return;
+      }
+
+      // Admin-specific navigation and storage
+      if (result.user.role === 'admin') {
+        localStorage.setItem('adminData', JSON.stringify({
+          ...result.user,
+          _id: result.user._id
+        }));
+        window.location.replace('/admin');
         setIsLoading(false);
         return;
       }

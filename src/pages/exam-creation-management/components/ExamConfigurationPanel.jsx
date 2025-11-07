@@ -94,12 +94,6 @@ const ExamConfigurationPanel = ({
     { value: 'ss3', label: 'SS3 (Grade 12)' }
   ];
 
-  const difficultyOptions = [
-    { value: 'easy', label: 'Easy' },
-    { value: 'medium', label: 'Medium' },
-    { value: 'hard', label: 'Hard' }
-  ];
-
   const normalizeClass = (val) =>
     val?.toLowerCase().replace(/\s+/g, '').replace(/[^a-z0-9]/g, '');
 
@@ -411,14 +405,6 @@ const ExamConfigurationPanel = ({
                 min="1"
                 max="300"
                 required
-              />
-
-              <Select
-                label="Difficulty Level"
-                options={difficultyOptions}
-                value={examData?.difficulty || ''}
-                onChange={(value) => handleInputChange('difficulty', value)}
-                placeholder="Select difficulty"
               />
             </div>
 

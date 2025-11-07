@@ -10,44 +10,11 @@ import ResourceLibrarySection from './components/ResourceLibrarySection';
 
 const StudentDashboard = () => {
   const [studentData, setStudentData] = useState(null);
+  const [showProfileModal, setShowProfileModal] = useState(false);
+  const [profile, setProfile] = useState(null);
   const navigate = useNavigate();
 
-  useEffect(() => {
-    // Get student data from localStorage
-    const storedData = localStorage.getItem('studentData');
-    let parsedData = {};
-    if (storedData) {
-      parsedData = JSON.parse(storedData);
-      setStudentData(parsedData);
-    }
-    // Best practice: Check for valid _id before proceeding
-    if (!parsedData._id) {
-      alert('Session expired or invalid. Please log in again.');
-      navigate('/login-authentication');
-    }
-  }, [navigate]);
-
-  useEffect(() => {
-    // Example: Fetch pending exams using API base URL from .env
-    if (studentData?.className && studentData?.term && studentData?._id) {
-      const API_BASE_URL = process.env.REACT_APP_API_BASE_URL;
-      fetch(
-        `${API_BASE_URL}/api/exams/categorized-exams?class=${encodeURIComponent(studentData.className)}&term=${encodeURIComponent(studentData.term)}&studentId=${studentData._id}`,
-        {
-          credentials: 'include', // <-- Send cookies/session with request
-        }
-      )
-        .then(res => res.json())
-        .then(data => {
-          // handle data (e.g., setPendingExamsCount(data.pending.length))
-        })
-        .catch(() => {
-          // handle error
-        });
-    }
-  }, [studentData]);
-
-  // Map backend fields to dashboard fields
+  // Map backend fields to dashboard fields (move this above useEffect)
   const data = studentData
     ? {
         name:
@@ -107,8 +74,108 @@ const StudentDashboard = () => {
         address: '',
       };
 
+  useEffect(() => {
+    // Get student data from localStorage
+    const storedData = localStorage.getItem('studentData');
+    let parsedData = {};
+    if (storedData) {
+      parsedData = JSON.parse(storedData);
+      setStudentData(parsedData);
+    }
+    // Best practice: Check for valid _id before proceeding
+    if (!parsedData._id) {
+      alert('Session expired or invalid. Please log in again.');
+      navigate('/login-authentication');
+    }
+  }, [navigate]);
+
+  useEffect(() => {
+    // Example: Fetch pending exams using API base URL from .env
+    if (studentData?.className && studentData?.term && studentData?._id) {
+      const API_BASE_URL = process.env.REACT_APP_API_BASE_URL;
+      fetch(
+        `${API_BASE_URL}/api/exams/categorized-exams?class=${encodeURIComponent(studentData.className)}&term=${encodeURIComponent(studentData.term)}&studentId=${studentData._id}`,
+        {
+          credentials: 'include', // <-- Send cookies/session with request
+        }
+      )
+        .then(res => res.json())
+        .then(data => {
+          // handle data (e.g
+        })
+        .catch(() => {
+          // handle error
+        });
+    }
+  }, [studentData]);
+
+  useEffect(() => {
+    // Get student ID from localStorage
+    const studentData = JSON.parse(localStorage.getItem("studentData") || "{}");
+    const userId = studentData._id;
+    if (!userId) return;
+
+    // Fetch profile from backend
+    const API_BASE_URL = process.env.REACT_APP_API_BASE_URL || "";
+    fetch(`${API_BASE_URL}/api/profile/${userId}`)
+      .then(res => res.ok ? res.json() : null)
+      .then(data => {
+        setProfile(data);
+      });
+  }, []);
+
+  useEffect(() => {
+    // If profile is not loaded, show modal
+    if (!profile) {
+      setShowProfileModal(true);
+      console.log("Profile modal is showing because profile is not loaded yet.");
+      return;
+    }
+
+    // List required fields (except name, which is read-only)
+    const requiredFields = [
+      { key: "email", value: profile.email },
+      { key: "gender", value: profile.gender },
+      { key: "dob", value: profile.dob },
+      { key: "address", value: profile.address },
+      { key: "currentFunction", value: profile.currentFunction },
+      { key: "gradeLevel", value: profile.gradeLevel },
+      { key: "photo", value: profile.photo }
+    ];
+
+    // Find missing fields
+    const missingFields = requiredFields.filter(field => !field.value || field.value === "").map(field => field.key);
+
+    // Show modal if any field is missing or profile is empty
+    const isProfileEmpty = Object.values(profile).every(val => !val || val === "");
+    const isIncomplete = missingFields.length > 0 || isProfileEmpty;
+
+    setShowProfileModal(isIncomplete);
+
+    if (isIncomplete) {
+      console.log("Profile modal is showing because these fields are missing or profile is empty:", missingFields);
+    }
+  }, [profile]);
+
   return (
     <div className="min-h-screen bg-background">
+      {/* Modal for incomplete profile */}
+      {showProfileModal && (
+        <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50">
+          <div className="bg-white rounded-lg p-8 shadow-lg max-w-sm w-full text-center">
+            <h2 className="text-xl font-bold mb-2 text-primary">Complete Your Profile</h2>
+            <p className="mb-4 text-muted-foreground">
+              Please fill in your profile details before using the dashboard.
+            </p>
+            <button
+              className="px-6 py-2 bg-primary text-white rounded font-semibold hover:bg-primary/90"
+              onClick={() => navigate('/profile')}
+            >
+              Go to Profile
+            </button>
+          </div>
+        </div>
+      )}
       {/* Header */}
       <RoleBasedHeader
         userRole="student"

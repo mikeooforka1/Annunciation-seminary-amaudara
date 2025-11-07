@@ -89,7 +89,7 @@ const ResultsAnalyticsPortal = () => {
       setResultsError('');
       fetch(`${API_BASE_URL}/api/results/student/${studentData._id}/${selectedTerm}/${selectedClass}`)
         .then(res => {
-          if (!res.ok) throw new Error(`Failed to fetch: ${res.status}`);
+          if (!res.ok) throw new Error
           return res.json();
         })
         .then(data => {
@@ -401,6 +401,16 @@ const ResultsAnalyticsPortal = () => {
     }
   }, [examResults]);
 
+  useEffect(() => {
+    // Only hide modal if there are real results (excluding "Overall" row)
+    const realResults = examResults.filter(r => r.subject && r.subject !== 'Overall');
+    if (realResults.length > 0) {
+      setShowNoResultsModal(false);
+    } else {
+      setShowNoResultsModal(true);
+    }
+  }, [examResults]);
+
   return (
     <>
       <RoleBasedHeader
@@ -465,23 +475,60 @@ const ResultsAnalyticsPortal = () => {
 
           {/* Print Area */}
           <div className="print-area" style={{ pageBreakInside: 'avoid', breakInside: 'avoid' }}>
-            <header style={{ textAlign: 'center', marginBottom: '24px' }}>
+            <header
+              style={{
+                textAlign: 'center',
+                marginBottom: '24px',
+                background: '#16a34a', // Tailwind green-600
+                padding: '24px 0',
+                borderRadius: '12px',
+                color: '#fff',
+                boxShadow: '0 2px 8px rgba(22,163,74,0.08)'
+              }}
+            >
               <img
                 src="/assets/images/school_logo-1754996036714.jpg"
                 alt="School Logo"
-                style={{ width: 90, margin: '0 auto 16px auto', borderRadius: '8px' }}
+                style={{
+                  width: 90,
+                  margin: '0 auto 16px auto',
+                  borderRadius: '8px',
+                  boxShadow: '0 2px 8px rgba(0,0,0,0.08)'
+                }}
               />
-              <h2 style={{ fontWeight: 'bold', fontSize: '2rem', marginBottom: '8px' }}>Goshen Prinath Academy</h2>
-              <div style={{ fontSize: '1.1rem', marginBottom: '4px' }}>
-                Student: {userName || 'N/A'}
+              <h2 style={{
+                fontWeight: 'bold',
+                fontSize: '2rem',
+                marginBottom: '8px',
+                color: '#fff',
+                letterSpacing: '1px'
+              }}>
+                Annunciation Seminary Amaudara
+              </h2>
+              <div style={{
+                fontSize: '1.2rem',
+                marginBottom: '4px',
+                fontWeight: 'bold',
+                color: '#fff',
+                textShadow: '0 1px 2px rgba(0,0,0,0.12)'
+              }}>
+                Student: <span style={{ fontWeight: 'bold', fontSize: '1.35rem', color: '#fff' }}>{userName || 'N/A'}</span>
               </div>
-              <div style={{ fontSize: '1.1rem', marginBottom: '4px' }}>
+              <div style={{
+                fontSize: '1.1rem',
+                marginBottom: '4px',
+                color: '#fff'
+              }}>
                 Class: {selectedClass || 'N/A'}
               </div>
-              <div style={{ fontSize: '1.1rem', marginBottom: '4px' }}>
+              <div style={{
+                fontSize: '1.1rem',
+                marginBottom: '4px',
+                color: '#fff'
+              }}>
                 Term: {selectedTerm || 'N/A'}
               </div>
-              <hr style={{ margin: '16px auto', borderTop: '1px solid #ccc' }} />
+              <hr style={{ margin: '16px auto', borderTop: '1px solid #fff', opacity: 0.3 }} />
             </header>
             <section style={{ marginBottom: '24px', textAlign: 'center' }}>
               <h2 style={{ fontSize: '1.5rem', fontWeight: 'bold', marginBottom: '8px' }}>Exam Results</h2>
@@ -623,10 +670,23 @@ const ResultsAnalyticsPortal = () => {
               Your result for this term has not been published by your teacher yet. Please check back later.
             </p>
             <div className="flex justify-center gap-4">
-              <Button variant="default" onClick={() => setShowNoResultsModal(false)}>
+              <Button
+                variant="default"
+                onClick={() => {
+                  // Only close if there are real results
+                  const realResults = examResults.filter(r => r.subject && r.subject !== 'Overall');
+                  if (realResults.length > 0) setShowNoResultsModal(false);
+                }}
+              >
                 OK
               </Button>
-              <Button variant="outline" onClick={() => setShowNoResultsModal(false)}>
+              <Button
+                variant="outline"
+                onClick={() => {
+                  const realResults = examResults.filter(r => r.subject && r.subject !== 'Overall');
+                  if (realResults.length > 0) setShowNoResultsModal(false);
+                }}
+              >
                 Cancel
               </Button>
             </div>

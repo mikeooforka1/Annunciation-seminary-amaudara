@@ -1,7 +1,8 @@
 import React, { useState, useEffect } from 'react';
 
+const API_BASE_URL = process.env.REACT_APP_API_BASE_URL || "";
+
 const tabList = [
-  { key: 'personal', label: 'Personal Info' },
   { key: 'parentGuardian', label: 'Parent/Guardian' },
   { key: 'emergencyContact', label: 'Emergency Contact' },
   { key: 'medical', label: 'Medical Info' },
@@ -9,14 +10,65 @@ const tabList = [
 ];
 
 const RegistrationTabs = ({ registrationData }) => {
-  const [activeTab, setActiveTab] = useState('personal');
+  const [activeTab, setActiveTab] = useState('parentGuardian');
   const [data, setData] = useState(registrationData);
+  const [editing, setEditing] = useState(false);
+  const [form, setForm] = useState({});
+  const [userId, setUserId] = useState("");
 
   useEffect(() => {
-    // Always reload latest registration data from localStorage
-    const latestData = JSON.parse(localStorage.getItem('goshen-registration-data')) || registrationData;
-    setData(latestData);
-  }, []);
+    // Get userId from localStorage
+    const studentData = JSON.parse(localStorage.getItem("studentData") || "{}");
+    setUserId(studentData._id);
+
+    // Fetch registration data from backend
+    const fetchRegistration = async () => {
+      if (!studentData._id) return;
+      try {
+        const res = await fetch(`${API_BASE_URL}/api/registration/${studentData._id}`);
+        if (res.ok) {
+          const reg = await res.json();
+          setData(reg);
+          setForm(reg[activeTab] || {});
+        } else {
+          setData(registrationData);
+          setForm(registrationData[activeTab] || {});
+        }
+      } catch {
+        setData(registrationData);
+        setForm(registrationData[activeTab] || {});
+      }
+    };
+    fetchRegistration();
+  }, [activeTab, registrationData]);
+
+  const handleChange = (e) => {
+    const { name, value, type, checked } = e.target;
+    setForm((prev) => ({
+      ...prev,
+      [name]: type === "checkbox" ? checked : value,
+    }));
+  };
+
+  const handleSave = async () => {
+    const updatedData = { ...data, [activeTab]: form };
+    setData(updatedData);
+    localStorage.setItem('goshen-registration-data', JSON.stringify(updatedData));
+    setEditing(false);
+
+    // Save to backend
+    if (userId) {
+      try {
+        await fetch(`${API_BASE_URL}/api/registration/${userId}`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(updatedData),
+        });
+      } catch {
+        // Optionally show error
+      }
+    }
+  };
 
   return (
     <div className="mt-8">
@@ -25,63 +77,140 @@ const RegistrationTabs = ({ registrationData }) => {
           <button
             key={tab.key}
             className={`px-4 py-2 font-medium whitespace-nowrap ${activeTab === tab.key ? 'border-b-2 border-primary text-primary' : 'text-muted-foreground'}`}
-            onClick={() => setActiveTab(tab.key)}
+            onClick={() => { setActiveTab(tab.key); setEditing(false); }}
           >
             {tab.label}
           </button>
         ))}
       </div>
       <div className="bg-background p-4 rounded shadow">
-        {activeTab === 'personal' && (
-          <div>
-            <h3 className="font-bold mb-2">Personal Information</h3>
-            <p>Name: {data.personal?.firstName} {data.personal?.middleName} {data.personal?.lastName}</p>
-            <p>Date of Birth: {data.personal?.dob}</p>
-            <p>Gender: {data.personal?.gender}</p>
-            <p>Grade Level: {data.personal?.gradeLevel}</p>
-            <p>Phone: {data.personal?.phoneNumber}</p>
-            <p>Address: {data.personal?.address}</p>
-            <p>Photo: {data.personal?.photo ? <img src={data.personal.photo} alt="Profile" className="w-16 h-16 rounded-full mt-2" /> : 'No photo'}</p>
-          </div>
-        )}
         {activeTab === 'parentGuardian' && (
           <div>
             <h3 className="font-bold mb-2">Parent/Guardian Information</h3>
-            <p>Name: {data.parentGuardian?.firstName} {data.parentGuardian?.middleName} {data.parentGuardian?.lastName}</p>
-            <p>Relationship: {data.parentGuardian?.relationship}</p>
-            <p>Email: {data.parentGuardian?.email}</p>
-            <p>Phone: {data.parentGuardian?.phone}</p>
-            <p>Address: {data.parentGuardian?.address}, {data.parentGuardian?.city}, {data.parentGuardian?.state}, {data.parentGuardian?.zip}</p>
+            {editing ? (
+              <>
+                <input type="text" name="firstName" value={form.firstName || ""} onChange={handleChange} placeholder="First Name" className="mb-2 w-full border rounded px-2 py-1" />
+                <input type="text" name="middleName" value={form.middleName || ""} onChange={handleChange} placeholder="Middle Name" className="mb-2 w-full border rounded px-2 py-1" />
+                <input type="text" name="lastName" value={form.lastName || ""} onChange={handleChange} placeholder="Last Name" className="mb-2 w-full border rounded px-2 py-1" />
+                <input type="text" name="relationship" value={form.relationship || ""} onChange={handleChange} placeholder="Relationship" className="mb-2 w-full border rounded px-2 py-1" />
+                <input type="email" name="email" value={form.email || ""} onChange={handleChange} placeholder="Email" className="mb-2 w-full border rounded px-2 py-1" />
+                <input type="text" name="phone" value={form.phone || ""} onChange={handleChange} placeholder="Phone" className="mb-2 w-full border rounded px-2 py-1" />
+                <input type="text" name="address" value={form.address || ""} onChange={handleChange} placeholder="Address" className="mb-2 w-full border rounded px-2 py-1" />
+                <input type="text" name="city" value={form.city || ""} onChange={handleChange} placeholder="City" className="mb-2 w-full border rounded px-2 py-1" />
+                <input type="text" name="state" value={form.state || ""} onChange={handleChange} placeholder="State" className="mb-2 w-full border rounded px-2 py-1" />
+                <input type="text" name="zip" value={form.zip || ""} onChange={handleChange} placeholder="ZIP" className="mb-2 w-full border rounded px-2 py-1" />
+              </>
+            ) : (
+              <>
+                <p>Name: {form.firstName} {form.middleName} {form.lastName}</p>
+                <p>Relationship: {form.relationship}</p>
+                <p>Email: {form.email}</p>
+                <p>Phone: {form.phone}</p>
+                <p>Address: {form.address}, {form.city}, {form.state}, {form.zip}</p>
+              </>
+            )}
           </div>
         )}
         {activeTab === 'emergencyContact' && (
           <div>
             <h3 className="font-bold mb-2">Emergency Contact</h3>
-            <p>Name: {data.emergencyContact?.name}</p>
-            <p>Relationship: {data.emergencyContact?.relationship}</p>
-            <p>Phone: {data.emergencyContact?.phone}</p>
-            <p>Medical Authorization: {data.emergencyContact?.medicalAuth ? 'Yes' : 'No'}</p>
+            {editing ? (
+              <>
+                <input type="text" name="name" value={form.name || ""} onChange={handleChange} placeholder="Name" className="mb-2 w-full border rounded px-2 py-1" />
+                <input type="text" name="relationship" value={form.relationship || ""} onChange={handleChange} placeholder="Relationship" className="mb-2 w-full border rounded px-2 py-1" />
+                <input type="text" name="phone" value={form.phone || ""} onChange={handleChange} placeholder="Phone" className="mb-2 w-full border rounded px-2 py-1" />
+                <label className="flex items-center gap-2 mb-2">
+                  <input type="checkbox" name="medicalAuth" checked={form.medicalAuth || false} onChange={handleChange} />
+                  Medical Authorization
+                </label>
+              </>
+            ) : (
+              <>
+                <p>Name: {form.name}</p>
+                <p>Relationship: {form.relationship}</p>
+                <p>Phone: {form.phone}</p>
+                <p>Medical Authorization: {form.medicalAuth ? 'Yes' : 'No'}</p>
+              </>
+            )}
           </div>
         )}
         {activeTab === 'medical' && (
           <div>
             <h3 className="font-bold mb-2">Medical Information</h3>
-            <p>Allergies: {data.medical?.allergies}</p>
-            <p>Conditions: {data.medical?.conditions}</p>
-            <p>Medications: {data.medical?.medications}</p>
-            <p>Physician: {data.medical?.physicianName} ({data.medical?.physicianPhone})</p>
-            <p>Insurance: {data.medical?.insurance}</p>
+            {editing ? (
+              <>
+                <input type="text" name="allergies" value={form.allergies || ""} onChange={handleChange} placeholder="Allergies" className="mb-2 w-full border rounded px-2 py-1" />
+                <input type="text" name="conditions" value={form.conditions || ""} onChange={handleChange} placeholder="Conditions" className="mb-2 w-full border rounded px-2 py-1" />
+                <input type="text" name="medications" value={form.medications || ""} onChange={handleChange} placeholder="Medications" className="mb-2 w-full border rounded px-2 py-1" />
+                <input type="text" name="physicianName" value={form.physicianName || ""} onChange={handleChange} placeholder="Physician Name" className="mb-2 w-full border rounded px-2 py-1" />
+                <input type="text" name="physicianPhone" value={form.physicianPhone || ""} onChange={handleChange} placeholder="Physician Phone" className="mb-2 w-full border rounded px-2 py-1" />
+                <input type="text" name="insurance" value={form.insurance || ""} onChange={handleChange} placeholder="Insurance" className="mb-2 w-full border rounded px-2 py-1" />
+              </>
+            ) : (
+              <>
+                <p>Allergies: {form.allergies}</p>
+                <p>Conditions: {form.conditions}</p>
+                <p>Medications: {form.medications}</p>
+                <p>Physician: {form.physicianName} ({form.physicianPhone})</p>
+                <p>Insurance: {form.insurance}</p>
+              </>
+            )}
           </div>
         )}
         {activeTab === 'legal' && (
           <div>
             <h3 className="font-bold mb-2">Legal & Account</h3>
-            <p>Media Consent: {data.legal?.mediaConsent ? 'Yes' : 'No'}</p>
-            <p>Emergency Consent: {data.legal?.emergencyConsent ? 'Yes' : 'No'}</p>
-            <p>Privacy Policy: {data.legal?.privacyPolicy ? 'Agreed' : 'Not Agreed'}</p>
-            <p>Email: {data.legal?.email}</p>
+            {editing ? (
+              <>
+                <label className="flex items-center gap-2 mb-2">
+                  <input type="checkbox" name="mediaConsent" checked={form.mediaConsent || false} onChange={handleChange} />
+                  Media Consent
+                </label>
+                <label className="flex items-center gap-2 mb-2">
+                  <input type="checkbox" name="emergencyConsent" checked={form.emergencyConsent || false} onChange={handleChange} />
+                  Emergency Consent
+                </label>
+                <label className="flex items-center gap-2 mb-2">
+                  <input type="checkbox" name="privacyPolicy" checked={form.privacyPolicy || false} onChange={handleChange} />
+                  Privacy Policy
+                </label>
+                <input type="email" name="email" value={form.email || ""} onChange={handleChange} placeholder="Email" className="mb-2 w-full border rounded px-2 py-1" />
+              </>
+            ) : (
+              <>
+                <p>Media Consent: {form.mediaConsent ? 'Yes' : 'No'}</p>
+                <p>Emergency Consent: {form.emergencyConsent ? 'Yes' : 'No'}</p>
+                <p>Privacy Policy: {form.privacyPolicy ? 'Agreed' : 'Not Agreed'}</p>
+                <p>Email: {form.email}</p>
+              </>
+            )}
           </div>
         )}
+        <div className="flex gap-4 mt-4">
+          {editing ? (
+            <>
+              <button
+                className="bg-primary text-white px-4 py-2 rounded font-semibold"
+                onClick={handleSave}
+              >
+                Save
+              </button>
+              <button
+                className="bg-gray-200 px-4 py-2 rounded font-semibold"
+                onClick={() => setEditing(false)}
+              >
+                Cancel
+              </button>
+            </>
+          ) : (
+            <button
+              className="bg-primary text-white px-4 py-2 rounded font-semibold"
+              onClick={() => setEditing(true)}
+            >
+              Edit
+            </button>
+          )}
+        </div>
       </div>
     </div>
   );

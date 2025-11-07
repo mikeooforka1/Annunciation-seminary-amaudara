@@ -432,7 +432,7 @@ const ComputerBasedTestingPlatform = () => {
           {/* School Logo */}
           <div className="flex flex-col items-center mb-8">
             <img src="/assets/images/school_logo-1754996036714.jpg" alt="Goshen Academy Logo" className="w-24 h-24 mb-2 rounded-full border-4 border-green-700" />
-            <h1 className="text-2xl font-bold text-gray-900 mb-2">GOSHEN Academy</h1>
+            <h1 className="text-2xl font-bold text-gray-900 mb-2">ANNUNCIATION SEMINARY AMAUDARA</h1>
             <p className="text-gray-600">Computer-Based Testing Platform</p>
           </div>
           {/* Student Info */}

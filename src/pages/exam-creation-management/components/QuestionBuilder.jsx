@@ -104,9 +104,6 @@ const QuestionBuilder = ({
   const renderQuestionForm = () => {
     switch (activeQuestionType) {
       case 'multiple-choice':
-      case 'true-false':
-      case 'short-answer':
-      case 'essay':
         return (
           <div className="space-y-4">
             <div>
@@ -202,6 +199,27 @@ const QuestionBuilder = ({
                   </div>
                 ))}
               </div>
+            </div>
+            {/* Added correct answer selection for auto-marking */}
+            <div>
+              <label className="block text-sm font-body font-medium text-foreground mb-2">
+                Select Correct Answer
+              </label>
+              <div className="flex flex-wrap gap-3">
+                {currentQuestion?.options?.map((option, idx) => (
+                  <Button
+                    key={idx}
+                    variant={currentQuestion?.correctAnswer === idx?.toString() ? "primary" : "outline"}
+                    size="sm"
+                    onClick={() => handleQuestionChange('correctAnswer', idx.toString())}
+                  >
+                    {`Option ${String.fromCharCode(65 + idx)}${option ? `: ${option}` : ''}`}
+                  </Button>
+                ))}
+              </div>
+              <p className="text-xs text-muted-foreground mt-2">
+                The selected answer will be used for automatic marking.
+              </p>
             </div>
           </div>
         );

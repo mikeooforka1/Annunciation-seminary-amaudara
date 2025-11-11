@@ -323,3 +323,13 @@ blockquote, .quote {
     padding-top: 0 !important;
   }
 }
+
+button.publish-btn {
+  background: linear-gradient(90deg, #bd1919 0%, #b91c1c 100%) !important; /* red */
+  color: #fff !important;
+}
+
+button.draft-btn {
+  background: linear-gradient(90deg, #16a34a 0%, #15803d 100%) !important; /* green */
+  color: #fff !important;
+}

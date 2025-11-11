@@ -15,6 +15,7 @@ const ExpelledStudents = () => {
   const [loading, setLoading] = useState(true);
   const [selectedClass, setSelectedClass] = useState(null);
   const [addingId, setAddingId] = useState(null);
+  const [showAddBar, setShowAddBar] = useState(false);
 
   useEffect(() => {
     const fetchStudents = async () => {
@@ -31,23 +32,30 @@ const ExpelledStudents = () => {
     fetchStudents();
   }, []);
 
+  // Fetch expelled students for selected class
   useEffect(() => {
-    const fetchExpelled = async () => {
-      try {
-        const res = await fetch(`${API_BASE_URL}/api/expelled-students`);
-        const data = await res.json();
-        setExpelled(data);
-      } catch (err) {
-        setExpelled([]);
-      }
-    };
-    fetchExpelled();
-  }, []);
+    if (selectedClass) {
+      setLoading(true);
+      fetch(`${API_BASE_URL}/api/expelled-students/class/${selectedClass}`)
+        .then(res => res.json())
+        .then(data => {
+          setExpelled(data);
+          setLoading(false);
+        })
+        .catch(() => {
+          setExpelled([]);
+          setLoading(false);
+        });
+    }
+  }, [selectedClass]);
 
   // Students in selected class for adding, filtered by search
   const studentsInClass = students.filter(
     (student) =>
-      student.className === selectedClass &&
+      student.className &&
+      selectedClass &&
+      student.className.toLowerCase() === selectedClass.toLowerCase() &&
+      student.name &&
       student.name.toLowerCase().includes(search.toLowerCase()) &&
       !expelled.some((s) => s._id === student._id)
   );
@@ -55,7 +63,10 @@ const ExpelledStudents = () => {
   // Expelled students in selected class, filtered by search
   const expelledInClass = expelled.filter(
     (student) =>
-      student.className === selectedClass &&
+      student.className &&
+      selectedClass &&
+      student.className.toLowerCase() === selectedClass.toLowerCase() &&
+      student.name &&
       student.name.toLowerCase().includes(search.toLowerCase())
   );
 
@@ -104,6 +115,7 @@ const ExpelledStudents = () => {
             onClick={() => {
               setSelectedClass(null);
               setSearch("");
+              setShowAddBar(false);
             }}
           >
             &larr; Back to classes
@@ -111,71 +123,102 @@ const ExpelledStudents = () => {
           <div className="mb-4 text-lg font-semibold text-primary">
             {selectedClass} Expelled Students
           </div>
-          <input
-            type="text"
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-            placeholder="Search student in this class..."
-            className="w-full mb-6 px-4 py-2 border border-primary rounded-lg focus:ring-2 focus:ring-primary"
-          />
-          {loading ? (
-            <div className="text-center text-muted-foreground py-12">Loading students...</div>
-          ) : (
+          {/* Add button to show search bar */}
+          {!showAddBar && (
+            <button
+              className="mb-4 bg-primary text-white px-4 py-2 rounded shadow"
+              onClick={() => setShowAddBar(true)}
+            >
+              Add
+            </button>
+          )}
+          {/* Search bar and add logic */}
+          {showAddBar && (
             <>
-              <div className="mb-4 font-semibold text-base text-primary">Add students to expelled list:</div>
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-8">
-                {studentsInClass.length === 0 && (
-                  <div className="text-center text-muted-foreground col-span-full py-8">
-                    No students found in this class. Use the search above to find and add.
+              <input
+                type="text"
+                value={search}
+                onChange={(e) => setSearch(e.target.value)}
+                placeholder="Search student in this class..."
+                className="w-full mb-6 px-4 py-2 border border-primary rounded-lg focus:ring-2 focus:ring-primary"
+              />
+              {/* Only show matching students if search is not empty */}
+              {search.trim() !== "" && (
+                <>
+                  <div className="mb-4 font-semibold text-base text-primary">Matching students:</div>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-8">
+                    {students
+                      .filter(
+                        (student) =>
+                          student.className &&
+                          selectedClass &&
+                          student.className.toLowerCase() === selectedClass.toLowerCase() &&
+                          student.name.toLowerCase().includes(search.toLowerCase()) &&
+                          !expelled.some((s) => s._id === student._id)
+                      )
+                      .map((student) => (
+                        <div
+                          key={student._id}
+                          className="flex items-center justify-between bg-white border border-border rounded-xl px-4 py-3 shadow hover:shadow-lg transition"
+                        >
+                          <div>
+                            <div className="font-semibold text-lg">{student.name}</div>
+                            <div className="text-xs text-muted-foreground">{student.className}</div>
+                          </div>
+                          <button
+                            className={`bg-primary text-white rounded-full p-2 hover:bg-primary/90 transition-all duration-150 ${
+                              addingId === student._id ? "opacity-50 cursor-not-allowed" : ""
+                            }`}
+                            title="Add to expelled"
+                            onClick={() => handleAddExpelled(student)}
+                            disabled={addingId === student._id}
+                          >
+                            {addingId === student._id ? (
+                              <FaCheckCircle className="animate-bounce" />
+                            ) : (
+                              <FaPlus />
+                            )}
+                          </button>
+                        </div>
+                      ))}
+                    {/* If no students match */}
+                    {students.filter(
+                      (student) =>
+                        student.className &&
+                        selectedClass &&
+                        student.className.toLowerCase() === selectedClass.toLowerCase() &&
+                        student.name.toLowerCase().includes(search.toLowerCase()) &&
+                        !expelled.some((s) => s._id === student._id)
+                    ).length === 0 && (
+                      <div className="text-center text-muted-foreground col-span-full py-8">
+                        No students found in this class. Use the search above to find and add.
+                      </div>
+                    )}
                   </div>
-                )}
-                {studentsInClass.map((student) => (
-                  <div
-                    key={student._id}
-                    className="flex items-center justify-between bg-white border border-border rounded-xl px-4 py-3 shadow hover:shadow-lg transition"
-                  >
-                    <div>
-                      <div className="font-semibold text-lg">{student.name}</div>
-                      <div className="text-xs text-muted-foreground">{student.className}</div>
-                    </div>
-                    <button
-                      className={`bg-primary text-white rounded-full p-2 hover:bg-primary/90 transition-all duration-150 ${
-                        addingId === student._id ? "opacity-50 cursor-not-allowed" : ""
-                      }`}
-                      title="Add to expelled"
-                      onClick={() => handleAddExpelled(student)}
-                      disabled={addingId === student._id}
-                    >
-                      {addingId === student._id ? (
-                        <FaCheckCircle className="animate-bounce" />
-                      ) : (
-                        <FaPlus />
-                      )}
-                    </button>
-                  </div>
-                ))}
-              </div>
-              <div className="mb-4 font-semibold text-base text-primary">Already expelled:</div>
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                {expelledInClass.length === 0 && (
-                  <div className="text-center text-muted-foreground col-span-full py-8">
-                    No expelled students in this class yet.
-                  </div>
-                )}
-                {expelledInClass.map((student) => (
-                  <div
-                    key={student._id}
-                    className="flex items-center justify-between bg-red-50 border border-red-200 rounded-xl px-4 py-3 shadow"
-                  >
-                    <div>
-                      <div className="font-semibold text-lg text-red-700">{student.name}</div>
-                      <div className="text-xs text-muted-foreground">{student.className}</div>
-                    </div>
-                  </div>
-                ))}
-              </div>
+                </>
+              )}
             </>
           )}
+          {/* Already expelled students */}
+          <div className="mb-4 font-semibold text-base text-primary">Already expelled:</div>
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            {expelledInClass.length === 0 && (
+              <div className="text-center text-muted-foreground col-span-full py-8">
+                No expelled students in this class yet.
+              </div>
+            )}
+            {expelledInClass.map((student) => (
+              <div
+                key={student._id}
+                className="flex items-center justify-between bg-red-50 border border-red-200 rounded-xl px-4 py-3 shadow"
+              >
+                <div>
+                  <div className="font-semibold text-lg text-red-700">{student.name}</div>
+                  <div className="text-xs text-muted-foreground">{student.className}</div>
+                </div>
+              </div>
+            ))}
+          </div>
         </>
       )}
     </div>

@@ -51,6 +51,7 @@ const ExamCreationManagement = () => {
   const [errorMsg, setErrorMsg] = useState('');
   const [openPhotoIdx, setOpenPhotoIdx] = useState(null); // <-- Add this line
   const [currentTerm, setCurrentTerm] = useState('');
+  const [draftMsg, setDraftMsg] = useState('');
 
   // Get teacher data from localStorage
   const [teacherData, setTeacherData] = useState(null);
@@ -194,12 +195,68 @@ const ExamCreationManagement = () => {
     }, 1000);
   };
 
+  const handleSaveDraft = async () => {
+    setIsLoading(true);
+    setErrorMsg('');
+    setDraftMsg('');
+    try {
+      const teacherClass = teacherData?.className || teacherData?.class;
+      const payload = {
+        ...examData,
+        questions,
+        status: 'draft',
+        createdBy: teacherData?._id,
+        class: teacherClass,
+        term: currentTerm,
+        startDate: examData.startDate ? new Date(examData.startDate).toISOString() : '',
+        endDate: examData.endDate ? new Date(examData.endDate).toISOString() : '',
+        photo: '',
+      };
+      const res = await fetch(`${API_BASE_URL}/api/exams/save-draft`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload),
+      });
+      const result = await res.json();
+      if (res.ok) {
+        setErrorMsg('');
+        setDraftMsg('✅ Draft saved successfully! You can continue later.');
+        localStorage.setItem('examDraft', JSON.stringify({ examData: payload, questions }));
+      } else {
+        setErrorMsg(result.error || 'Failed to save draft.');
+        setDraftMsg('');
+      }
+    } catch (err) {
+      setErrorMsg('Network error. Please check your connection and try again.');
+      setDraftMsg('');
+    }
+    setIsLoading(false);
+  };
+
   // Reset exam after publish
   const handlePublishExam = async () => {
-    // Prevent publishing if no questions are added
+    // Check for missing questions
     if (!questions || questions.length === 0) {
       setErrorMsg('Please add at least one question before publishing the exam.');
       alert('⚠️ You must add at least one question before publishing your exam.');
+      return;
+    }
+    // Check for missing required exam fields
+    const requiredFields = [
+      { key: 'title', label: 'Exam Title' },
+      { key: 'subject', label: 'Subject' },
+      { key: 'class', label: 'Class' },
+      { key: 'duration', label: 'Duration' },
+      { key: 'totalMarks', label: 'Total Marks' },
+      { key: 'passMarks', label: 'Pass Marks' },
+      { key: 'startDate', label: 'Start Date' },
+      { key: 'endDate', label: 'End Date' }
+    ];
+    const missingFields = requiredFields.filter(f => !examData[f.key] || String(examData[f.key]).trim() === '');
+    if (missingFields.length > 0) {
+      const missingLabels = missingFields.map(f => f.label).join(', ');
+      setErrorMsg(`Please fill in the following required fields before publishing: ${missingLabels}`);
+      alert(`⚠️ Please fill in the following required fields before publishing:\n${missingLabels}`);
       return;
     }
     setIsLoading(true);
@@ -213,7 +270,6 @@ const ExamCreationManagement = () => {
         createdBy: teacherData?._id,
         class: teacherClass,
         term: currentTerm, // Ensure term is set
-        // Convert startDate and endDate to ISO format if present
         startDate: examData.startDate ? new Date(examData.startDate).toISOString() : '',
         endDate: examData.endDate ? new Date(examData.endDate).toISOString() : '',
         photo: '',
@@ -229,14 +285,15 @@ const ExamCreationManagement = () => {
         setExamData({ ...initialExamData, class: teacherClass, term: currentTerm });
         setQuestions([]);
         setErrorMsg('');
-        // Refetch exams and submissions
         fetchExams();
         fetchAllSubmissions();
       } else {
         setErrorMsg(result.error || 'Failed to publish exam. Please check your details and try again.');
+        alert(result.error || 'Failed to publish exam. Please check your details and try again.');
       }
     } catch (err) {
       setErrorMsg('Network error. Please check your connection and try again.');
+      alert('Network error. Please check your connection and try again.');
     }
     setIsLoading(false);
   };
@@ -342,7 +399,40 @@ const ExamCreationManagement = () => {
   }, [activeView, exams]);
 
   // Polling for "My Exams" tab
-  
+  useEffect(() => {
+    let interval;
+    if (activeView === 'existing') {
+      interval = setInterval(() => {
+        fetchExams();
+        fetchAllSubmissions();
+      }, POLLING_INTERVAL);
+    }
+    return () => clearInterval(interval);
+  }, [activeView, teacherData, currentTerm]);
+
+  useEffect(() => {
+    const autoSaveDraft = (e) => {
+      if (examData && questions.length > 0 && examData.status !== 'published') {
+        handleSaveDraft();
+        e.preventDefault();
+        e.returnValue = '';
+      }
+    };
+    window.addEventListener('beforeunload', autoSaveDraft);
+    return () => window.removeEventListener('beforeunload', autoSaveDraft);
+  }, [examData, questions, teacherData, currentTerm]);
+
+  useEffect(() => {
+    const savedDraft = localStorage.getItem('examDraft');
+    if (savedDraft) {
+      const { examData: savedExamData, questions: savedQuestions } = JSON.parse(savedDraft);
+      if (savedExamData && savedExamData.status !== 'published') {
+        setExamData(savedExamData);
+        setQuestions(savedQuestions || []);
+        setDraftMsg('📝 Draft loaded! Continue from where you stopped.');
+      }
+    }
+  }, []);
 
   return (
     <div className="min-h-screen bg-background">
@@ -412,17 +502,6 @@ const ExamCreationManagement = () => {
               Configuration
             </button>
             <button
-              onClick={() => setActiveView('questions')}
-              className={`flex items-center px-4 py-3 text-sm font-body border-b-2 transition-colors whitespace-nowrap
-                ${activeView === 'questions'
-                  ? 'border-primary text-primary bg-primary/5'
-                  : 'border-transparent text-muted-foreground hover:text-foreground hover:bg-muted'
-                }`}
-            >
-              <Icon name="HelpCircle" size={16} className="mr-2" />
-              Questions ({questions?.length})
-            </button>
-            <button
               onClick={() => setActiveView('existing')}
               className={`flex items-center px-4 py-3 text-sm font-body border-b-2 transition-colors whitespace-nowrap
                 ${activeView === 'existing'
@@ -455,6 +534,7 @@ const ExamCreationManagement = () => {
                     examData={examData}
                     onExamDataChange={setExamData}
                     onSaveExam={handleSaveExam}
+                    onSaveDraft={handleSaveDraft} // <-- Add this prop
                     onPublishExam={handlePublishExam}
                     isLoading={isLoading}
                     questions={questions}
@@ -489,45 +569,6 @@ const ExamCreationManagement = () => {
                         <span className="text-sm text-muted-foreground">Status:</span>
                         <span className="text-sm font-medium text-warning">Draft</span>
                       </div>
-                    </div>
-                  </div>
-
-                  <div className="bg-card border border-border rounded-lg p-4">
-                    <h3 className="font-heading font-semibold text-lg text-foreground mb-4">
-                      Quick Actions
-                    </h3>
-                    <div className="space-y-2">
-                      <Button
-                        variant="outline"
-                        fullWidth
-                        onClick={() => setActiveView('questions')}
-                        iconName="Plus"
-                        iconPosition="left"
-                        className="w-full"
-                      >
-                        Add Questions
-                      </Button>
-                      <Button
-                        variant="outline"
-                        fullWidth
-                        onClick={() => setShowQuestionBank(true)}
-                        iconName="Database"
-                        iconPosition="left"
-                        className="w-full"
-                      >
-                        Import from Bank
-                      </Button>
-                      <Button
-                        variant="outline"
-                        fullWidth
-                        onClick={() => setShowPreview(true)}
-                        disabled={questions?.length === 0}
-                        iconName="Eye"
-                        iconPosition="left"
-                        className="w-full"
-                      >
-                        Preview Exam
-                      </Button>
                     </div>
                   </div>
                 </div>
@@ -742,25 +783,60 @@ const ExamCreationManagement = () => {
                         {student.name || student.fullName || student._id}
                       </h3>
                       <div className="flex flex-wrap gap-4">
-                        {exams.map(sub => (
-                          <div key={sub._id} className="border rounded p-3 bg-white flex flex-col items-start min-w-[200px]">
-                            <div className="flex items-center mb-2">
-                              <strong>{sub.examId?.subject || sub.examId?.title || 'Exam'}</strong>
-                              <span className="ml-2 text-xs text-muted-foreground">
-                                {sub.submittedAt ? new Date(sub.submittedAt).toLocaleString() : 'N/A'}
-                              </span>
+                        {exams.map(sub => {
+                          // --- Auto-mark multiple choice ---
+                          let mcTotal = 0;
+                          let mcScore = 0;
+                          if (sub.examId?.questions) {
+                            sub.examId.questions.forEach((q, idx) => {
+                              if (q.type === 'multiple-choice') {
+                                mcTotal += q.points || 1;
+                                const answer =
+                                  sub.answers[q?.id] ??
+                                  sub.answers[String(q?.id)] ??
+                                  sub.answers[idx + 1] ??
+                                  sub.answers[idx] ??
+                                  (Array.isArray(sub.answers) ? sub.answers[idx] : undefined);
+                                // Mark correct if answer matches correctAnswer index
+                                if (
+                                  q.correctAnswer !== undefined &&
+                                  answer !== undefined &&
+                                  String(answer) === String(q.correctAnswer)
+                                ) {
+                                  mcScore += q.points || 1;
+                                }
+                              }
+                            });
+                          }
+                          return (
+                            <div key={sub._id} className="border rounded p-3 bg-white flex flex-col items-start min-w-[200px]">
+                              <div className="flex items-center mb-2">
+                                <strong>{sub.examId?.subject || sub.examId?.title || 'Exam'}</strong>
+                                <span className="ml-2 text-xs text-muted-foreground">
+                                  {sub.submittedAt ? new Date(sub.submittedAt).toLocaleString() : 'N/A'}
+                                </span>
+                              </div>
+                              {/* Show auto-marked multiple choice score */}
+                              <div className="mb-2">
+                                <span className="font-semibold text-success">
+                                  Multiple Choice Score: {mcScore}/{mcTotal}
+                                </span>
+                                <span className="ml-2 text-xs text-muted-foreground">
+                                  (Other question types to be marked manually)
+                                </span>
+                              </div>
+                              <Button
+                                variant="outline"
+                                size="sm"
+                                onClick={() => setSelectedSubmission(sub)}
+                                iconName="Eye"
+                                className="w-full"
+                              >
+                                View Answers
+                              </Button>
                             </div>
-                            <Button
-                              variant="outline"
-                              size="sm"
-                              onClick={() => setSelectedSubmission(sub)}
-                              iconName="Eye"
-                              className="w-full"
-                            >
-                              View Answers
-                            </Button>
-                          </div>
-                        ))}
+                          );
+                        })}
                       </div>
                     </div>
                   ))
@@ -795,7 +871,6 @@ const ExamCreationManagement = () => {
                             if (answer === undefined || answer === null || answer === '') {
                               displayAnswer = <span className="italic text-warning">Not answered</span>;
                             } else if (q.type === 'multiple-choice' && Array.isArray(q.options)) {
-                              // If answer is index, show option text
                               displayAnswer = q.options[Number(answer)] ?? answer;
                             } else if (q.type === 'true-false') {
                               displayAnswer = answer === true || answer === 'true' || answer === 1 || answer === '1'
@@ -807,6 +882,15 @@ const ExamCreationManagement = () => {
                               displayAnswer = <span style={{ whiteSpace: 'pre-line' }}>{String(answer)}</span>;
                             } else {
                               displayAnswer = String(answer);
+                            }
+
+                            // --- Show auto-mark result for multiple choice ---
+                            let autoMark = null;
+                            if (q.type === 'multiple-choice' && q.correctAnswer !== undefined) {
+                              autoMark =
+                                String(answer) === String(q.correctAnswer)
+                                  ? <span className="ml-2 text-success font-bold">✔ {q.points || 1} pt</span>
+                                  : <span className="ml-2 text-destructive font-bold">✘ 0 pt</span>;
                             }
 
                             return (
@@ -841,6 +925,7 @@ const ExamCreationManagement = () => {
                                 <div>
                                   <span className="text-muted-foreground">Student Answer: </span>
                                   <span className="font-semibold">{displayAnswer}</span>
+                                  {autoMark}
                                 </div>
                               </div>
                             );
@@ -879,6 +964,11 @@ const ExamCreationManagement = () => {
           onClose={() => setShowQuestionBank(false)}
           onImportQuestions={handleImportQuestions}
         />
+      )}
+      {draftMsg && (
+        <div className="mb-4 px-4 py-2 rounded bg-green-100 text-green-800 font-semibold shadow">
+          {draftMsg}
+        </div>
       )}
     </div>
   );

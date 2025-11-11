@@ -4,6 +4,7 @@ import Button from '../../../components/ui/Button';
 import Input from '../../../components/ui/Input';
 import Select from '../../../components/ui/Select';
 import ExamPreview from './ExamPreview'; // Import the ExamPreview component
+import QuestionBuilder from './QuestionBuilder'; // Import the QuestionBuilder component
 
 const termOptions = [
   { value: 'first', label: 'First Term' },
@@ -134,6 +135,7 @@ const ExamConfigurationPanel = ({
 
   const sections = [
     { id: 'basic', label: 'Basic Info', icon: 'FileText' },
+    { id: 'questions', label: `Questions (${questions?.length})`, icon: 'HelpCircle' }, // <-- Added here
     { id: 'schedule', label: 'Schedule', icon: 'Calendar' },
     { id: 'security', label: 'Security', icon: 'Shield' }
   ];
@@ -208,31 +210,6 @@ const ExamConfigurationPanel = ({
     setActiveSection('schedule');
   };
 
-  // Save draft handler
-  const handleSaveDraft = async () => {
-    setPublishError('');
-    const draftExamData = {
-      ...examData,
-      status: 'draft',
-    };
-    try {
-      const res = await fetch(`${API_BASE_URL}/api/exams/save-draft`, { // <-- Use env variable here
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(draftExamData),
-      });
-      const result = await res.json();
-      if (res.ok) {
-        alert('Draft saved! You can continue later.');
-        if (onSaveExam) onSaveExam();
-      } else {
-        setPublishError(result.error || 'Failed to save draft.');
-      }
-    } catch (err) {
-      setPublishError('Network error. Please try again.');
-    }
-  };
-
   // Publish handler (called only from modal)
   const handlePublishExam = () => {
     // Validation before publish
@@ -283,24 +260,24 @@ const ExamConfigurationPanel = ({
           </h2>
           <div className="flex space-x-2 w-full sm:w-auto">
             <Button
-              variant="outline"
+              className="draft-btn"
               size="sm"
-              onClick={handleSaveDraft}
+              onClick={onSaveExam} // <-- Use the prop from parent
               loading={isLoading}
               iconName="Save"
               iconPosition="left"
-              className="w-full sm:w-auto"
+              style={{ backgroundColor: '#16a34a', color: '#fff', borderColor: '#15803d' }} // green
             >
               Save Draft
             </Button>
             <Button
-              variant="default"
+              className="publish-btn"
               size="sm"
               onClick={handlePublishClick}
               loading={isLoading}
               iconName="Send"
               iconPosition="left"
-              className="w-full sm:w-auto"
+              style={{ backgroundColor: '#dc2626', color: '#fff', borderColor: '#b91c1c' }} // red
             >
               Publish
             </Button>
@@ -420,6 +397,15 @@ const ExamConfigurationPanel = ({
               />
             </div>
           </div>
+        )}
+
+        {activeSection === 'questions' && (
+          // Render your QuestionBuilder component here
+          <QuestionBuilder
+            questions={questions}
+            onQuestionsChange={setQuestions}
+            // ...other props as needed
+          />
         )}
 
         {activeSection === 'schedule' && (

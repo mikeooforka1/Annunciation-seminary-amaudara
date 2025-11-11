@@ -16,9 +16,7 @@ const TeacherPortal = () => {
       parsedData = JSON.parse(storedData);
       setTeacherData(parsedData);
     }
-    // Best practice: Check for valid _id before proceeding
     if (!parsedData._id) {
-      // Handle missing ID: show error and redirect to login
       alert('Session expired or invalid. Please log in again.');
       navigate('/login-authentication');
     }
@@ -60,31 +58,87 @@ const TeacherPortal = () => {
   }
 
   return (
-    <div className="min-h-screen bg-background px-2 sm:px-4 lg:px-8">
+    <div
+      className="min-h-screen px-2 sm:px-4 lg:px-8"
+      style={{
+        background: `
+          linear-gradient(135deg, #e0f2fe 0%, #bae6fd 100%),
+          url('https://www.transparenttextures.com/patterns/paper-fibers.png')
+        `,
+        backgroundBlendMode: 'multiply',
+        backgroundRepeat: 'repeat',
+      }}
+    >
       <WelcomeBanner
         teacherName={teacherData.name || teacherData.fullName || 'Teacher'}
         teacherPhoto={teacherData.photo || ''}
       />
       <DashboardWidgets teacherData={teacherData} />
       <div className="flex flex-col items-center mt-8 space-y-4 w-full">
-        <button
-          className="w-full sm:w-auto px-6 py-2 bg-primary text-white rounded shadow hover:bg-primary/80 transition"
-          onClick={() => navigate('/exam-creation-management')}
-        >
-          Go to Exam Creation & Management
-        </button>
-        <button
-          className="w-full sm:w-auto px-6 py-2 bg-secondary text-white rounded shadow hover:bg-secondary/80 transition"
-          onClick={() => setShowStudentsModal(true)}
-        >
-          View My Students ({studentsList.length})
-        </button>
-        <button
-          className="w-full sm:w-auto px-6 py-2 bg-accent text-white rounded shadow hover:bg-accent/80 transition"
-          onClick={() => navigate('/post-announcement')}
-        >
-          Post Announcement
-        </button>
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 w-full">
+          {/* Exam Creation Card */}
+          <div
+            className="bg-primary/10 border border-primary rounded-lg shadow hover:shadow-lg transition cursor-pointer flex flex-col items-center justify-center p-6"
+            onClick={() => navigate('/exam-creation-management')}
+          >
+            <span className="text-primary text-3xl mb-2">
+              <i className="fas fa-file-alt" />
+            </span>
+            <span className="font-heading font-bold text-lg mb-1 text-primary">Exam Creation & Management</span>
+            <span className="text-sm text-muted-foreground text-center">Create and manage exams for your classes.</span>
+          </div>
+          {/* Students Card */}
+          <div
+            className="bg-secondary/10 border border-secondary rounded-lg shadow hover:shadow-lg transition cursor-pointer flex flex-col items-center justify-center p-6"
+            onClick={() => setShowStudentsModal(true)}
+          >
+            <span className="text-secondary text-3xl mb-2">
+              <i className="fas fa-users" />
+            </span>
+            <span
+              className="font-heading font-extrabold text-xl mb-1"
+              style={{
+                color: '#252c3bff', // dark blue-gray for visibility
+                textShadow: '0 1px 2px #fff8',
+                letterSpacing: '0.5px'
+              }}
+            >
+              View My Students
+            </span>
+            <span className="text-sm text-muted-foreground text-center">See all students in your classes. ({studentsList.length})</span>
+          </div>
+          {/* Announcement Card */}
+          <div
+            className="bg-accent/10 border border-accent rounded-lg shadow hover:shadow-lg transition cursor-pointer flex flex-col items-center justify-center p-6"
+            onClick={() => navigate('/post-announcement')}
+          >
+            <span className="text-accent text-3xl mb-2">
+              <i className="fas fa-bullhorn" />
+            </span>
+            <span
+              className="font-heading font-extrabold text-xl mb-1"
+              style={{
+                color: '#282f3dff', // dark blue-gray for visibility
+                textShadow: '0 1px 2px #fff8',
+                letterSpacing: '0.5px'
+              }}
+            >
+              Post Announcement
+            </span>
+            <span className="text-sm text-muted-foreground text-center">Share important updates with your students.</span>
+          </div>
+          {/* Set Result Card */}
+          <div
+            className="bg-red-100 border border-red-400 rounded-lg shadow hover:shadow-lg transition cursor-pointer flex flex-col items-center justify-center p-6"
+            onClick={() => navigate('/result-portal')}
+          >
+            <span className="text-red-600 text-3xl mb-2">
+              <i className="fas fa-chart-bar" />
+            </span>
+            <span className="font-heading font-bold text-lg mb-1 text-red-600">Set Result</span>
+            <span className="text-sm text-muted-foreground text-center">Go to the result portal to set or view results.</span>
+          </div>
+        </div>
       </div>
 
       {/* Students Modal */}

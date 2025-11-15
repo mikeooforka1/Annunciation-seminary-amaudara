@@ -432,6 +432,40 @@ const LandingPage = () => {
           </motion.div>
         </div>
       </section>
+
+      {/* Founder Picture Section */}
+      <section className="py-12 bg-muted/10">
+        <div className="container mx-auto px-0 lg:px-0">
+          <motion.div
+            initial={{ opacity: 0, y: 50 }}
+            whileInView={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.1 }}
+            className="flex flex-col items-center justify-center w-full"
+          >
+            <div className="w-full flex justify-center items-center">
+              <div className="flex flex-col items-center w-full max-w-xs sm:max-w-sm md:max-w-md lg:max-w-lg xl:max-w-xl 2xl:max-w-2xl">
+                <div className="relative w-full aspect-[4/5]">
+                  {/* Frame (no bg-white) */}
+                  <div className="absolute inset-0 rounded-2xl border-4 border-primary/40 shadow-xl pointer-events-none z-10"></div>
+                  {/* Image fills the card */}
+                  <Image
+                    src="/assets/images/founder.jpg"
+                    alt="HIS LORDSHIP LATE BISHOP ANTHONY NWEDO,cssp."
+                    className="w-full h-full object-cover rounded-2xl"
+                    style={{ position: 'absolute', inset: 0 }}
+                  />
+                </div>
+              </div>
+            </div>
+            <p className="text-center text-base font-semibold text-primary mt-4">
+              HIS LORDSHIP<br />
+              LATE BISHOP ANTHONY NWEDO, cssp.<br />
+              <span className="text-muted-foreground">(Founder of Annunciation Seminary Amaudara)</span>
+            </p>
+          </motion.div>
+        </div>
+      </section>
+
       {/* Team of Formators Section */}
       <section className="py-20 bg-gradient-to-br from-primary/10 via-background to-accent/10">
         <div className="container mx-auto px-4 lg:px-6">
@@ -592,7 +626,7 @@ const LandingPage = () => {
               transition={{ duration: 0.1, delay: 0.1 }}
               className="flex flex-col items-center"
             >
-              <div className="w-full max-w-lg rounded-2xl overflow-hidden shadow-xl border-4 border-accent/20 bg-white">
+              <div className="w-full max-w-lg rounded-2xl overflow-hidden shadow-xl border-4 border-accent/20 bg-white mb-6">
                 <Image
                   src="/assets/images/main-football-field.jpg"
                   alt="Seminary Football Field"
@@ -602,6 +636,18 @@ const LandingPage = () => {
               <p className="mt-4 text-center text-base font-semibold text-accent break-words max-w-xs sm:max-w-md md:max-w-lg">
                 <span className="block">Vibrant Seminary Life:</span>
                 <span className="block">Sports and brotherhood on the lush football field</span>
+              </p>
+              {/* Lawn Tennis Pic and Caption */}
+              <div className="w-full max-w-lg rounded-2xl overflow-hidden shadow-xl border-4 border-accent/20 bg-white mt-8">
+                <Image
+                  src="/assets/images/lawn-tennis.jpg"
+                  alt="Seminary Lawn Tennis Court"
+                  className="w-full h-80 object-cover"
+                />
+              </div>
+              <p className="mt-4 text-center text-base font-semibold text-accent break-words max-w-xs sm:max-w-md md:max-w-lg">
+                <span className="block">Lawn Tennis Court:</span>
+                <span className="block">A modern court for tennis, recreation, and healthy competition</span>
               </p>
             </motion.div>
           </div>

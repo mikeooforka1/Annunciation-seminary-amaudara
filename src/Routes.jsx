@@ -21,6 +21,7 @@ import ContactPage from './pages/contact';
 import ResultPortal from './pages/exam-creation-management/components/ResultPortal';
 import PostAnnouncement from './pages/teacher-portal/components/post-announcement';
 import AdminDashboard from './pages/admin'; // Add this import
+import StudentProfilePage from './pages/admin/components/student-profile'; // Import your student profile page
 
 const AppWrapper = ({ children }) => {
   const navigate = useNavigate();
@@ -282,6 +283,7 @@ const Routes = () => {
                   <Route path="/teacher-portal" element={<TeacherPortal />} />
                   <Route path="/post-announcement" element={<PostAnnouncement />} />
                   <Route path="/admin" element={<AdminDashboard />} />
+                  <Route path="/admin/student/:studentId" element={<StudentProfilePage />} />
                   <Route path="*" element={<NotFound />} />
                 </RouterRoutes>
               </Suspense>

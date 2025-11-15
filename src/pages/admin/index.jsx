@@ -6,6 +6,8 @@ import TeachersList from "./components/teachers";
 import FormatorsList from "./components/formators";
 import ExpelledStudents from "./components/expelled-students";
 import NonAcademicStaffList from "./components/non-academic staffs"; // <-- Add this import
+import VerifyResult from "./components/verify-result"; // <-- Add this import
+import { useNavigate } from "react-router-dom";
 
 const API_BASE_URL = process.env.REACT_APP_API_BASE_URL;
 
@@ -60,6 +62,7 @@ const AdminDashboard = () => {
   const [search, setSearch] = useState("");
   const [loading, setLoading] = useState(false);
   const [errorMsg, setErrorMsg] = useState("");
+  const navigate = useNavigate();
 
   useEffect(() => {
     fetchClasses();
@@ -327,7 +330,9 @@ const AdminDashboard = () => {
               {filterUsers(students).map((student) => (
                 <div
                   key={student._id}
-                  className="flex items-center justify-between bg-muted/10 rounded-lg px-3 py-2"
+                  className="flex items-center justify-between bg-muted/10 rounded-lg px-3 py-2 cursor-pointer hover:bg-primary/10 transition"
+                  onClick={() => navigate(`/admin/student/${student._id}`)}
+                  title="View Profile"
                 >
                   <span className="font-semibold">{student.name}</span>
                   <span className="text-xs text-muted-foreground">
@@ -406,10 +411,7 @@ const AdminDashboard = () => {
             >
               &larr; Back to Dashboard
             </Button>
-            <h2 className="font-heading text-xl mb-4">Verify Results</h2>
-            <div className="text-muted-foreground">
-              <p>Result verification functionality coming soon.</p>
-            </div>
+            <VerifyResult /> {/* <-- Render the verify result page */}
           </>
         )}
       </main>

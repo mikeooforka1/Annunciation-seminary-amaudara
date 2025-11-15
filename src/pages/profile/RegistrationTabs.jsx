@@ -9,38 +9,16 @@ const tabList = [
   { key: 'legal', label: 'Legal & Account' },
 ];
 
-const RegistrationTabs = ({ registrationData }) => {
+const RegistrationTabs = ({ registrationData, userId }) => {
   const [activeTab, setActiveTab] = useState('parentGuardian');
   const [data, setData] = useState(registrationData);
   const [editing, setEditing] = useState(false);
   const [form, setForm] = useState({});
-  const [userId, setUserId] = useState("");
 
   useEffect(() => {
-    // Get userId from localStorage
-    const studentData = JSON.parse(localStorage.getItem("studentData") || "{}");
-    setUserId(studentData._id);
-
-    // Fetch registration data from backend
-    const fetchRegistration = async () => {
-      if (!studentData._id) return;
-      try {
-        const res = await fetch(`${API_BASE_URL}/api/registration/${studentData._id}`);
-        if (res.ok) {
-          const reg = await res.json();
-          setData(reg);
-          setForm(reg[activeTab] || {});
-        } else {
-          setData(registrationData);
-          setForm(registrationData[activeTab] || {});
-        }
-      } catch {
-        setData(registrationData);
-        setForm(registrationData[activeTab] || {});
-      }
-    };
-    fetchRegistration();
-  }, [activeTab, registrationData]);
+    setData(registrationData);
+    setForm(registrationData[activeTab] || {});
+  }, [registrationData, activeTab]);
 
   const handleChange = (e) => {
     const { name, value, type, checked } = e.target;
@@ -53,7 +31,6 @@ const RegistrationTabs = ({ registrationData }) => {
   const handleSave = async () => {
     const updatedData = { ...data, [activeTab]: form };
     setData(updatedData);
-    localStorage.setItem('goshen-registration-data', JSON.stringify(updatedData));
     setEditing(false);
 
     // Save to backend

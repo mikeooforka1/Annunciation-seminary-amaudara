@@ -103,7 +103,7 @@ const ProfilePage = () => {
   return (
     <div className="max-w-2xl mx-auto bg-white rounded-lg shadow p-4 sm:p-6 mt-6 sm:mt-10">
       <div className="flex flex-col sm:flex-row items-center mb-6 gap-4 sm:gap-6">
-        <div className="relative group">
+        <div className="relative group w-full sm:w-auto flex justify-center">
           <img
             src={profile.photo || "/assets/images/default_student.png"}
             alt="Student"

@@ -1,0 +1,205 @@
+[{
+  "_id": {
+    "$oid": "691f1414844675bc29f573d2"
+  },
+  "studentId": {
+    "$oid": "691b02ba64f21188c2b1dab0"
+  },
+  "className": "ss2",
+  "subject": "Mathematics",
+  "term": "first",
+  "__v": 0,
+  "date": {
+    "$date": "2025-11-20T13:14:11.326Z"
+  },
+  "pending": false,
+  "remarks": "",
+  "reviewed": true,
+  "score": 1,
+  "teacherId": {
+    "$oid": "691aeef664f21188c2b1daae"
+  },
+  "verified": false,
+  "examScore": 1,
+  "firstCatScore": 1,
+  "grade": "a",
+  "maxScore": 11,
+  "minScore": 1,
+  "projectScore": 1,
+  "remark": "1",
+  "secondCatScore": 1,
+  "totalScore": 4
+},
+{
+  "_id": {
+    "$oid": "691f1414844675bc29f573d3"
+  },
+  "term": "first",
+  "subject": "English",
+  "className": "ss2",
+  "studentId": {
+    "$oid": "691b02ba64f21188c2b1dab0"
+  },
+  "__v": 0,
+  "date": {
+    "$date": "2025-11-20T13:14:11.329Z"
+  },
+  "pending": false,
+  "remarks": "",
+  "reviewed": true,
+  "score": 1,
+  "teacherId": {
+    "$oid": "691aeef664f21188c2b1daae"
+  },
+  "verified": false,
+  "examScore": 1,
+  "firstCatScore": 1,
+  "grade": "a",
+  "maxScore": 1,
+  "minScore": 1,
+  "projectScore": 1,
+  "remark": "1",
+  "secondCatScore": 1,
+  "totalScore": 4
+},
+{
+  "_id": {
+    "$oid": "691f1414844675bc29f573d4"
+  },
+  "studentId": {
+    "$oid": "691b02ba64f21188c2b1dab0"
+  },
+  "className": "ss2",
+  "subject": "Biology",
+  "term": "first",
+  "__v": 0,
+  "date": {
+    "$date": "2025-11-20T13:14:11.332Z"
+  },
+  "pending": false,
+  "remarks": "",
+  "reviewed": true,
+  "score": 1,
+  "teacherId": {
+    "$oid": "691aeef664f21188c2b1daae"
+  },
+  "verified": false,
+  "examScore": 1,
+  "firstCatScore": 1,
+  "grade": "a",
+  "maxScore": 1,
+  "minScore": 1,
+  "projectScore": 1,
+  "remark": "11",
+  "secondCatScore": 1,
+  "totalScore": 4
+},
+{
+  "_id": {
+    "$oid": "691f1414844675bc29f573d5"
+  },
+  "term": "first",
+  "subject": "Physics",
+  "className": "ss2",
+  "studentId": {
+    "$oid": "691b02ba64f21188c2b1dab0"
+  },
+  "__v": 0,
+  "date": {
+    "$date": "2025-11-20T13:14:11.335Z"
+  },
+  "pending": false,
+  "remarks": "",
+  "reviewed": true,
+  "score": 1,
+  "teacherId": {
+    "$oid": "691aeef664f21188c2b1daae"
+  },
+  "verified": false,
+  "examScore": 1,
+  "firstCatScore": 1,
+  "grade": "a",
+  "maxScore": 1,
+  "minScore": 1,
+  "projectScore": 1,
+  "remark": "1",
+  "secondCatScore": 1,
+  "totalScore": 4
+},
+{
+  "_id": {
+    "$oid": "691f1414844675bc29f573d6"
+  },
+  "studentId": {
+    "$oid": "691b02ba64f21188c2b1dab0"
+  },
+  "className": "ss2",
+  "subject": "Chemistry",
+  "term": "first",
+  "__v": 0,
+  "date": {
+    "$date": "2025-11-20T13:14:11.337Z"
+  },
+  "pending": false,
+  "remarks": "",
+  "reviewed": true,
+  "score": 2,
+  "teacherId": {
+    "$oid": "691aeef664f21188c2b1daae"
+  },
+  "verified": false,
+  "examScore": 2,
+  "firstCatScore": 1,
+  "grade": "a",
+  "maxScore": 1,
+  "minScore": 1,
+  "projectScore": 1,
+  "remark": "1",
+  "secondCatScore": 1,
+  "totalScore": 5
+},
+{
+  "_id": {
+    "$oid": "691f1414844675bc29f573d7"
+  },
+  "term": "first",
+  "subject": "Overall",
+  "className": "ss2",
+  "studentId": {
+    "$oid": "691b02ba64f21188c2b1dab0"
+  },
+  "__v": 0,
+  "date": {
+    "$date": "2025-11-20T13:14:11.319Z"
+  },
+  "pending": false,
+  "remarks": "Position: 1st",
+  "reviewed": true,
+  "score": 1,
+  "teacherId": {
+    "$oid": "691aeef664f21188c2b1daae"
+  },
+  "verified": false,
+  "academicYear": "1",
+  "schoolOpened": 1,
+  "present": 1,
+  "absent": 1,
+  "totalScore": 1,
+  "projectDefence": "1",
+  "overallScore": 1,
+  "average": 1,
+  "nextTerm": "11",
+  "attentiveness": 2,
+  "attitude": 1,
+  "creativity": 2,
+  "handwriting": 2,
+  "headTeacherRemark": "rr",
+  "honesty": 2,
+  "initiative": 2,
+  "neatness": 2,
+  "obedience": 3,
+  "punctuality": 2,
+  "respect": 2,
+  "signatureDate": "11",
+  "teacherComment": "11"
+}]

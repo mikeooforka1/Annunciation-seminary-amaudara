@@ -47,6 +47,12 @@ const TeacherPortal = () => {
     }
   }, [teacherData]);
 
+  const handleLogout = () => {
+    localStorage.removeItem('user');
+    localStorage.removeItem('teacherData');
+    navigate('/login-authentication');
+  };
+
   if (!teacherData || !teacherData._id) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-background">
@@ -69,6 +75,17 @@ const TeacherPortal = () => {
         backgroundRepeat: 'repeat',
       }}
     >
+      {/* Logout Button */}
+      <div className="w-full flex justify-end items-center pt-4 pb-2">
+        <button
+          onClick={handleLogout}
+          className="bg-destructive text-white px-4 py-2 rounded-lg shadow hover:bg-destructive/90 transition font-semibold text-sm sm:text-base"
+          style={{ minWidth: 90 }}
+          aria-label="Logout"
+        >
+          Logout
+        </button>
+      </div>
       <WelcomeBanner
         teacherName={teacherData.name || teacherData.fullName || 'Teacher'}
         teacherPhoto={teacherData.photo || ''}

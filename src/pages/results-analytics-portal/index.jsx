@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import RoleBasedHeader from '../../components/ui/RoleBasedHeader';
 import ContextualBreadcrumbs from '../../components/ui/ContextualBreadcrumbs';
-import GradeTrendChart from './components/GradeTrendChart';
+// import GradeTrendChart from './components/GradeTrendChart'; // REMOVED
 import ResultsTable from './components/ResultsTable';
 import ExamBreakdownModal from './components/ExamBreakdownModal';
 import Icon from '../../components/AppIcon';
@@ -12,7 +12,7 @@ const ResultsAnalyticsPortal = () => {
   const [selectedExam, setSelectedExam] = useState(null);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [showNoResultsModal, setShowNoResultsModal] = useState(false);
-  const [filters, setFilters] = useState({
+  const [filters] = useState({
     subject: '',
     examType: '',
     performance: '',
@@ -25,12 +25,8 @@ const ResultsAnalyticsPortal = () => {
   const [userName, setUserName] = useState('');
   const [studentData, setStudentData] = useState(null);
   const [currentTerm, setCurrentTerm] = useState('');
-
-  // Move these two lines up here, before any useEffect or logic that uses them
   const [selectedTerm, setSelectedTerm] = useState('');
   const [selectedClass, setSelectedClass] = useState('');
-
-  // Add these two states at the top
   const [subjects, setSubjects] = useState([]);
   const [examTypes, setExamTypes] = useState([]);
 
@@ -56,44 +52,48 @@ const ResultsAnalyticsPortal = () => {
   const API_BASE_URL = process.env.REACT_APP_API_BASE_URL;
 
   // Fetch real subjects and exam types from backend
-  useEffect(() => {
-    if (!studentData?._id) return;
-    async function fetchStudentMeta() {
-      try {
-        const subjectsRes = await fetch(`${API_BASE_URL}/api/student/subjects`);
-        const examTypesRes = await fetch(`${API_BASE_URL}/api/student/exam-types`);
-        const subjectsData = await subjectsRes.json();
-        const examTypesData = await examTypesRes.json();
-        setSubjects(subjectsData || []);
-        setExamTypes(examTypesData || []);
-      } catch (err) {
-        setSubjects([]);
-        setExamTypes([]);
-      }
-    }
-    fetchStudentMeta();
-  }, [API_BASE_URL, studentData]);
+  
 
   // Fetch results pushed by teacher for this student and term
   const [examResults, setExamResults] = useState([]);
   const [isLoadingResults, setIsLoadingResults] = useState(false);
   const [resultsError, setResultsError] = useState('');
 
+  const [hasSelected, setHasSelected] = useState(false);
+
+  // Utility to check for valid ObjectId
+  const isValidObjectId = id => typeof id === 'string' && /^[a-fA-F0-9]{24}$/.test(id);
+
   useEffect(() => {
     if (
       studentData?._id &&
       selectedTerm &&
-      selectedClass
+      selectedClass &&
+      hasSelected // <-- Only fetch after selection
     ) {
+      if (!isValidObjectId(studentData._id)) {
+        setResultsError('Invalid student ID. Please log in again.');
+        setExamResults([]);
+        setIsLoadingResults(false);
+        setShowNoResultsModal(true);
+        return;
+      }
       setIsLoadingResults(true);
       setResultsError('');
       fetch(`${API_BASE_URL}/api/results/student/${studentData._id}/${selectedTerm}/${selectedClass}`)
         .then(res => {
-          if (!res.ok) throw new Error
+          if (!res.ok) throw new Error(`Failed to fetch: ${res.status}`);
           return res.json();
         })
         .then(data => {
+          if (!Array.isArray(data) || data.length === 0) {
+            setExamResults([]);
+            setShowNoResultsModal(true);
+            setIsLoadingResults(false);
+            return;
+          }
           const formattedResults = data.map((result, idx) => ({
+            ...result,
             id: idx + 1,
             date: result.date ? new Date(result.date).toISOString().slice(0, 10) : '',
             subject: result.subject,
@@ -108,7 +108,6 @@ const ResultsAnalyticsPortal = () => {
             className: result.className
           }));
 
-          // Add overall score and position object
           const totalScore = formattedResults.reduce((sum, r) => sum + (r.score || 0), 0);
           const totalMarks = formattedResults.reduce((sum, r) => sum + (r.totalMarks || 0), 0);
           const overallPercentage = totalMarks > 0 ? Math.round((totalScore / totalMarks) * 100) : 0;
@@ -120,19 +119,24 @@ const ResultsAnalyticsPortal = () => {
           });
 
           setExamResults(formattedResults);
+
+          const subjectsList = [...new Set(formattedResults.filter(r => r.subject && r.subject !== 'Overall').map(r => r.subject))];
+          setSubjects(subjectsList);
+
           setIsLoadingResults(false);
+          setShowNoResultsModal(false);
         })
         .catch(err => {
           setExamResults([]);
           setIsLoadingResults(false);
           setResultsError('Could not fetch results. Please check your network or try again later.');
+          setShowNoResultsModal(true);
           console.error('Error fetching results:', err);
         });
     }
-  }, [studentData, selectedTerm, selectedClass, API_BASE_URL]);
+  }, [studentData, selectedTerm, selectedClass, API_BASE_URL, hasSelected]);
 
   // Fetch achievements if you have a backend endpoint for them
-
 
   // Fetch detailed exam data if you have a backend endpoint for it
   const [detailedExamData, setDetailedExamData] = useState({});
@@ -156,133 +160,13 @@ const ResultsAnalyticsPortal = () => {
     }
   };
 
-  const handleFilterChange = (key, value) => {
-    setFilters(prev => ({
-      ...prev,
-      [key]: value
-    }));
-  };
-
-  const handleClearFilters = () => {
-    setFilters({
-      subject: '',
-      examType: '',
-      performance: '',
-      dateFrom: '',
-      dateTo: '',
-      dateRange: ''
-    });
-  };
-
-  const handleExportReport = () => {
-    console.log('Exporting comprehensive report...');
-    // Mock export functionality
-  };
-
-  const handleShareWithParent = () => {
-    console.log('Sharing results with parent...');
-    // Mock sharing functionality
-  };
-
   const breadcrumbItems = [
     { label: 'Results & Analytics', path: '/results-analytics-portal' }
   ];
 
-  // New state variables for performance summary and grade trend data
-  const [performanceSummary, setPerformanceSummary] = useState([]);
-  const [gradeTrendData, setGradeTrendData] = useState([]);
-
-  useEffect(() => {
-    if (examResults.length > 0) {
-      // Average score
-      const avgScore = Math.round(
-        examResults.reduce((sum, r) => sum + (r.score || 0), 0) / examResults.length
-      );
-
-      // Best subject
-      const subjectScores = {};
-      examResults.forEach(r => {
-        if (!subjectScores[r.subject]) subjectScores[r.subject] = [];
-        subjectScores[r.subject].push(r.score || 0);
-      });
-      const bestSubject = Object.entries(subjectScores)
-        .map(([subject, scores]) => ({
-          subject,
-          avg: scores.length ? scores.reduce((a, b) => a + b, 0) / scores.length : 0
-        }))
-        .sort((a, b) => b.avg - a.avg)[0]?.subject || '';
-
-      // Exams taken
-      const examsTaken = examResults.length;
-
-      // Attendance (if you have attendance data, otherwise mock as 100%)
-      const attendance = 100;
-
-      setPerformanceSummary([
-        {
-          title: 'Average Score',
-          value: `${avgScore}%`,
-          subtitle: 'This Term',
-          icon: 'BarChart',
-          trend: avgScore >= 80 ? 'up' : avgScore < 60 ? 'down' : 'neutral',
-          trendValue: '', // You can calculate trend compared to previous term if you have data
-          color: 'success'
-        },
-        {
-          title: 'Best Subject',
-          value: bestSubject,
-          subtitle: 'Top Score',
-          icon: 'BookOpen',
-          trend: 'up',
-          trendValue: '',
-          color: 'primary'
-        },
-        {
-          title: 'Exams Taken',
-          value: examsTaken,
-          subtitle: 'This Term',
-          icon: 'ClipboardList',
-          trend: 'neutral',
-          trendValue: '',
-          color: 'info'
-        },
-        {
-          title: 'Attendance',
-          value: `${attendance}%`,
-          subtitle: 'This Term',
-          icon: 'UserCheck',
-          trend: 'neutral',
-          trendValue: '',
-          color: 'success'
-        }
-      ]);
-    } else {
-      setPerformanceSummary([]);
-    }
-  }, [examResults]);
-
-  useEffect(() => {
-    if (examResults.length > 0) {
-      // Group results by month
-      const monthMap = {};
-      examResults.forEach(res => {
-        const month = res.date ? res.date.slice(0, 7) : ''; // 'YYYY-MM'
-        if (!monthMap[month]) monthMap[month] = [];
-        monthMap[month].push(res.score);
-      });
-
-      // Build trend data array
-      const trendArr = Object.entries(monthMap).map(([month, scores]) => ({
-        month,
-        myScore: Math.round(scores.reduce((a, b) => a + b, 0) / scores.length),
-        classAverage: Math.round(scores.reduce((a, b) => a + b, 0) / scores.length) // Replace with real class average if available
-      }));
-
-      setGradeTrendData(trendArr);
-    } else {
-      setGradeTrendData([]);
-    }
-  }, [examResults]);
+  // REMOVE gradeTrendData state and related useEffect
+  // const [gradeTrendData, setGradeTrendData] = useState([]);
+  // useEffect(() => { ... }, [examResults]);
 
   const [filteredResults, setFilteredResults] = useState([]);
 
@@ -411,6 +295,136 @@ const ResultsAnalyticsPortal = () => {
     }
   }, [examResults]);
 
+  // --- ADD THIS LINE RIGHT BEFORE RETURN ---
+  const overallResult = filteredResults.find(r => r.subject === 'Overall');
+
+  const handlePrintResult = () => {
+    const style = document.createElement('style');
+    style.id = 'custom-print-style';
+    style.innerHTML = `
+      @media print {
+        @page {
+          size: A3;
+          margin: 20mm;
+        }
+        body * {
+          visibility: hidden !important;
+        }
+        #result-print-section, #result-print-section * {
+          visibility: visible !important;
+        }
+        #result-print-section {
+          position: absolute !important;
+          left: 0;
+          top: 0;
+          width: 100vw !important;
+          margin: 0 !important;
+          background: none !important;
+          box-shadow: none !important;
+          /* Ensure background image prints */
+          -webkit-print-color-adjust: exact !important;
+          print-color-adjust: exact !important;
+          background-image: url("/assets/images/school_logo-1754996036714.jpg") !important;
+          background-repeat: no-repeat !important;
+          background-position: center center !important;
+          background-size: 60% !important;
+        }
+        /* Ensure subheading is visible */
+        #result-print-section h2 {
+          visibility: visible !important;
+        }
+      }
+    `;
+    document.head.appendChild(style);
+
+    window.print();
+
+    window.onafterprint = () => {
+      const styleTag = document.getElementById('custom-print-style');
+      if (styleTag) styleTag.remove();
+      window.onafterprint = null;
+    };
+  };
+
+  const allClassOptions = [
+    'JSS1', 'JSS2', 'JSS3', 'SS1', 'SS2', 'SS3'
+  ];
+
+  // Helper to check if previous class should be shown
+  const showPreviousClass =
+    studentData?.className &&
+    !allClassOptions.includes(studentData.className) &&
+    selectedClass !== studentData.className;
+
+  // Reset results/loading when class/term changes before "Continue"
+  useEffect(() => {
+    if (!hasSelected) {
+      setExamResults([]);
+      setResultsError('');
+      setIsLoadingResults(false);
+    }
+  }, [selectedClass, selectedTerm, hasSelected]);
+
+  // Render selection screen if not selected
+  if (!hasSelected) {
+    return (
+      <main className="pt-24 pb-20 lg:pb-8 transition-all duration-300" style={{ minHeight: '100vh' }}>
+        <div
+          className="flex items-center justify-center"
+          style={{ minHeight: '80vh', width: '100%' }}
+        >
+          <div className="max-w-md w-full bg-white rounded-lg shadow-lg p-8 flex flex-col items-center">
+            <h1 className="font-heading text-3xl font-bold text-foreground mb-6 text-center">Select Class and Term</h1>
+            <div className="flex flex-wrap gap-4 mb-4 justify-center w-full">
+              <div>
+                <label className="block text-sm font-medium mb-1">Term</label>
+                <select
+                  value={selectedTerm}
+                  onChange={e => setSelectedTerm(e.target.value)}
+                  className="border rounded px-3 py-2"
+                >
+                  <option value="">Select Term</option>
+                  <option value="first">First Term</option>
+                  <option value="second">Second Term</option>
+                  <option value="third">Third Term</option>
+                </select>
+              </div>
+              <div>
+                <label className="block text-sm font-medium mb-1">Class</label>
+                <select
+                  value={selectedClass}
+                  onChange={e => setSelectedClass(e.target.value)}
+                  className="border rounded px-3 py-2"
+                >
+                  <option value="">Select Class</option>
+                  {allClassOptions.map(cls => (
+                    <option key={cls} value={cls}>{cls}</option>
+                  ))}
+                  {showPreviousClass && (
+                    <option value={studentData.className}>{studentData.className} (Previous)</option>
+                  )}
+                </select>
+              </div>
+            </div>
+            <Button
+              variant="default"
+              onClick={() => {
+                if (selectedTerm && selectedClass) {
+                  setHasSelected(true);
+                } else {
+                  alert('Please select both class and term.');
+                }
+              }}
+              className="w-full"
+            >
+              Continue
+            </Button>
+          </div>
+        </div>
+      </main>
+    );
+  }
+
   return (
     <>
       <RoleBasedHeader
@@ -420,120 +434,114 @@ const ResultsAnalyticsPortal = () => {
       />
 
       <main className="pt-24 pb-20 lg:pb-8 transition-all duration-300">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-          {/* --- MOVE THIS SECTION TO THE TOP --- */}
-          <ContextualBreadcrumbs items={breadcrumbItems} className="mb-6" />
-          <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between mb-8">
-            <div>
-              <h1 className="font-heading text-3xl font-bold text-foreground">Results & Analytics</h1>
-              <p className="font-body text-lg text-muted-foreground mt-2">
-                Track your academic performance and progress over time
-              </p>
-            </div>
-            
+        <div className="max-w-7xl mx-auto px-2 sm:px-4 lg:px-8 py-8" style={{ width: '100%' }}>
+          <ContextualBreadcrumbs items={breadcrumbItems} className="mb-6 print-hide" />
+          <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between mb-8 print-hide">
             <div className="flex items-center space-x-3 mt-4 lg:mt-0">
-              <Button variant="default" onClick={() => window.print()}>
+              <Button variant="default" onClick={handlePrintResult}>
                 <Icon name="Printer" size={16} className="mr-2" />
                 Print Results
               </Button>
             </div>
           </div>
-          <div className="flex flex-wrap gap-4 mb-4">
-            <div>
-              <label className="block text-sm font-medium mb-1">Term</label>
-              <select
-                value={selectedTerm}
-                onChange={e => setSelectedTerm(e.target.value)}
-                className="border rounded px-3 py-2"
-              >
-                <option value="">Select Term</option>
-                <option value="first">First Term</option>
-                <option value="second">Second Term</option>
-                <option value="third">Third Term</option>
-              </select>
-            </div>
-            <div>
-              <label className="block text-sm font-medium mb-1">Class</label>
-              <select
-                value={selectedClass}
-                onChange={e => setSelectedClass(e.target.value)}
-                className="border rounded px-3 py-2"
-              >
-                <option value="">Select Class</option>
-                {/* Dynamically list classes if available */}
-                {studentData?.allClasses?.map(cls => (
-                  <option key={cls} value={cls}>{cls}</option>
-                ))}
-                {/* Fallback to current class */}
-                {!studentData?.allClasses && (
-                  <option value={studentData?.className}>{studentData?.className}</option>
-                )}
-              </select>
-            </div>
-          </div>
-          {/* ------------------------------------- */}
+          {/* PRINTABLE AREA */}
+          <div
+            id="result-print-section"
+            style={{
+              pageBreakInside: 'avoid',
+              breakInside: 'avoid',
+              position: 'relative',
+              background: 'none',
+              backgroundImage: 'url("/assets/images/school_logo-1754996036714.jpg")',
+              backgroundRepeat: 'no-repeat',
+              backgroundPosition: 'center center',
+              backgroundSize: '60%',
+              opacity: 1,
+              minHeight: '100vh',
+              maxWidth: '1100px', // <-- Increased from 900px to 1100px
+              margin: '0 auto',
+            }}
+          >
+            {/* Watermark overlay */}
+            <div className="watermark-overlay" style={{
+              position: 'absolute',
+              inset: 0,
+              zIndex: 0,
+              pointerEvents: 'none',
+              background: 'rgba(255,255,255,0.72)', // <-- Increased opacity from 0.7 to 0.72
+            }} />
 
-          {/* Print Area */}
-          <div className="print-area" style={{ pageBreakInside: 'avoid', breakInside: 'avoid' }}>
+            {/* HEADER */}
             <header
+              className="print-area-header"
               style={{
-                textAlign: 'center',
+                position: 'relative',
+                zIndex: 1,
                 marginBottom: '24px',
-                background: '#16a34a', // Tailwind green-600
-                padding: '24px 0',
-                borderRadius: '12px',
-                color: '#fff',
-                boxShadow: '0 2px 8px rgba(22,163,74,0.08)'
+                padding: '16px 0',
+                borderBottom: '2px solid #e5e7eb',
+                background: '#fff',
+                flexWrap: 'wrap',
               }}
             >
-              <img
-                src="/assets/images/school_logo-1754996036714.jpg"
-                alt="School Logo"
-                style={{
-                  width: 90,
-                  margin: '0 auto 16px auto',
-                  borderRadius: '8px',
-                  boxShadow: '0 2px 8px rgba(0,0,0,0.08)'
-                }}
-              />
-              <h2 style={{
-                fontWeight: 'bold',
-                fontSize: '2rem',
-                marginBottom: '8px',
-                color: '#fff',
-                letterSpacing: '1px'
-              }}>
-                Annunciation Seminary Amaudara
-              </h2>
-              <div style={{
-                fontSize: '1.2rem',
-                marginBottom: '4px',
-                fontWeight: 'bold',
-                color: '#fff',
-                textShadow: '0 1px 2px rgba(0,0,0,0.12)'
-              }}>
-                Student: <span style={{ fontWeight: 'bold', fontSize: '1.35rem', color: '#fff' }}>{userName || 'N/A'}</span>
+              <div className="flex flex-col items-center w-full">
+                <img
+                  src="/assets/images/school_logo-1754996036714.jpg"
+                  alt="School Logo"
+                  style={{ width: 100, borderRadius: '50%', marginBottom: 12 }}
+                />
+                <h1
+                  className="font-extrabold text-3xl md:text-4xl text-gray-900 tracking-wide mb-1 text-center"
+                  style={{ letterSpacing: '2px' }}
+                >
+                  ANNUNCIATION SEMINARY AMAUDARA
+                </h1>
+                <div className="font-semibold text-lg text-gray-700 mb-1 text-center">
+                  RENOVARE FACIEM TERRA
+                </div>
+                <div className="text-sm text-gray-600 mb-1 text-center">
+                  Isiala Ngwa South, Owerrinta Abia State
+                </div>
+                <div className="text-sm text-gray-600 mb-1 text-center">
+                  Website: <a href="https://annunciationseminaryamaudara.online" className="text-blue-600 underline">www.annunciationseminaryamaudara.online</a> &nbsp;|&nbsp;
+                  Email: <a href="mailto:annunciationseminaryamaudara84@gmail.com" className="text-blue-600 underline">annunciationseminaryamaudara84@gmail.com</a>
+                </div>
               </div>
-              <div style={{
-                fontSize: '1.1rem',
-                marginBottom: '4px',
-                color: '#fff'
-              }}>
-                Class: {selectedClass || 'N/A'}
+              <div className="flex flex-wrap justify-between items-center mt-4 text-sm text-gray-700 gap-2 px-2 w-full">
+                <div>
+                  Name: <span className="font-extrabold text-2xl text-primary" style={{ fontWeight: 900, letterSpacing: '1px' }}>
+                    {userName || 'N/A'}
+                  </span>
+                </div>
+                {/* Removed Gender */}
+                <div>Class: <span className="font-bold">{selectedClass || 'N/A'}</span></div>
+                <div>Term: <span className="font-bold">{selectedTerm || 'N/A'}</span></div>
               </div>
-              <div style={{
-                fontSize: '1.1rem',
-                marginBottom: '4px',
-                color: '#fff'
-              }}>
-                Term: {selectedTerm || 'N/A'}
+              <div className="flex flex-wrap justify-between items-center mt-2 text-sm text-gray-700 gap-2 px-2 w-full">
+                <div>Academic Season: <span className="font-bold">{overallResult?.academicYear || '____'}</span></div>
+                <div>No. of Times School Opened: <span className="font-bold">{overallResult?.schoolOpened || '____'}</span></div>
+                <div>No. of Time Present: <span className="font-bold">{overallResult?.present || '____'}</span></div>
+                <div>No. of Time Absent: <span className="font-bold">{overallResult?.absent || '____'}</span></div>
+                <div>Total Score: <span className="font-bold">{overallResult?.totalScore || '____'}</span></div>
+                <div>Project Defence: <span className="font-bold">{overallResult?.projectDefence || '____'}</span></div>
+                <div>Over-all Score: <span className="font-bold">{overallResult?.overallScore || '____'}</span></div>
+                <div>Average: <span className="font-bold">{overallResult?.average || '____'}</span></div>
               </div>
-              <hr style={{ margin: '16px auto', borderTop: '1px solid #fff', opacity: 0.3 }} />
+              <div className="mt-2 text-sm text-gray-700 px-2 w-full">
+                Next Term Begins: <span className="font-bold">{overallResult?.nextTerm || '____'}</span>
+              </div>
+              <hr style={{ margin: '16px auto', borderTop: '1px solid #ccc' }} />
             </header>
+
+            {/* SUBHEADING */}
             <section style={{ marginBottom: '24px', textAlign: 'center' }}>
-              <h2 style={{ fontSize: '1.5rem', fontWeight: 'bold', marginBottom: '8px' }}>Exam Results</h2>
+              <h2 style={{ fontSize: '1.5rem', fontWeight: 'bold', marginBottom: '8px', textTransform: 'uppercase', letterSpacing: '1px' }}>
+                COGNITIVE DOMAIN [PERFORMANCE IN SUBJECTS]
+              </h2>
             </section>
-            <div className="results-table mb-8 overflow-x-auto">
+
+            {/* RESULTS TABLE */}
+            <div className="results-table mb-8 overflow-x-auto" style={{ position: 'relative', zIndex: 1 }}>
               {isLoadingResults ? (
                 <div className="flex items-center justify-center py-8">
                   <Icon name="Loader" size={32} className="animate-spin text-primary mr-2" />
@@ -542,113 +550,84 @@ const ResultsAnalyticsPortal = () => {
               ) : resultsError ? (
                 <div className="text-red-600 py-8">{resultsError}</div>
               ) : (
-                <>
-                  <ResultsTable 
-                    results={filteredResults}
-                    onViewDetails={handleExamDetails}
-                    showOverallScore={true}
-                    showPosition={true}
-                  />
-                  {/* --- Summary boxes inside results-table for print --- */}
-                  <div style={{ display: 'flex', justifyContent: 'center', gap: '2rem', margin: '24px 0' }}>
-                    {(() => {
-                      const overallResult = filteredResults.find(r => r.subject === 'Overall');
-                      if (overallResult) {
-                        return (
-                          <>
-                            <div style={{
-                              background: '#e0e7ff',
-                              padding: '1rem 2rem',
-                              borderRadius: '1rem',
-                              fontWeight: 'bold',
-                              fontSize: '1.2rem',
-                              color: '#2563eb',
-                              boxShadow: '0 2px 8px rgba(38,99,235,0.08)'
-                            }}>
-                              Overall Score: <span style={{ color: '#16a34a' }}>{overallResult.score}%</span>
-                            </div>
-                            <div style={{
-                              background: '#f0fdf4',
-                              padding: '1rem 2rem',
-                              borderRadius: '1rem',
-                              fontWeight: 'bold',
-                              fontSize: '1.2rem',
-                              color: '#16a34a',
-                              boxShadow: '0 2px 8px rgba(38,99,235,0.08)'
-                            }}>
-                              Position: <span style={{ color: '#2563eb' }}>{overallResult.remarks.replace('Position:', '').trim()}</span>
-                            </div>
-                          </>
-                        );
-                      }
-                      return null;
-                    })()}
-                  </div>
-                  {/* --- End summary boxes --- */}
-                </>
+                <ResultsTable results={filteredResults} />
               )}
             </div>
-          </div>
-          {/* --- End printable content --- */}
 
-          {/* The rest of your page */}
-          <div className="flex flex-col lg:flex-row gap-8 mb-8">
-            <div className="w-full lg:w-2/3">
-              <GradeTrendChart data={gradeTrendData} />
+            {/* KEY RATING SECTION */}
+            <div className="key-rating-section" style={{ position: 'relative', zIndex: 1 }}>
+              <h3 className="font-bold text-lg mb-2 text-center">Key Rating</h3>
+              <div className="flex flex-wrap justify-center gap-2 text-sm mb-4">
+                <span>5-EXCELLENT</span>
+                <span>4-VERY GOOD</span>
+                <span>3-SATISFACTORY</span>
+                <span>2-POOR</span>
+                <span>1-VERY POOR</span>
+              </div>
+              <div className="overflow-x-auto">
+                <table className="min-w-full border border-gray-300 rounded-lg mb-4">
+                  <thead>
+                    <tr className="bg-gray-100">
+                      <th className="px-2 py-1">Handwriting</th>
+                      <th className="px-2 py-1">Punctuality</th>
+                      <th className="px-2 py-1">Initiative</th>
+                      <th className="px-2 py-1">Obedience</th>
+                      <th className="px-2 py-1">Honesty</th>
+                      <th className="px-2 py-1">Neatness</th>
+                      <th className="px-2 py-1">Attentiveness</th>
+                      <th className="px-2 py-1">Respect</th>
+                      <th className="px-2 py-1">Attitude</th>
+                      <th className="px-2 py-1">Creativity</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    <tr>
+                      {[
+                        'handwriting', 'punctuality', 'initiative', 'obedience', 'honesty',
+                        'neatness', 'attentiveness', 'respect', 'attitude', 'creativity'
+                      ].map(key => {
+                        const value = overallResult?.[key];
+                        let label = '';
+                        if (value === 5) label = 'Excellent';
+                        else if (value === 4) label = 'Very Good';
+                        else if (value === 3) label = 'Satisfactory';
+                        else if (value === 2) label = 'Poor';
+                        else if (value === 1) label = 'Very Poor';
+                        return (
+                          <td className="px-2 py-1 text-center" key={key}>
+                            {value
+                              ? <span className="font-bold">{value} - {label}</span>
+                              : <span className="text-gray-400">Not marked</span>
+                            }
+                          </td>
+                        );
+                      })}
+                    </tr>
+                  </tbody>
+                </table>
+              </div>
             </div>
-            <div className="w-full lg:w-1/3">
-              <div className="bg-card border border-border rounded-lg p-6">
-                <h3 className="font-heading text-lg font-semibold text-foreground mb-4">Study Recommendations</h3>
-                <div className="space-y-4">
-                  <div className="flex items-start space-x-3 p-3 bg-warning/10 border border-warning/20 rounded-lg">
-                    <Icon name="AlertTriangle" size={16} className="text-warning mt-0.5" />
-                    <div>
-                      <p className="font-body text-sm font-medium text-foreground">
-                        {lowestSubject
-                          ? `Focus on ${lowestSubject}`
-                          : 'Keep reviewing all subjects'}
-                      </p>
-                      <p className="font-caption text-xs text-muted-foreground">
-                        {lowestSubject && lowestAvg !== null
-                          ? `Your average score in ${lowestSubject} is ${Math.round(lowestAvg)}%. Consider extra practice or asking for help.`
-                          : 'No subjects with low scores detected.'}
-                      </p>
-                    </div>
-                  </div>
-                  <div className="flex items-start space-x-3 p-3 bg-success/10 border border-success/20 rounded-lg">
-                    <Icon name="CheckCircle" size={16} className="text-success mt-0.5" />
-                    <div>
-                      <p className="font-body text-sm font-medium text-foreground">
-                        {bestSubject
-                          ? `Excellent in ${bestSubject}`
-                          : 'No top subject detected'}
-                      </p>
-                      <p className="font-caption text-xs text-muted-foreground">
-                        {isTopTenPercent
-                          ? `Keep up the great work! You're in the top 10% for ${bestSubject}.`
-                          : bestAvg !== null
-                            ? `Your average in ${bestSubject} is ${Math.round(bestAvg)}%.`
-                            : 'No scores available.'}
-                      </p>
-                    </div>
-                  </div>
-                  <div className="flex items-start space-x-3 p-3 bg-primary/10 border border-primary/20 rounded-lg">
-                    <Icon name="Target" size={16} className="text-primary mt-0.5" />
-                    <div>
-                      <p className="font-body text-sm font-medium text-foreground">
-                        Goal: {goalAvg}% Average
-                      </p>
-                      <p className="font-caption text-xs text-muted-foreground">
-                        {pointsToGoal > 0
-                          ? `You need ${pointsToGoal} more point${pointsToGoal > 1 ? 's' : ''} to reach your semester goal`
-                          : `Congratulations! You've reached your semester goal.`}
-                      </p>
-                    </div>
-                  </div>
-                </div>
+
+            {/* COMMENTS SECTION */}
+            <div className="comments-section flex flex-col md:flex-row gap-4 justify-between mt-4" style={{ position: 'relative', zIndex: 1 }}>
+              <div className="flex-1">
+                <label className="font-semibold">Deans Remark:</label>
+                <div className="border rounded px-2 py-1 min-h-[32px]">{overallResult?.teacherComment || '_________________________'}</div>
+              </div>
+              <div className="flex-1">
+                <label className="font-semibold">Signature & Date:</label>
+                <div className="border rounded px-2 py-1 min-h-[32px]">{overallResult?.signatureDate || '_________________________'}</div>
+              </div>
+              <div className="flex-1 mt-4 md:mt-0">
+                <label className="font-semibold">Rectors Remark:</label>
+                <div className="border rounded px-2 py-1 min-h-[32px]">{overallResult?.headTeacherRemark || '_________________________'}</div>
               </div>
             </div>
           </div>
+          {/* END PRINTABLE AREA */}
+
+          {/* The rest of your page (charts, recommendations, etc.) */}
+          {/* REMOVED: Grade Trend Chart and Study Recommendations card */}
         </div>
       </main>
       <ExamBreakdownModal
@@ -659,7 +638,6 @@ const ResultsAnalyticsPortal = () => {
           setSelectedExam(null);
         }}
       />
-    
 
       {showNoResultsModal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-40">
@@ -672,20 +650,13 @@ const ResultsAnalyticsPortal = () => {
             <div className="flex justify-center gap-4">
               <Button
                 variant="default"
-                onClick={() => {
-                  // Only close if there are real results
-                  const realResults = examResults.filter(r => r.subject && r.subject !== 'Overall');
-                  if (realResults.length > 0) setShowNoResultsModal(false);
-                }}
+                onClick={() => setShowNoResultsModal(false)}
               >
                 OK
               </Button>
               <Button
                 variant="outline"
-                onClick={() => {
-                  const realResults = examResults.filter(r => r.subject && r.subject !== 'Overall');
-                  if (realResults.length > 0) setShowNoResultsModal(false);
-                }}
+                onClick={() => setShowNoResultsModal(false)}
               >
                 Cancel
               </Button>

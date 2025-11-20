@@ -128,131 +128,22 @@ const PageTransitionWrapper = ({ children }) => {
 
 // Add this component for public route protection
 const PublicRoute = ({ element: Element }) => {
-  const navigate = useNavigate();
-  const [showWarning, setShowWarning] = useState(false);
-
-  useEffect(() => {
-    const user = JSON.parse(localStorage.getItem("user") || "{}");
-    const isAuthenticated = user && user.isAuthenticated;
-    if (isAuthenticated) {
-      setShowWarning(true);
-    }
-  }, []);
-
-  const handleBack = () => {
-    // On second back, log out and redirect to login
-    localStorage.removeItem("user");
-    window.location.replace("/login-authentication");
-  };
-
-  if (showWarning) {
-    return (
-      <div className="min-h-screen flex flex-col items-center justify-center bg-background">
-        <div className="bg-white border border-primary/30 rounded-xl shadow-lg p-8 max-w-md text-center">
-          <h2 className="text-xl font-bold text-primary mb-4">Notice</h2>
-          <p className="mb-6 text-muted-foreground">
-            You are currently logged in. Going back to public pages is not allowed.<br />
-            <span className="font-semibold text-red-600">
-              Going back again will automatically log you out.
-            </span>
-          </p>
-          <button
-            className="px-4 py-2 bg-primary text-white rounded-lg hover:bg-primary/90 transition"
-            onClick={handleBack}
-          >
-            Go Back Anyway (Logout)
-          </button>
-        </div>
-      </div>
-    );
-  }
-
+  // Directly render the element, no modal or warning
   return <Element />;
 };
 
 const ProtectedRouteGuard = ({ children }) => {
-  const location = useLocation();
-  const navigate = useNavigate();
-  const [showModal, setShowModal] = useState(false);
-  const [pendingPath, setPendingPath] = useState(null);
-
   // Get user and authentication status
   const user = JSON.parse(localStorage.getItem("user") || "{}");
   const isAuthenticated = user && user.isAuthenticated;
+  const location = useLocation();
   const protectedPaths = [
     "/admin", "/student-dashboard", "/teacher-portal", "/parent-dashboard"
   ];
   const isProtected = protectedPaths.some((p) => location.pathname.startsWith(p));
 
-  useEffect(() => {
-    const handlePopState = (event) => {
-      // Only show modal if authenticated and on protected route
-      if (isAuthenticated && isProtected) {
-        const nextPath = window.location.pathname;
-        const isGoingToPublic = !protectedPaths.some((p) => nextPath.startsWith(p));
-        if (isGoingToPublic) {
-          setShowModal(true);
-          setPendingPath(nextPath);
-          window.history.pushState(null, "", location.pathname);
-        }
-      } else {
-        setShowModal(false); // Hide modal if not authenticated or not protected
-      }
-    };
-
-    window.addEventListener("popstate", handlePopState);
-    return () => window.removeEventListener("popstate", handlePopState);
-  }, [location.pathname, isAuthenticated, isProtected]);
-
-  const handleLogout = () => {
-    localStorage.removeItem("user");
-    setShowModal(false); // Hide modal on logout
-    setPendingPath(null);
-    navigate("/login-authentication");
-  };
-
-  const handleStay = () => {
-    setShowModal(false);
-    setPendingPath(null);
-  };
-
-  // Always hide modal if not authenticated or not on protected route
-  useEffect(() => {
-    if (!isAuthenticated || !isProtected) {
-      setShowModal(false);
-      setPendingPath(null);
-    }
-  }, [isAuthenticated, isProtected]);
-
-  return (
-    <>
-      {children}
-      {showModal && isAuthenticated && isProtected && (
-        <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50">
-          <div className="bg-white rounded-lg p-6 shadow-lg max-w-sm w-full text-center">
-            <h2 className="text-lg font-bold mb-2">Are you sure you want to logout?</h2>
-            <p className="mb-4 text-muted-foreground">
-              Going back will log you out and take you to a public page.
-            </p>
-            <div className="flex gap-4 justify-center">
-              <button
-                className="px-4 py-2 bg-primary text-white rounded hover:bg-primary/90"
-                onClick={handleLogout}
-              >
-                Logout
-              </button>
-              <button
-                className="px-4 py-2 bg-gray-200 rounded hover:bg-gray-300"
-                onClick={handleStay}
-              >
-                Stay
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
-    </>
-  );
+  // No modal logic, just render children
+  return <>{children}</>;
 };
 
 const Routes = () => {
@@ -284,6 +175,16 @@ const Routes = () => {
                   <Route path="/post-announcement" element={<PostAnnouncement />} />
                   <Route path="/admin" element={<AdminDashboard />} />
                   <Route path="/admin/student/:studentId" element={<StudentProfilePage />} />
+                  <Route
+  path="/result-portal"
+  element={
+    <ProtectedRouteGuard>
+      <PageTransitionWrapper>
+        <ResultPortal />
+      </PageTransitionWrapper>
+    </ProtectedRouteGuard>
+  }
+                  />
                   <Route path="*" element={<NotFound />} />
                 </RouterRoutes>
               </Suspense>

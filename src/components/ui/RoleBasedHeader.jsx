@@ -150,16 +150,18 @@ const RoleBasedHeader = ({
             {isProfileOpen && (
               <div className="absolute top-full right-0 mt-1 w-48 bg-popover border border-border rounded-md shadow-elevation z-1010">
                 <div className="py-1">
-                  <button 
-                    className="w-full px-3 py-2 text-left text-sm font-body text-foreground hover:bg-muted flex items-center"
-                    onClick={() => {
-                      setIsProfileOpen(false);
-                      window.location.href = '/profile';
-                    }}
-                  >
-                    <Icon name="User" size={16} className="mr-2" />
-                    Profile
-                  </button>
+                  {userRole === 'student' && (
+                    <button 
+                      className="w-full px-3 py-2 text-left text-sm font-body text-foreground hover:bg-muted flex items-center"
+                      onClick={() => {
+                        setIsProfileOpen(false);
+                        window.location.href = '/profile';
+                      }}
+                    >
+                      <Icon name="User" size={16} className="mr-2" />
+                      Profile
+                    </button>
+                  )}
                   <button 
                     className="w-full px-3 py-2 text-left text-sm font-body text-destructive hover:bg-muted flex items-center"
                     onClick={handleLogout}

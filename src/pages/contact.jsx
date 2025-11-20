@@ -41,7 +41,7 @@ const ContactPage = () => {
             </li>
             <li className="flex items-center space-x-3">
               <Icon name="Mail" size={20} />
-              <span>ubanichristian2282@gmail.com</span>
+              <span>annunciationseminaryamaudara84@gmail.com</span>
             </li>
           </ul>
         </div>

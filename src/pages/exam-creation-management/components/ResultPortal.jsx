@@ -3,6 +3,7 @@ import { TbFidgetSpinner } from "react-icons/tb";
 import RoleBasedHeader from '../../../components/ui/RoleBasedHeader';
 import Button from '../../../components/ui/Button';
 import Icon from '../../../components/AppIcon';
+import Modal from '../../../components/ui/Modal';
 
 const terms = [
     { value: 'first', label: 'First Term' },
@@ -10,7 +11,7 @@ const terms = [
     { value: 'third', label: 'Third Term' }
 ];
 
-const API_BASE_URL = process.env.REACT_APP_API_BASE_URL; // Use deployed backend URL
+const API_BASE_URL = process.env.REACT_APP_API_BASE_URL;
 
 const ResultPortal = () => {
     const [teacherData, setTeacherData] = useState(null);
@@ -28,6 +29,90 @@ const ResultPortal = () => {
     const [isLoadingResults, setIsLoadingResults] = useState(false);
     const [manualOverall, setManualOverall] = useState({});
     const [caScores, setCaScores] = useState({});
+    const [selectedStudent, setSelectedStudent] = useState(null);
+    const [resultsPushed, setResultsPushed] = useState({});
+    const [showPushConfirm, setShowPushConfirm] = useState(false);
+    const [pendingPushStudentId, setPendingPushStudentId] = useState(null);
+
+
+    function buildSaveAllPayload(studentId) {
+  // You may need to adjust these variable names if your state is different
+  // This assumes you have access to results, caScores, overall, subjects, teacherData, selectedTerm
+  // If you define this inside the component, you can access them directly
+
+  // Example for inside the component:
+  return {
+    studentId,
+    teacherId: teacherData?._id,
+    className: teacherData?.className,
+    term: selectedTerm,
+    subjects,
+    caScores: caScores[studentId] || {},
+    results: results[studentId] || {},
+    overall: overall[studentId] || {},
+  };
+}
+    // 1. Load subjects from localStorage on mount (per class/term)
+    useEffect(() => {
+      const key = `resultPortal_subjects_${teacherData?.className}_${selectedTerm}`;
+      const savedSubjects = localStorage.getItem(key);
+      if (savedSubjects) {
+        setSubjects(JSON.parse(savedSubjects));
+      }
+    }, [teacherData, selectedTerm]);
+
+    // 2. Save subjects to localStorage whenever it changes
+    useEffect(() => {
+      if (teacherData?.className && selectedTerm) {
+        const key = `resultPortal_subjects_${teacherData.className}_${selectedTerm}`;
+        localStorage.setItem(key, JSON.stringify(subjects));
+      }
+    }, [subjects, teacherData, selectedTerm]);
+
+    // 3. Load saved result data for selected student (including subjects)
+    useEffect(() => {
+      if (selectedStudent) {
+        const key = `resultPortal_${teacherData?.className}_${selectedTerm}_${selectedStudent._id}`;
+        const saved = localStorage.getItem(key);
+        if (saved) {
+          const parsed = JSON.parse(saved);
+          setResults(prev => ({
+            ...prev,
+            [selectedStudent._id]: parsed.results || {},
+          }));
+          setCaScores(prev => ({
+            ...prev,
+            [selectedStudent._id]: parsed.caScores || {},
+          }));
+          setOverall(prev => ({
+            ...prev,
+            [selectedStudent._id]: parsed.overall || {},
+          }));
+          // Merge subjects from localStorage for this student
+          if (Array.isArray(parsed.subjects) && parsed.subjects.length > 0) {
+            setSubjects(prev => {
+              const merged = Array.from(new Set([...prev, ...parsed.subjects]));
+              return merged;
+            });
+          }
+        }
+      }
+    }, [selectedStudent, teacherData, selectedTerm]);
+
+    // 4. Save result data for selected student to localStorage (including subjects)
+    useEffect(() => {
+      if (selectedStudent) {
+        localStorage.setItem(
+          `resultPortal_${teacherData?.className}_${selectedTerm}_${selectedStudent._id}`,
+          JSON.stringify({
+            results: results[selectedStudent._id] || {},
+            caScores: caScores[selectedStudent._id] || {},
+            overall: overall[selectedStudent._id] || {},
+            subjects,
+          })
+        );
+      }
+    }, [results, caScores, overall, subjects, selectedStudent, teacherData, selectedTerm]);
 
     // Get teacher data from localStorage
     useEffect(() => {
@@ -57,32 +142,86 @@ const ResultPortal = () => {
                 credentials: 'include'
             })
                 .then(res => res.json())
-                .then(data => setTeacherResults(Array.isArray(data) ? data : []))
-                .catch(() => setTeacherResults([]))
+                .then(data => {
+                    setTeacherResults(Array.isArray(data) ? data : []);
+                    // Merge previous state to preserve input
+                    const newResults = { ...results };
+                    const newCaScores = { ...caScores };
+                    const newOverall = { ...overall };
+                    students.forEach(student => {
+                      newResults[student._id] = { ...(results[student._id] || {}) };
+                      newCaScores[student._id] = { ...(caScores[student._id] || {}) };
+                      subjects.forEach(subject => {
+                        // Find all result objects for this student/subject
+                        const foundResults = data.filter(
+                          r => String(r.studentId) === String(student._id) && r.subject === subject
+                        );
+                        if (foundResults.length > 0) {
+                          // Set all fields from backend for this subject
+                          const r = foundResults[0];
+                          [
+                            '_project', '_cat1', '_cat2', '_exam', '_maxScore', '_minScore', '_grade', '_remark'
+                          ].forEach(suffix => {
+                            if (r[subject + suffix] !== undefined) {
+                              newResults[student._id][subject + suffix] = r[subject + suffix];
+                            }
+                          });
+                          // Also set score if present
+                          if (r.score !== undefined) {
+                            newResults[student._id][subject] = r.score;
+                          }
+                        }
+                        // C/A scores
+                        const foundCA = data.find(
+                          r => String(r.studentId) === String(student._id) && r.subject === `${subject} C/A`
+                        );
+                        if (foundCA) {
+                          newCaScores[student._id][subject] = foundCA.score;
+                        }
+                      });
+                      // Overall
+                      const foundOverall = data.find(
+                        r => String(r.studentId) === String(student._id) && r.subject === 'Overall'
+                      );
+                      if (foundOverall) {
+                        newOverall[student._id] = {
+                          ...(overall[student._id] || {}),
+                          overallScore: foundOverall.score,
+                          position: foundOverall.remarks?.replace('Position:', '').trim() || ''
+                        };
+                      }
+                    });
+                    setResults(newResults);
+                    setCaScores(newCaScores);
+                    setOverall(newOverall);
+                })
+                .catch(() => {
+                    setTeacherResults([]);
+                    // Do NOT reset results, caScores, or overall here!
+                })
                 .finally(() => setIsLoadingResults(false));
         }
-    }, [teacherData, selectedTerm]);
+    }, [teacherData, selectedTerm, students, subjects]);
 
     // Map fetched results to local state
     useEffect(() => {
         if (teacherResults.length && students.length && subjects.length) {
-            // Map subject scores
-            const newResults = {};
-            const newCaScores = {};
+            // Merge previous state to preserve input
+            const newResults = { ...results };
+            const newCaScores = { ...caScores };
             students.forEach(student => {
-                newResults[student._id] = {};
-                newCaScores[student._id] = {};
+                newResults[student._id] = { ...(results[student._id] || {}) };
+                newCaScores[student._id] = { ...(caScores[student._id] || {}) };
                 subjects.forEach(subject => {
-                    // Exam score
+                    // Only update if found in teacherResults, otherwise preserve previous value
                     const foundExam = teacherResults.find(
-                        r => r.studentId === student._id && r.subject === subject
+                        r => String(r.studentId) === String(student._id) && r.subject === subject
                     );
                     if (foundExam) {
                         newResults[student._id][subject] = foundExam.score;
                     }
-                    // C/A score
                     const foundCA = teacherResults.find(
-                        r => r.studentId === student._id && r.subject === `${subject} C/A`
+                        r => r.studentId?.toString() === student._id && r.subject === `${subject} C/A`
                     );
                     if (foundCA) {
                         newCaScores[student._id][subject] = foundCA.score;
@@ -92,14 +231,15 @@ const ResultPortal = () => {
             setResults(newResults);
             setCaScores(newCaScores);
 
-            // Map overall score and position
-            const newOverall = {};
+            // Merge overall state
+            const newOverall = { ...overall };
             students.forEach(student => {
                 const found = teacherResults.find(
-                    r => r.studentId === student._id && r.subject === 'Overall'
+                    r => r.studentId?.toString() === student._id && r.subject === 'Overall'
                 );
                 if (found) {
                     newOverall[student._id] = {
+                        ...(overall[student._id] || {}),
                         overallScore: found.score,
                         position: found.remarks?.replace('Position:', '').trim() || ''
                     };
@@ -108,6 +248,49 @@ const ResultPortal = () => {
             setOverall(newOverall);
         }
     }, [teacherResults, students, subjects]);
+
+    // --- ADDED: Track pushed status for each student ---
+    useEffect(() => {
+      if (teacherResults.length && students.length) {
+        const pushedStatus = {};
+        students.forEach(student => {
+          // Only consider results with pending: false
+          const hasPushed = teacherResults
+            .filter(r =>
+              String(r.studentId) === String(student._id) &&
+              r.className === teacherData.className &&
+              r.term === selectedTerm &&
+              r.pending === false // Only pushed results
+            ).length > 0;
+          pushedStatus[student._id] = hasPushed;
+        });
+        setResultsPushed(pushedStatus);
+      }
+    }, [teacherResults, students, teacherData, selectedTerm]);
+    // --- END ADDED ---
+
+    // --- ADDED: Track verified status for each student ---
+    useEffect(() => {
+      if (teacherResults.length && students.length) {
+        const verifiedStatus = {};
+        students.forEach(student => {
+          // Check if any result for this student is verified by admin
+          const isVerified = teacherResults.some(
+            r => String(r.studentId) === String(student._id) && r.verified === true && r.pending === false
+          );
+          verifiedStatus[student._id] = isVerified;
+        });
+        setResultsPushed(prev => {
+          // If already pushed, keep true, but if verified, force true (read-only)
+          const updated = { ...prev };
+          Object.keys(verifiedStatus).forEach(id => {
+            if (verifiedStatus[id]) updated[id] = true;
+          });
+          return updated;
+        });
+      }
+    }, [teacherResults, students]);
+    // --- END ADDED ---
 
     // Automatically update overall score and position when subject scores change, unless manually edited
     useEffect(() => {
@@ -171,27 +354,55 @@ const ResultPortal = () => {
 
     // Add new subject to tray
     const handleAddSubject = () => {
-        const subject = newSubject.trim();
-        if (subject && !subjects.includes(subject)) {
-            setSubjects([...subjects, subject]);
-            setNewSubject('');
+  const subject = newSubject.trim();
+  if (subject && !subjects.includes(subject)) {
+    setSubjects(prevSubjects => [...prevSubjects, subject]);
+    setNewSubject('');
+    setResults(prevResults => {
+      if (!students || !students.length) return prevResults;
+      const updatedResults = { ...prevResults };
+      students.forEach(student => {
+        updatedResults[student._id] = { ...(prevResults[student._id] || {}) };
+        // Only add the new subject key, do not touch other fields
+        if (!(subject in updatedResults[student._id])) {
+          updatedResults[student._id][subject] = '';
         }
-    };
+      });
+      return updatedResults;
+    });
+    setCaScores(prevCaScores => {
+      if (!students || !students.length) return prevCaScores;
+      const updatedCaScores = { ...prevCaScores };
+      students.forEach(student => {
+        updatedCaScores[student._id] = { ...(prevCaScores[student._id] || {}) };
+        if (!(subject in updatedCaScores[student._id])) {
+          updatedCaScores[student._id][subject] = '';
+        }
+      });
+      return updatedCaScores;
+    });
+  }
+};
 
     // Remove subject from tray
     const handleRemoveSubject = (subject) => {
         setSubjects(subjects.filter(s => s !== subject));
     };
 
+    const keyRatingFields = [
+      'handwriting', 'punctuality', 'initiative', 'obedience', 'honesty',
+      'neatness', 'attentiveness', 'respect', 'attitude', 'creativity'
+    ];
+
     // Handle result input change
-    const handleResultChange = (studentId, subject, value) => {
-        setResults(prev => ({
-            ...prev,
-            [studentId]: {
-                ...(prev[studentId] || {}),
-                [subject]: value
-            }
-        }));
+    const handleResultChange = (studentId, field, value) => {
+      setResults(prev => ({
+        ...prev,
+        [studentId]: {
+          ...(prev[studentId] || {}),
+          [field]: keyRatingFields.includes(field) && value !== '' ? Number(value) : value
+        }
+      }));
     };
 
     // Handle overall score and position change (manual edit)
@@ -297,79 +508,177 @@ const ResultPortal = () => {
 
     // Push individual student result
     const handlePushIndividualResult = async (studentId) => {
-        setIsSubmitting(true);
-        setSuccessMsg('');
-        setErrorMsg('');
-        let success = true;
-        try {
-            // Push subjects
-            for (const subject of subjects) {
-                const score = results?.[studentId]?.[subject];
-                if (score !== undefined && score !== '') {
-                    const res = await fetch(`${API_BASE_URL}/api/results/set`, {
-                        method: 'POST',
-                        headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify({
-                            studentId,
-                            teacherId: teacherData._id,
-                            className: teacherData.className,
-                            term: selectedTerm,
-                            subject,
-                            score: Number(score),
-                            remarks: ''
-                        })
-                    });
-                    if (!res.ok) success = false;
-                }
-            }
-            // Push overall score and position
-            const overallScore = overall?.[studentId]?.overallScore;
-            const position = overall?.[studentId]?.position;
-            if (overallScore || position) {
-                const res = await fetch(`${API_BASE_URL}/api/results/set`, {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({
-                        studentId,
-                        teacherId: teacherData._id,
-                        className: teacherData.className,
-                        term: selectedTerm,
-                        subject: 'Overall',
-                        score: Number(overallScore) || 0,
-                        remarks: `Position: ${position || ''}`
-                    })
-                });
-                if (!res.ok) success = false;
-            }
-            // Push C/A score
-            for (const subject of subjects) {
-                const caScore = caScores?.[studentId]?.[subject];
-                if (caScore !== undefined && caScore !== '') {
-                    await fetch(`${API_BASE_URL}/api/results/set`, {
-                        method: 'POST',
-                        headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify({
-                            studentId,
-                            teacherId: teacherData._id,
-                            className: teacherData.className,
-                            term: selectedTerm,
-                            subject: `${subject} C/A`,
-                            score: Number(caScore),
-                            remarks: ''
-                        })
-                    });
-                }
-            }
-            if (success) {
-                setSuccessMsg('Student result has been successfully updated.');
-            } else {
-                setErrorMsg('Failed to update student result. Please try again.');
-            }
-        } catch (err) {
-            setErrorMsg('Failed to update student result. Please try again.');
+  if (resultsPushed[studentId]) return; // Prevent double push
+  setIsSubmitting(true);
+  setSuccessMsg('');
+  setErrorMsg('');
+  let success = true;
+  try {
+    for (const subject of subjects) {
+      const score = results?.[studentId]?.[subject];
+      if (score !== undefined && score !== '') {
+        const res = await fetch(`${API_BASE_URL}/api/results/set`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            studentId,
+            teacherId: teacherData._id,
+            className: teacherData.className,
+            term: selectedTerm,
+            subject,
+            score: Number(score),
+            remarks: '',
+            isPush: true
+          })
+        });
+        if (!res.ok) success = false;
+      }
+      const caScore = caScores?.[studentId]?.[subject];
+      if (caScore !== undefined && caScore !== '') {
+        await fetch(`${API_BASE_URL}/api/results/set`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            studentId,
+            teacherId: teacherData._id,
+            className: teacherData.className,
+            term: selectedTerm,
+            subject: `${subject} C/A`,
+            score: Number(caScore),
+            remarks: '',
+            isPush: true
+          })
+        });
+      }
+    }
+    const overallScore = overall?.[studentId]?.overallScore;
+    const position = overall?.[studentId]?.position;
+    if (overallScore || position) {
+      const res = await fetch(`${API_BASE_URL}/api/results/set`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          studentId,
+          teacherId: teacherData._id,
+          className: teacherData.className,
+          term: selectedTerm,
+          subject: 'Overall',
+          score: Number(overallScore) || 0,
+          remarks: `Position: ${position || ''}`,
+          isPush: true
+        })
+      });
+      if (!res.ok) {
+        success = false;
+      }
+    }
+    if (success) {
+      setResultsPushed(prev => ({ ...prev, [studentId]: true }));
+      setSuccessMsg('Student result has been successfully pushed.');
+      setIsLoadingResults(true); // Show spinner while fetching
+      fetch(`${API_BASE_URL}/api/results/class/${encodeURIComponent(teacherData.className)}/${encodeURIComponent(selectedTerm)}`, {
+        credentials: 'include'
+      })
+        .then(res => res.json())
+        .then(data => {
+          setTeacherResults(Array.isArray(data) ? data : []);
+        })
+        .finally(() => setIsLoadingResults(false));
+
+      // --- ADD THIS: Re-fetch pushed status for the student ---
+      fetch(`${API_BASE_URL}/api/results/student/${studentId}/pushed?className=${encodeURIComponent(teacherData.className)}&term=${encodeURIComponent(selectedTerm)}`, {
+        credentials: 'include'
+      })
+        .then(res => res.json())
+        .then(pushedResults => {
+          setResultsPushed(prev => ({
+            ...prev,
+            [studentId]: Array.isArray(pushedResults) && pushedResults.length > 0
+          }));
+        });
+      // --- END ADD ---
+    } else {
+      setErrorMsg('Failed to update student result. Please try again.');
+    }
+  } catch (err) {
+    setErrorMsg('Failed to update student result. Please try again.');
+  }
+  setIsSubmitting(false);
+  setShowPushConfirm(false);
+  setPendingPushStudentId(null);
+};
+
+    // Load saved result data for selected student
+    useEffect(() => {
+      if (selectedStudent) {
+        const key = `resultPortal_${teacherData?.className}_${selectedTerm}_${selectedStudent._id}`;
+        const saved = localStorage.getItem(key);
+        if (saved) {
+          const parsed = JSON.parse(saved);
+          setResults(prev => ({
+            ...prev,
+            [selectedStudent._id]: parsed.results || {},
+          }));
+          setCaScores(prev => ({
+            ...prev,
+            [selectedStudent._id]: parsed.caScores || {},
+          }));
+          setOverall(prev => ({
+            ...prev,
+            [selectedStudent._id]: parsed.overall || {},
+          }));
         }
-        setIsSubmitting(false);
-    };
+      }
+      // Optionally, clear on class/term change
+    }, [selectedStudent, teacherData, selectedTerm]);
+
+    // Save result data for selected student to localStorage
+    useEffect(() => {
+      if (selectedStudent) {
+        localStorage.setItem(
+          `resultPortal_${teacherData?.className}_${selectedTerm}_${selectedStudent._id}`,
+          JSON.stringify({
+            results: results[selectedStudent._id] || {},
+            caScores: caScores[selectedStudent._id] || {},
+            overall: overall[selectedStudent._id] || {},
+            subjects,
+          })
+        );
+      }
+    }, [results, caScores, overall, subjects, selectedStudent, teacherData, selectedTerm]);
+
+    // Autosave result data for selected student to backend (debounced)
+    useEffect(() => {
+      if (selectedStudent) {
+        const timeout = setTimeout(() => {
+          const payload = {
+            studentId: selectedStudent._id,
+            teacherId: teacherData?._id,
+            className: teacherData?.className,
+            term: selectedTerm,
+            subjects,
+            caScores: caScores[selectedStudent._id] || {},
+            ...results[selectedStudent._id],
+            ...overall[selectedStudent._id],
+          };
+          // Only autosave if there is some data to save
+          if (
+            Object.keys(results[selectedStudent._id] || {}).length > 0 ||
+            Object.keys(caScores[selectedStudent._id] || {}).length > 0 ||
+            Object.keys(overall[selectedStudent._id] || {}).length > 0
+          ) {
+            fetch(`${API_BASE_URL}/api/results/save-all`, {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify(payload),
+            });
+            // DO NOT setResultsPushed here!
+          }
+        }, 17000); // 17 seconds debounce
+
+        return () => clearTimeout(timeout);
+      }
+    }, [results, caScores, overall, subjects, selectedStudent, teacherData, selectedTerm]);
 
     // Term selection before entering main page
     if (!selectedTerm) {
@@ -401,6 +710,492 @@ const ResultPortal = () => {
         );
     }
 
+    // If a student is selected, show the result entry page for that student
+    if (selectedStudent) {
+        // Only set read-only if result has been pushed (not after save)
+        const isReadOnly = resultsPushed[selectedStudent._id] === true;
+
+        return (
+            <main className="pt-20 pb-10 bg-background min-h-screen">
+          <div className="max-w-3xl mx-auto px-2 sm:px-4">
+            <Button variant="outline" onClick={() => setSelectedStudent(null)} className="mb-4">
+              <Icon name="ArrowLeft" size={16} className="mr-2" />
+              Back to Student List
+            </Button>
+            <h2 className="font-heading text-2xl font-bold text-primary mb-2">
+              Enter Result for {selectedStudent.name}
+            </h2>
+            <div className="bg-card border border-border rounded-xl shadow-lg p-6">
+              {/* Feedback message area */}
+              {(successMsg || errorMsg) && (
+                <div
+                  className={`mb-4 px-4 py-2 rounded-lg font-medium text-center transition-all ${
+                    successMsg
+                      ? 'bg-green-100 text-green-700 border border-green-300'
+                      : 'bg-red-100 text-red-700 border border-red-300'
+                  }`}
+                >
+                  {successMsg || errorMsg}
+                  <button
+                    className="ml-2 text-xs text-gray-500 hover:text-gray-700"
+                    onClick={() => {
+                      setSuccessMsg('');
+                      setErrorMsg('');
+                    }}
+                    aria-label="Dismiss"
+                  >
+                    &times;
+                  </button>
+                </div>
+              )}
+              <form
+                onSubmit={e => {
+                  e.preventDefault();
+                  if (!isReadOnly) handlePushIndividualResult(selectedStudent._id);
+                }}
+              >
+                <div className="overflow-x-auto">
+                  <table className="min-w-full border-collapse mb-6">
+                    <thead>
+                      <tr>
+                        <th className="px-2 py-2 text-left font-semibold text-muted-foreground">Subject</th>
+                        <th className="px-2 py-2 text-left font-semibold text-muted-foreground">Project (10%)</th>
+                        <th className="px-2 py-2 text-left font-semibold text-muted-foreground">1st C.A.T (20%)</th>
+                        <th className="px-2 py-2 text-left font-semibold text-muted-foreground">2nd C.A.T (20%)</th>
+                        <th className="px-2 py-2 text-left font-semibold text-muted-foreground">Exam (50%)</th>
+                        <th className="px-2 py-2 text-left font-semibold text-muted-foreground">Total (100%)</th>
+                        <th className="px-2 py-2 text-left font-semibold text-muted-foreground">Max Score</th>
+                        <th className="px-2 py-2 text-left font-semibold text-muted-foreground">Min Score</th>
+                        <th className="px-2 py-2 text-left font-semibold text-muted-foreground">Grade</th>
+                        <th className="px-2 py-2 text-left font-semibold text-muted-foreground">Remark</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {subjects.map(subject => {
+                        // Calculate total automatically
+                        const project = Number(results?.[selectedStudent._id]?.[`${subject}_project`] || 0);
+                        const cat1 = Number(results?.[selectedStudent._id]?.[`${subject}_cat1`] || 0);
+                        const cat2 = Number(results?.[selectedStudent._id]?.[`${subject}_cat2`] || 0);
+                        const exam = Number(results?.[selectedStudent._id]?.[`${subject}_exam`] || 0);
+                        const total = project + cat1 + cat2 + exam;
+
+                        return (
+                          <tr key={subject}>
+                            <td className="px-2 py-2">{subject}</td>
+                            <td className="px-2 py-2">
+                              <input
+                                type="number"
+                                min="0"
+                                max="10"
+                                className="w-16 border rounded-lg px-2 py-1"
+                                value={results?.[selectedStudent._id]?.[`${subject}_project`] || ''}
+                                onChange={e => !isReadOnly && handleResultChange(selectedStudent._id, `${subject}_project`, e.target.value)}
+                                placeholder="Project"
+                                readOnly={isReadOnly}
+                              />
+                            </td>
+                            <td className="px-2 py-2">
+                              <input
+                                type="number"
+                                min="0"
+                                max="20"
+                                className="w-16 border rounded-lg px-2 py-1"
+                                value={results?.[selectedStudent._id]?.[`${subject}_cat1`] || ''}
+                                onChange={e => !isReadOnly && handleResultChange(selectedStudent._id, `${subject}_cat1`, e.target.value)}
+                                placeholder="1st C.A.T"
+                                readOnly={isReadOnly}
+                              />
+                            </td>
+                            <td className="px-2 py-2">
+                              <input
+                                type="number"
+                                min="0"
+                                max="20"
+                                className="w-16 border rounded-lg px-2 py-1"
+                                value={results?.[selectedStudent._id]?.[`${subject}_cat2`] || ''}
+                                onChange={e => !isReadOnly && handleResultChange(selectedStudent._id, `${subject}_cat2`, e.target.value)}
+                                placeholder="2nd C.A.T"
+                                readOnly={isReadOnly}
+                              />
+                            </td>
+                            <td className="px-2 py-2">
+                              <input
+                                type="number"
+                                min="0"
+                                max="50"
+                                className="w-16 border rounded-lg px-2 py-1"
+                                value={results?.[selectedStudent._id]?.[`${subject}_exam`] || ''}
+                                onChange={e => !isReadOnly && handleResultChange(selectedStudent._id, `${subject}_exam`, e.target.value)}
+                                placeholder="Exam"
+                                readOnly={isReadOnly}
+                              />
+                            </td>
+                            <td className="px-2 py-2 font-bold text-primary">
+                              {total}
+                            </td>
+                            <td className="px-2 py-2">
+                              <input
+                                type="number"
+                                min="0"
+                                max="100"
+                                className="w-16 border rounded-lg px-2 py-1"
+                                value={results?.[selectedStudent._id]?.[`${subject}_maxScore`] || ''}
+                                onChange={e => !isReadOnly && handleResultChange(selectedStudent._id, `${subject}_maxScore`, e.target.value)}
+                                placeholder="Max"
+                                readOnly={isReadOnly}
+                              />
+                            </td>
+                            <td className="px-2 py-2">
+                              <input
+                                type="number"
+                                min="0"
+                                max="100"
+                                className="w-16 border rounded-lg px-2 py-1"
+                                value={results?.[selectedStudent._id]?.[`${subject}_minScore`] || ''}
+                                onChange={e => !isReadOnly && handleResultChange(selectedStudent._id, `${subject}_minScore`, e.target.value)}
+                                placeholder="Min"
+                                readOnly={isReadOnly}
+                              />
+                            </td>
+                            <td className="px-2 py-2">
+                              <input
+                                type="text"
+                                className="w-16 border rounded-lg px-2 py-1"
+                                value={results?.[selectedStudent._id]?.[`${subject}_grade`] || ''}
+                                onChange={e => !isReadOnly && handleResultChange(selectedStudent._id, `${subject}_grade`, e.target.value)}
+                                placeholder="Grade"
+                                readOnly={isReadOnly}
+                              />
+                            </td>
+                            <td className="px-2 py-2">
+                              <input
+                                type="text"
+                                className="w-24 border rounded-lg px-2 py-1"
+                                value={results?.[selectedStudent._id]?.[`${subject}_remark`] || ''}
+                                onChange={e => !isReadOnly && handleResultChange(selectedStudent._id, `${subject}_remark`, e.target.value)}
+                                placeholder="Remark"
+                                readOnly={isReadOnly}
+                              />
+                            </td>
+                          </tr>
+                        );
+                      })}
+                    </tbody>
+                  </table>
+                </div>
+                {/* Subject Tray (Add/Remove Subjects) */}
+                <div className="mb-6">
+                  <h4 className="font-semibold mb-2">Subjects</h4>
+                  <div className="flex flex-wrap gap-2 mb-2">
+                    {subjects.map(subject => (
+                      <span key={subject} className="flex items-center bg-gray-100 border border-gray-300 rounded px-3 py-1 text-sm font-medium">
+                        {subject}
+                        <button
+                          type="button"
+                          className="ml-2 text-red-500 hover:text-red-700"
+                          onClick={() => handleRemoveSubject(subject)}
+                          title="Remove subject"
+                          disabled={isReadOnly} // <-- Disable remove button
+                          style={isReadOnly ? { cursor: 'not-allowed', opacity: 0.5 } : {}}
+                        >
+                          &times;
+                        </button>
+                      </span>
+                    ))}
+                  </div>
+                  <div className="flex gap-2">
+                    <input
+                      type="text"
+                      className="border rounded px-2 py-1 w-40"
+                      value={newSubject}
+                      onChange={e => setNewSubject(e.target.value)}
+                      placeholder="Add subject"
+                      disabled={isReadOnly} // <-- Disable input
+                    />
+                    <Button
+                      variant="default"
+                      type="button"
+                      onClick={handleAddSubject}
+                      disabled={!newSubject.trim() || isReadOnly} // <-- Disable add button
+                    >
+                      Add
+                    </Button>
+                  </div>
+                </div>
+
+                {/* Key Rating Section - Responsive & Professional */}
+                <div className="mb-4">
+                  <h4 className="font-semibold mb-2">Key Rating</h4>
+                  <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-5 gap-4">
+                    {[
+                      'handwriting', 'punctuality', 'initiative', 'obedience', 'honesty',
+                      'neatness', 'attentiveness', 'respect', 'attitude', 'creativity'
+                    ].map(key => (
+                      <div key={key} className="flex flex-col items-start bg-gray-50 border border-gray-200 rounded-lg p-2">
+                        <label className="text-sm font-medium capitalize mb-1">{key}</label>
+                        <select
+                          className="border rounded px-2 py-1 w-full"
+                          value={results?.[selectedStudent._id]?.[key] || ''}
+                          onChange={e => !isReadOnly && handleResultChange(selectedStudent._id, key, e.target.value)}
+                          disabled={isReadOnly} // <-- add this
+                        >
+                          <option value="">Not marked</option>
+                          <option value="5">5-Excellent</option>
+                          <option value="4">4-Very Good</option>
+                          <option value="3">3-Satisfactory</option>
+                          <option value="2">2-Poor</option>
+                          <option value="1">1-Very Poor</option>
+                        </select>
+                      </div>
+                    ))}
+                  </div>
+                  <div className="flex flex-wrap gap-2 mt-2 text-xs text-muted-foreground">
+                    <span>5-EXCELLENT</span>
+                    <span>4-VERY GOOD</span>
+                    <span>3-SATISFACTORY</span>
+                    <span>2-POOR</span>
+                    <span>1-VERY POOR</span>
+                  </div>
+                </div>
+
+                {/* Teacher's Comment, Signature, Head Teacher's Remark */}
+                <div className="mb-4 grid grid-cols-1 sm:grid-cols-3 gap-4">
+                    <div>
+                        <label className="font-semibold">Deans Remark:</label>
+                        <textarea
+                            className="border rounded px-2 py-1 w-full"
+                            rows={2}
+                            value={results?.[selectedStudent._id]?.teacherComment || ''}
+                            onChange={e => handleResultChange(selectedStudent._id, 'teacherComment', e.target.value)}
+                            placeholder="Deans Remark"
+                            readOnly={isReadOnly}
+                        />
+                    </div>
+                    <div>
+                        <label className="font-semibold">Signature & Date:</label>
+                        <input
+                            type="text"
+                            className="border rounded px-2 py-1 w-full"
+                            value={results?.[selectedStudent._id]?.signatureDate || ''}
+                            onChange={e => handleResultChange(selectedStudent._id, 'signatureDate', e.target.value)}
+                            placeholder="Signature & Date"
+                            readOnly={isReadOnly}
+                        />
+                    </div>
+                    <div>
+                        <label className="font-semibold">Rectors Remark:</label>
+                        <textarea
+                            className="border rounded px-2 py-1 w-full"
+                            rows={2}
+                            value={results?.[selectedStudent._id]?.headTeacherRemark || ''}
+                            onChange={e => handleResultChange(selectedStudent._id, 'headTeacherRemark', e.target.value)}
+                            placeholder="Rectors Remark"
+                            readOnly={isReadOnly}
+                        />
+                    </div>
+                </div>
+                <div className="mb-6 grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4">
+                  <div>
+                    <label className="font-semibold">Academic Season:</label>
+                    <input
+                      type="text"
+                      className="border rounded px-2 py-1 w-full"
+                      value={results?.[selectedStudent._id]?.academicYear || ''}
+                      onChange={e => handleResultChange(selectedStudent._id, 'academicYear', e.target.value)}
+                      placeholder="Academic Season"
+                      readOnly={isReadOnly}
+                    />
+                  </div>
+                  <div>
+                    <label className="font-semibold">No. of Times School Opened:</label>
+                    <input
+                      type="number"
+                      className="border rounded px-2 py-1 w-full"
+                      value={results?.[selectedStudent._id]?.schoolOpened || ''}
+                      onChange={e => handleResultChange(selectedStudent._id, 'schoolOpened', e.target.value)}
+                      placeholder="School Opened"
+                      readOnly={isReadOnly}
+                    />
+                  </div>
+                  <div>
+                    <label className="font-semibold">No. of Time Present:</label>
+                    <input
+                      type="number"
+                      className="border rounded px-2 py-1 w-full"
+                      value={results?.[selectedStudent._id]?.present || ''}
+                      onChange={e => handleResultChange(selectedStudent._id, 'present', e.target.value)}
+                      placeholder="Present"
+                      readOnly={isReadOnly}
+                    />
+                  </div>
+                  <div>
+                    <label className="font-semibold">No. of Time Absent:</label>
+                    <input
+                      type="number"
+                      className="border rounded px-2 py-1 w-full"
+                      value={results?.[selectedStudent._id]?.absent || ''}
+                      onChange={e => handleResultChange(selectedStudent._id, 'absent', e.target.value)}
+                      placeholder="Absent"
+                      readOnly={isReadOnly}
+                    />
+                  </div>
+                  <div>
+                    <label className="font-semibold">Total Score:</label>
+                    <input
+                      type="number"
+                      className="border rounded px-2 py-1 w-full"
+                      value={results?.[selectedStudent._id]?.totalScore || ''}
+                      onChange={e => handleResultChange(selectedStudent._id, 'totalScore', e.target.value)}
+                      placeholder="Total Score"
+                      readOnly={isReadOnly}
+                    />
+                  </div>
+                  <div>
+                    <label className="font-semibold">Project Defence:</label>
+                    <input
+                      type="text"
+                      className="border rounded px-2 py-1 w-full"
+                      value={results?.[selectedStudent._id]?.projectDefence || ''}
+                      onChange={e => handleResultChange(selectedStudent._id, 'projectDefence', e.target.value)}
+                      placeholder="Project Defence"
+                      readOnly={isReadOnly}
+                    />
+                  </div>
+                  <div>
+                    <label className="font-semibold">Over-all Score:</label>
+                    <input
+                      type="number"
+                      className="border rounded px-2 py-1 w-full"
+                      value={results?.[selectedStudent._id]?.overallScore || ''}
+                      onChange={e => handleResultChange(selectedStudent._id, 'overallScore', e.target.value)}
+                      placeholder="Over-all Score"
+                      readOnly={isReadOnly}
+                    />
+                  </div>
+                  <div>
+                    <label className="font-semibold">Average:</label>
+                    <input
+                      type="number"
+                      className="border rounded px-2 py-1 w-full"
+                      value={results?.[selectedStudent._id]?.average || ''}
+                      onChange={e => handleResultChange(selectedStudent._id, 'average', e.target.value)}
+                      placeholder="Average"
+                      readOnly={isReadOnly}
+                    />
+                  </div>
+                  <div>
+                    <label className="font-semibold">Next Term Begins:</label>
+                    <input
+                      type="text"
+                      className="border rounded px-2 py-1 w-full"
+                      value={results?.[selectedStudent._id]?.nextTerm || ''}
+                      onChange={e => handleResultChange(selectedStudent._id, 'nextTerm', e.target.value)}
+                      placeholder="Next Term Begins"
+                      readOnly={isReadOnly}
+                    />
+                  </div>
+                </div>
+                <div className="flex gap-4 mt-4">
+                    {/* 2. In your Save button handler, replace the payload logic with this: */}
+                    <Button
+                      variant="secondary"
+                      type="button"
+                      disabled={isSubmitting}
+                      className="w-full"
+                      onClick={async () => {
+                        setSuccessMsg('');
+                        setErrorMsg('');
+                        setIsSubmitting(true);
+
+                        // Use the new payload builder here:
+                        const payload = buildSaveAllPayload(selectedStudent._id);
+
+                        try {
+                          const res = await fetch(`${API_BASE_URL}/api/results/save-all`, {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify(payload),
+                          });
+                          const data = await res.json();
+                          if (data.success) {
+                            setSuccessMsg('Saved!');
+                          } else {
+                            setErrorMsg('Failed to save result. Please try again.');
+                          }
+                        } catch (err) {
+                          setErrorMsg('Failed to save result. Please try again.');
+                        }
+                        setIsSubmitting(false);
+                      }}
+                    >
+                      <Icon name="Save" size={16} className="mr-2" />
+                      Save
+                    </Button>
+                    <Button
+                      variant="primary"
+                      type="button"
+                      disabled={isSubmitting || isReadOnly || resultsPushed[selectedStudent._id]}
+                      className="w-full"
+                      onClick={() => {
+                        setPendingPushStudentId(selectedStudent._id);
+                        setShowPushConfirm(true);
+                      }}
+                    >
+                      {isSubmitting ? (
+                        <>
+                          <TbFidgetSpinner className="animate-spin mr-2" />
+                          Saving...
+                        </>
+                      ) : (
+                        <>
+                          <Icon name="Send" size={16} className="mr-2" />
+                          {resultsPushed[selectedStudent._id] ? "Already Pushed" : "Save & Push Result"}
+                        </>
+                      )}
+                    </Button>
+                    {isReadOnly && (
+                      <div className="mt-4 text-warning text-center font-semibold">
+                        Results have been submitted for admin verification.<br />
+                        You cannot modify again.
+                      </div>
+                    )}
+                  </div>
+              </form>
+              {/* Move the modal here, inside the result setter */}
+              {showPushConfirm && (
+                <Modal
+                  isOpen={showPushConfirm}
+                  onClose={() => setShowPushConfirm(false)}
+                  title="Confirm Push"
+                >
+                  <div>
+                    <p>Are you sure you want to push this student's result? This will submit the result for admin verification and make it read-only.</p>
+                    <div className="flex gap-4 mt-4">
+                      <Button
+                        variant="primary"
+                        onClick={() => handlePushIndividualResult(pendingPushStudentId)}
+                        disabled={isSubmitting}
+                      >
+                        Yes, Push Result
+                      </Button>
+                      <Button
+                        variant="secondary"
+                        onClick={() => setShowPushConfirm(false)}
+                        disabled={isSubmitting}
+                      >
+                        Cancel
+                      </Button>
+                    </div>
+                  </div>
+                </Modal>
+              )}
+            </div>
+          </div>
+        </main>
+    );
+    }
+
+    // Otherwise, show the student list
     return (
         <>
             <RoleBasedHeader
@@ -415,193 +1210,85 @@ const ResultPortal = () => {
                             Result Portal - {terms.find(t => t.value === selectedTerm)?.label}
                         </h1>
                         <p className="text-muted-foreground text-lg">
-                            Grade students who took your exam this term. You can add custom subjects, scores, and set overall score and position.
+                            Click a student to enter their result.
                         </p>
                     </div>
-                    {successMsg && (
-                        <div className="bg-success/10 border border-success text-success rounded-md px-4 py-2 mb-4 text-sm">
-                            {successMsg}
+                    {isLoadingStudents ? (
+                        <div className="flex flex-col items-center justify-center py-12">
+                            <TbFidgetSpinner className="animate-spin text-5xl text-primary mb-2" />
+                            <span className="text-primary font-medium">Loading students...</span>
                         </div>
-                    )}
-                    {errorMsg && (
-                        <div className="bg-error/10 border border-error text-error rounded-md px-4 py-2 mb-4 text-sm">
-                            {errorMsg}
-                        </div>
-                    )}
-                    {/* Subject Tray */}
-                    <div className="mb-6 flex flex-wrap items-center gap-2">
-                        <span className="font-heading font-semibold text-primary mr-2">Subjects:</span>
-                        {subjects.map(subject => (
-                            <span key={subject} className="inline-flex items-center px-3 py-1 rounded-full bg-primary/10 text-primary font-semibold border border-primary/20 mr-2">
-                                {subject}
-                                <button
-                                    type="button"
-                                    className="ml-2 text-xs text-destructive hover:text-destructive/80"
-                                    onClick={() => handleRemoveSubject(subject)}
-                                    title="Remove subject"
+                    ) : (
+                        <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4">
+                            {students.map(student => (
+                                <div
+                                    key={student._id}
+                                    className="bg-card border border-border rounded-lg shadow p-4 flex flex-col items-center cursor-pointer hover:bg-primary/10 transition"
+                                    onClick={() => setSelectedStudent(student)}
                                 >
-                                    <Icon name="X" size={12} />
-                                </button>
-                            </span>
-                        ))}
-                        <input
-                            type="text"
-                            className="border rounded-lg px-2 py-1 text-sm w-24 sm:w-32"
-                            placeholder="Add subject"
-                            value={newSubject}
-                            onChange={e => setNewSubject(e.target.value)}
-                            onKeyDown={e => e.key === 'Enter' && handleAddSubject()}
-                        />
-                        <Button variant="outline" size="sm" onClick={handleAddSubject} disabled={!newSubject.trim()} className="w-full sm:w-auto">
-                            <Icon name="Plus" size={14} className="mr-1" />
-                            Add
-                        </Button>
-                    </div>
-                    <div className="bg-card border border-border rounded-xl shadow-lg p-6">
-                        <div className="mb-6 flex items-center justify-between">
-                            <h2 className="font-heading text-xl font-bold text-foreground">Students in {teacherData?.className} (Exam Taken)</h2>
-                            <span className="text-muted-foreground text-sm">{students.length} students</span>
+                                    <span className="w-12 h-12 rounded-full bg-primary flex items-center justify-center text-xl font-bold text-white border-2 border-primary shadow mb-2">
+                                        {student.name ? student.name.charAt(0).toUpperCase() : "S"}
+                                    </span>
+                                    <span className="font-body font-medium text-foreground">{student.name}</span>
+                                    <span className="text-xs text-muted-foreground">{student.className}</span>
+                                </div>
+                            ))}
                         </div>
-                        {isLoadingStudents || isLoadingResults ? (
-                            <div className="flex flex-col items-center justify-center py-12">
-                                <TbFidgetSpinner className="animate-spin text-5xl text-primary mb-2" />
-                                <span className="text-primary font-medium">Loading data...</span>
-                            </div>
-                        ) : (
-                            <div className="overflow-x-auto">
-                                <table className="min-w-full border-collapse">
-                                    <thead>
-                                        <tr>
-                                            <th className="px-2 py-2 sm:px-4 sm:py-2 text-left font-semibold text-muted-foreground text-xs sm:text-sm">Student</th>
-                                            {subjects.map(subject => (
-                                              <th key={subject} className="px-4 py-2 text-left font-semibold text-muted-foreground">{subject}</th>
-                                            ))}
-                                            <th className="px-4 py-2 text-left font-semibold text-muted-foreground">Overall Score</th>
-                                            <th className="px-4 py-2 text-left font-semibold text-muted-foreground">Position</th>
-                                        </tr>
-                                        <tr>
-                                            <th className="px-2 py-2 text-left font-semibold text-muted-foreground">C/A</th>
-                                            {subjects.map(subject => (
-                                              <th key={subject} className="px-4 py-2 text-left font-semibold text-muted-foreground"></th>
-                                            ))}
-                                            <th colSpan="2"></th>
-                                        </tr>
-                                    </thead>
-                                    <tbody>
-                                        {students.map(student => (
-                                            <React.Fragment key={student._id}>
-                                                {/* C/A Row */}
-                                                <tr className="border-b border-border bg-muted/10">
-                                                    <td className="px-4 py-2 font-body font-medium text-foreground">
-                                                      <span className="text-xs text-muted-foreground">C/A</span>
-                                                    </td>
-                                                    {subjects.map(subject => (
-                                                      <td key={subject} className="px-4 py-2">
-                                                        <input
-                                                          type="number"
-                                                          min="0"
-                                                          max="40"
-                                                          className="w-16 border rounded-lg px-2 py-1 focus:outline-none focus:ring bg-background"
-                                                          value={caScores?.[student._id]?.[subject] || ''}
-                                                          onChange={e => setCaScores(prev => ({
-                                                            ...prev,
-                                                            [student._id]: {
-                                                              ...(prev[student._id] || {}),
-                                                              [subject]: e.target.value
-                                                            }
-                                                          }))}
-                                                          placeholder="C/A"
-                                                        />
-                                                      </td>
-                                                    ))}
-                                                    <td colSpan="2"></td>
-                                                </tr>
-                                                {/* Exam Row */}
-                                                <tr className="border-b border-border hover:bg-muted/20 transition">
-                                                    <td className="px-4 py-2 flex items-center space-x-3">
-                                                        <span className="w-10 h-10 rounded-full bg-primary flex items-center justify-center text-lg font-bold text-white border-2 border-primary shadow">
-                                                            {student.name ? student.name.charAt(0).toUpperCase() : "S"}
-                                                        </span>
-                                                        <span className="font-body font-medium text-foreground">{student.name}</span>
-                                                        <span className="text-xs text-muted-foreground ml-2">({student.className})</span>
-                                                    </td>
-                                                    {subjects.map(subject => (
-                                                        <td key={subject} className="px-4 py-2">
-                                                            <input
-                                                                type="number"
-                                                                min="0"
-                                                                max="60"
-                                                                className="w-16 border rounded-lg px-2 py-1 focus:outline-none focus:ring bg-background"
-                                                                value={results?.[student._id]?.[subject] || ''}
-                                                                onChange={e => handleResultChange(student._id, subject, e.target.value)}
-                                                                placeholder="Exam"
-                                                            />
-                                                        </td>
-                                                    ))}
-                                                    <td className="px-4 py-2">
-                                                        <div className="relative">
-                                                            <input
-                                                                type="number"
-                                                                min="0"
-                                                                max="100"
-                                                                className="w-20 border rounded-lg px-2 py-1 focus:outline-none focus:ring bg-background pr-8"
-                                                                value={overall?.[student._id]?.overallScore || ''}
-                                                                onChange={e => handleOverallChange(student._id, 'overallScore', e.target.value)}
-                                                                placeholder="Overall"
-                                                            />
-                                                            {/* Show percentage label if value exists */}
-                                                            {overall?.[student._id]?.overallScore !== undefined && overall?.[student._id]?.overallScore !== '' && (
-                                                                <span className="absolute right-2 top-1/2 -translate-y-1/2 text-xs text-muted-foreground pointer-events-none">
-                                                                    %
-                                                                </span>
-                                                            )}
-                                                        </div>
-                                                    </td>
-                                                    <td className="px-4 py-2">
-                                                        <input
-                                                            type="text"
-                                                            className="w-20 border rounded-lg px-2 py-1 focus:outline-none focus:ring bg-background"
-                                                            value={overall?.[student._id]?.position || ''}
-                                                            onChange={e => handleOverallChange(student._id, 'position', e.target.value)}
-                                                            placeholder="Position"
-                                                        />
-                                                    </td>
-                                                </tr>
-                                                {/* Push Button Row */}
-                                                <tr>
-                                                    <td colSpan={subjects.length + 3} className="px-4 py-2 text-right">
-                                                        <Button
-                                                            variant="outline"
-                                                            size="sm"
-                                                            onClick={() => handlePushIndividualResult(student._id)}
-                                                            disabled={isSubmitting}
-                                                        >
-                                                            <Icon name="Send" size={14} className="mr-1" />
-                                                            Push This Student's Result
-                                                        </Button>
-                                                    </td>
-                                                </tr>
-                                            </React.Fragment>
-                                        ))}
-                                    </tbody>
-                                </table>
-                            </div>
-                        )}
-                        <div className="mt-6 flex justify-end">
-                            <Button
-                                variant="primary"
-                                onClick={handleSubmitResults}
-                                disabled={isSubmitting || students.length === 0}
-                                className="w-full sm:w-auto"
-                            >
-                                <Icon name="Send" size={16} className="mr-2" />
-                                {isSubmitting ? 'Pushing Results...' : 'Push Results to Students'}
-                            </Button>
-                        </div>
-                    </div>
-                
+                    )}
                 </div>
             </main>
+            {/* Feedback message area for student list */}
+            {(successMsg || errorMsg) && (
+              <div
+                className={`fixed bottom-6 left-1/2 transform -translate-x-1/2 px-4 py-2 rounded-lg font-medium text-center shadow-lg z-50 transition-all ${
+                  successMsg
+                    ? 'bg-green-100 text-green-700 border border-green-300'
+                    : 'bg-red-100 text-red-700 border border-red-300'
+                }`}
+                style={{ minWidth: '280px', maxWidth: '90vw' }}
+              >
+                {successMsg || errorMsg}
+                <button
+                  className="ml-2 text-xs text-gray-500 hover:text-gray-700"
+                  onClick={() => {
+                    setSuccessMsg('');
+                    setErrorMsg('');
+                  }}
+                  aria-label="Dismiss"
+                >
+                  &times;
+                </button>
+              </div>
+            )}
+
+            {/* Confirmation Modal */}
+            {showPushConfirm && (
+              <Modal
+                isOpen={showPushConfirm}
+                onClose={() => setShowPushConfirm(false)}
+                title="Confirm Push"
+              >
+                <div>
+                  <p>Are you sure you want to push this student's result? This will submit the result for admin verification and make it read-only.</p>
+                  <div className="flex gap-4 mt-4">
+                    <Button
+                      variant="primary"
+                      onClick={() => handlePushIndividualResult(pendingPushStudentId)}
+                      disabled={isSubmitting}
+                    >
+                      Yes, Push Result
+                    </Button>
+                    <Button
+                      variant="secondary"
+                      onClick={() => setShowPushConfirm(false)}
+                      disabled={isSubmitting}
+                    >
+                      Cancel
+                    </Button>
+                  </div>
+                </div>
+              </Modal>
+            )}
         </>
     );
 };

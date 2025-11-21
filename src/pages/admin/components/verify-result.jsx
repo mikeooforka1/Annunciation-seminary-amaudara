@@ -74,28 +74,32 @@ const VerifyResult = () => {
             const subjects = [];
             let isReviewed = false;
             let isVerified = false;
-            let overallFields = {};
+            // Always define subjectResults
+            let subjectResults = [];
             if (Array.isArray(results) && results.length > 0) {
               // Only consider subject results (not 'Overall')
-              const subjectResults = results.filter(r => r.subject && r.subject !== 'Overall');
+              subjectResults = results.filter(r => r.subject && r.subject !== 'Overall');
+              // Use backend fields directly
               isReviewed = subjectResults.length > 0 && subjectResults.every(r => r.reviewed === true && r.pending === false);
               isVerified = subjectResults.length > 0 && subjectResults.every(r => r.verified === true && r.pending === false);
               results.forEach(r => {
-                if (r.subject) {
-                  if (r.subject === 'Overall') {
-                    // Merge all fields from "Overall" into resultObj
-                    Object.assign(resultObj, r);
-                  } else {
-                    resultObj[r.subject] = r;
-                    if (!subjects.includes(r.subject)) {
-                      subjects.push(r.subject);
-                    }
-                  }
+                if (r.subject && r.subject !== 'Overall') {
+                  resultObj[r.subject] = r;
+                  subjects.push(r.subject);
+                } else if (r.subject === 'Overall') {
+                  // Map meta/key rating fields
+                  Object.assign(resultObj, r);
                 }
               });
               resultObj.subjects = subjects;
             }
-            return { studentId: student._id, resultObj, isReviewed, isVerified };
+            // Store backend status fields for this student
+            resultObj._status = {
+              reviewed: isReviewed,
+              verified: isVerified,
+              pending: subjectResults.some(r => r.pending === true)
+            };
+            return { studentId: student._id, resultObj };
           });
       });
 
@@ -103,9 +107,16 @@ const VerifyResult = () => {
         .then(resultsArray => {
           const newEditResults = {};
           const newVerifiedStudents = {};
-          resultsArray.forEach(({ studentId, resultObj, isReviewed, isVerified }) => {
+          resultsArray.forEach(({ studentId, resultObj }) => {
             newEditResults[studentId] = resultObj;
-            newVerifiedStudents[studentId] = isVerified ? 'verified' : (isReviewed ? 'reviewed' : false);
+            // Use backend status fields for display
+            if (resultObj._status?.verified) {
+              newVerifiedStudents[studentId] = 'verified';
+            } else if (resultObj._status?.reviewed) {
+              newVerifiedStudents[studentId] = 'reviewed';
+            } else {
+              newVerifiedStudents[studentId] = 'pending';
+            }
           });
           setEditResults(newEditResults);
           setVerifiedStudents(newVerifiedStudents);
@@ -184,96 +195,54 @@ const VerifyResult = () => {
   };
 
   // Mark individual student result as reviewed (admin review)
-  const handleReviewStudent = async (studentId, retryCount = 0) => {
-    setMessage('');
-    setReviewLoading(true);
-    if (!adminId) {
-      setMessage('Admin ID not found. Please log in again.');
-      setReviewLoading(false);
-      return;
-    }
-    if (!isValidObjectId(studentId)) {
-      setMessage('Invalid student ID.');
-      setReviewLoading(false);
-      return;
-    }
-    const normalizedClassName = selectedClass ? selectedClass.toLowerCase() : '';
-    const normalizedTerm = selectedTerm ? selectedTerm.toLowerCase() : '';
-    const reviewUrl = `${API_BASE_URL}/api/results/review-student-all`;
-    try {
-      const res = await fetch(reviewUrl, {
-        method: 'POST',
-        body: JSON.stringify({
-          studentId,
-          className: normalizedClassName,
-          term: normalizedTerm
-        }),
-        headers: { 'Content-Type': 'application/json' }
-      });
-      const data = await res.json();
-      if (res.ok && data.success) {
-        setMessage('Result marked as reviewed!');
-        setTimeout(() => setMessage(''), 1500);
-        // Wait a bit before re-fetching to allow backend to update
-        setTimeout(async () => {
-          const resultsUrl = `${API_BASE_URL}/api/results/student/${studentId}/all?className=${normalizedClassName}&term=${normalizedTerm}`;
-          try {
-            const res2 = await fetch(resultsUrl);
-            if (!res2.ok) {
-              if (retryCount < 3) {
-                setMessage('Server error, retrying...');
-                setTimeout(() => handleReviewStudent(studentId, retryCount + 1), 1000);
-              } else {
-                setMessage('Server error. Please try again later.');
-                setReviewLoading(false);
-              }
-              return;
-            }
-            const results2 = await res2.json();
-            const resultObj = {};
-            const subjects = [];
-            let allReviewed = false;
-            if (Array.isArray(results2) && results2.length > 0) {
-              const subjectResults = results2.filter(
-                r => r.subject && r.subject !== 'Overall'
-              );
-              allReviewed =
-                subjectResults.length > 0 &&
-                subjectResults.every(r => r.reviewed === true && r.pending === false);
-              results2.forEach(r => {
-                if (r.subject) {
-                  if (r.subject === 'Overall') {
-                    Object.assign(resultObj, r);
-                  } else {
-                    resultObj[r.subject] = r;
-                    if (!subjects.includes(r.subject)) {
-                      subjects.push(r.subject);
-                    }
-                  }
-                }
-              });
-              resultObj.subjects = subjects;
-              setEditResults(prev => ({ ...prev, [studentId]: resultObj }));
-            }
-            setVerifiedStudents(prev => ({
-              ...prev,
-              [studentId]: allReviewed ? 'reviewed' : false
-            }));
-            setReviewLoading(false);
-          } catch (err) {
-            setMessage('Error fetching updated results.');
-            setReviewLoading(false);
-          }
-        }, 700); // 700ms delay
-      } else {
-        setMessage(data.error || 'Failed to mark as reviewed.');
-        setReviewLoading(false);
-      }
-    } catch (err) {
-      setMessage('Network error. Please try again.');
+ const handleReviewStudent = async (studentId, retryCount = 0) => {
+  setMessage('');
+  setReviewLoading(true);
+  if (!adminId) {
+    setMessage('Admin ID not found. Please log in again.');
+    setReviewLoading(false);
+    return;
+  }
+  if (!isValidObjectId(studentId)) {
+    setMessage('Invalid student ID.');
+    setReviewLoading(false);
+    return;
+  }
+  const normalizedClassName = selectedClass ? selectedClass.toLowerCase() : '';
+  const normalizedTerm = selectedTerm ? selectedTerm.toLowerCase() : '';
+  const reviewUrl = `${API_BASE_URL}/api/results/review-student-all`;
+  try {
+    const res = await fetch(reviewUrl, {
+      method: 'POST',
+      body: JSON.stringify({
+        studentId,
+        className: normalizedClassName,
+        term: normalizedTerm
+      }),
+      headers: { 'Content-Type': 'application/json' }
+    });
+    const data = await res.json();
+    if (res.ok && data.success) {
+      setMessage('Result marked as reviewed!');
+      setTimeout(() => setMessage(''), 1500);
+      // Always re-fetch latest pushed results after status change
+      setTimeout(async () => {
+        let studentsUrl = `${API_BASE_URL}/api/user/class/${selectedClass}/all/students`;
+        if (selectedTerm) studentsUrl += `?term=${selectedTerm}`;
+        const studentsRes = await fetch(studentsUrl);
+        const studentsData = await studentsRes.json();
+        setStudents(Array.isArray(studentsData) ? studentsData : []);
+        setReviewLoading(false); // <-- Move here so it always resets after re-fetch
+      }, 700);
+    } else {
+      setMessage(data.error || 'Failed to mark as reviewed.');
       setReviewLoading(false);
     }
-  };
+  } catch (err) {
+    setMessage('Network error. Please try again.');
+    setReviewLoading(false);
+  }
+};
 
   // Check if all students are reviewed
   useEffect(() => {

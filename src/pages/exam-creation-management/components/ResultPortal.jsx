@@ -36,7 +36,7 @@ const ResultPortal = () => {
     const [dirtyStudents, setDirtyStudents] = useState({}); // <-- New state for tracking dirty students
 
 
-    function buildSaveAllPayload(studentId) {
+    function buildSaveAllPayload(studentId, isPush = false) {
   return {
     studentId,
     teacherId: teacherData?._id,
@@ -46,6 +46,7 @@ const ResultPortal = () => {
     caScores: caScores[studentId] || {},
     ...results[studentId],   // flatten subject fields
     ...overall[studentId],   // flatten overall/meta fields
+    isPush, // <-- Always include isPush
   };
 }
     // 1. Load subjects from localStorage on mount (per class/term)
@@ -676,8 +677,8 @@ useEffect(() => {
   setErrorMsg('');
   let success = true;
   try {
-    // NEW: Save all fields first (ensures detailed data is in backend before pushing)
-    const savePayload = buildSaveAllPayload(studentId);
+    // Save all fields first (ensures detailed data is in backend before pushing)
+    const savePayload = buildSaveAllPayload(studentId, true); // Always isPush: true for push
     const saveRes = await fetch(`${API_BASE_URL}/api/results/save-all`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -690,7 +691,7 @@ useEffect(() => {
     for (const subject of subjects) {
       const score = results?.[studentId]?.[subject];
       if (score !== undefined && score !== '') {
-        const res = await fetch(`${API_BASE_URL}/api/results/set`, {
+        await fetch(`${API_BASE_URL}/api/results/set`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
@@ -699,12 +700,10 @@ useEffect(() => {
             className: teacherData.className,
             term: selectedTerm,
             subject,
-            score: Number(score),
-            remarks: '',
-            isPush: true
+            score: Number(score) || 0,
+            isPush: true // Always true for push
           })
         });
-        if (!res.ok) success = false;
       }
       const caScore = caScores?.[studentId]?.[subject];
       if (caScore !== undefined && caScore !== '') {
@@ -717,9 +716,8 @@ useEffect(() => {
             className: teacherData.className,
             term: selectedTerm,
             subject: `${subject} C/A`,
-            score: Number(caScore),
-            remarks: '',
-            isPush: true
+            score: Number(caScore) || 0,
+            isPush: true // Always true for push
           })
         });
       }
@@ -738,7 +736,7 @@ useEffect(() => {
           subject: 'Overall',
           score: Number(overallScore) || 0,
           remarks: `Position: ${position || ''}`,
-          isPush: true
+          isPush: true // Always true for push
         })
       });
       if (!res.ok) {
@@ -852,7 +850,6 @@ useEffect(() => {
               headers: { 'Content-Type': 'application/json' },
               body: JSON.stringify(payload),
             });
-            // DO NOT setResultsPushed here!
           }
         }, 17000); // 17 seconds debounce
 
@@ -1395,15 +1392,15 @@ useEffect(() => {
                     <Button
                       variant="secondary"
                       type="button"
-                      disabled={isSubmitting}
+                      disabled={isSubmitting || isReadOnly} // <-- Disable if already pushed
                       className="w-full"
                       onClick={async () => {
                         setSuccessMsg('');
                         setErrorMsg('');
                         setIsSubmitting(true);
 
-                        // Use the new payload builder here:
-                        const payload = buildSaveAllPayload(selectedStudent._id);
+                        // Always send isPush: false for draft save
+                        const payload = buildSaveAllPayload(selectedStudent._id, false);
 
                         try {
                           const res = await fetch(`${API_BASE_URL}/api/results/save-all`, {
@@ -1413,18 +1410,7 @@ useEffect(() => {
                           });
                           const data = await res.json();
                           if (data.success) {
-                            setSuccessMsg('Saved!');
-                            // Update localStorage with current state after save
-                            localStorage.setItem(
-                              `resultPortal_${teacherData.className}_${selectedTerm}_${selectedStudent._id}`,
-                              JSON.stringify({
-                                results: results[selectedStudent._id] || {},
-                                caScores: caScores[selectedStudent._id] || {},
-                                overall: overall[selectedStudent._id] || {},
-                                subjects,
-                              })
-                            );
-                            // Clear dirty flag to allow future fetches
+                            setSuccessMsg('Result saved as draft.');
                             setDirtyStudents(prev => ({ ...prev, [selectedStudent._id]: false }));
                           } else {
                             setErrorMsg('Failed to save result. Please try again.');

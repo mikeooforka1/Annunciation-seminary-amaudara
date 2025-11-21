@@ -333,3 +333,19 @@ button.draft-btn {
   background: linear-gradient(90deg, #16a34a 0%, #15803d 100%) !important; /* green */
   color: #fff !important;
 }
+.icon-delete-btn {
+  background: none !important;
+  border: none !important;
+  box-shadow: none !important;
+  padding: 0.5rem !important;
+  border-radius: 0.5rem !important;
+  color: #dc2626 !important; /* Tailwind red-600 */
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  transition: background 0.2s;
+}
+.icon-delete-btn:hover {
+  background: #fee2e2 !important; /* Tailwind red-100 */
+}

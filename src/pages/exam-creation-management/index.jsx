@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import RoleBasedHeader from '../../components/ui/RoleBasedHeader';
 import AcademicTabNavigation from '../../components/ui/AcademicTabNavigation';
 import ContextualBreadcrumbs from '../../components/ui/ContextualBreadcrumbs';
@@ -37,21 +37,20 @@ const POLLING_INTERVAL = 30000; // 30 seconds
 
 const ExamCreationManagement = () => {
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
-  const [isSidebarOpen, setIsSidebarOpen] = useState(false); // Only this state
-  const [activeView, setActiveView] = useState('configuration'); // 'configuration', 'questions', 'existing', 'submitted'
-  const [activeExamTab, setActiveExamTab] = useState('all'); // 'all' or 'submitted'
+  const [isSidebarOpen, setIsSidebarOpen] = useState(false);
+  const [activeView, setActiveView] = useState('configuration');
+  const [activeExamTab, setActiveExamTab] = useState('all');
   const [showPreview, setShowPreview] = useState(false);
   const [showQuestionBank, setShowQuestionBank] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const [exams, setExams] = useState([]);
   const [submissions, setSubmissions] = useState([]);
-  const [openExamModal, setOpenExamModal] = useState(null); // <-- Add this line to fix "not defined" error
+  const [openExamModal, setOpenExamModal] = useState(null);
   const [selectedSubmission, setSelectedSubmission] = useState(null);
-  const [openPhotoModal, setOpenPhotoModal] = useState({ idx: null, photo: null }); // <-- Add this to fix "not defined" error
+  const [openPhotoModal, setOpenPhotoModal] = useState({ idx: null, photo: null });
   const [errorMsg, setErrorMsg] = useState('');
-  const [openPhotoIdx, setOpenPhotoIdx] = useState(null); // <-- Add this line
+  const [openPhotoIdx, setOpenPhotoIdx] = useState(null);
   const [currentTerm, setCurrentTerm] = useState('');
-  const [draftMsg, setDraftMsg] = useState('');
 
   // Get teacher data from localStorage
   const [teacherData, setTeacherData] = useState(null);
@@ -60,7 +59,7 @@ const ExamCreationManagement = () => {
     if (storedData) {
       const teacher = JSON.parse(storedData);
       setTeacherData(teacher);
-      setCurrentTerm(teacher?.term || teacher?.currentTerm || ''); // Detect term
+      setCurrentTerm(teacher?.term || teacher?.currentTerm || '');
     }
   }, []);
 
@@ -69,7 +68,7 @@ const ExamCreationManagement = () => {
 
   const [questions, setQuestions] = useState([]);
 
-  const API_BASE_URL = process.env.REACT_APP_API_BASE_URL; // <-- Use env variable
+  const API_BASE_URL = process.env.REACT_APP_API_BASE_URL;
 
   // Exam fetch with teacherId validation
   const fetchExams = async () => {
@@ -137,7 +136,7 @@ const ExamCreationManagement = () => {
       const allSubmissions = [];
       for (const exam of exams) {
         const res = await fetch(`${API_BASE_URL}/api/exams/submissions?examId=${exam._id}`, {
-          credentials: 'include', // <-- Send cookies/session with request
+          credentials: 'include',
         });
         if (!res.ok) throw new Error('Unable to fetch submissions.');
         const data = await res.json();
@@ -154,6 +153,7 @@ const ExamCreationManagement = () => {
     setIsLoading(false);
   };
 
+  // Define breadcrumbItems before using it
   const breadcrumbItems = [
     { label: 'Exam Management', path: '/exam-creation-management' }
   ];
@@ -171,7 +171,17 @@ const ExamCreationManagement = () => {
   };
 
   const handleImportQuestions = (importedQuestions) => {
-    const questionsWithNewIds = importedQuestions?.map(q => ({
+    let parsedQuestions = importedQuestions;
+    // Parse if importedQuestions is a string
+    if (typeof importedQuestions === 'string') {
+      try {
+        parsedQuestions = JSON.parse(importedQuestions);
+      } catch (e) {
+        alert('Invalid questions format. Please check your import.');
+        return;
+      }
+    }
+    const questionsWithNewIds = parsedQuestions?.map(q => ({
       ...q,
       id: Date.now() + Math.random()
     }));
@@ -186,7 +196,6 @@ const ExamCreationManagement = () => {
         ...examData,
         term: currentTerm,
         questions,
-        // Convert startDate and endDate to ISO format if present
         startDate: examData.startDate ? new Date(examData.startDate).toISOString() : '',
         endDate: examData.endDate ? new Date(examData.endDate).toISOString() : '',
       };
@@ -195,72 +204,25 @@ const ExamCreationManagement = () => {
     }, 1000);
   };
 
-  const handleSaveDraft = async () => {
-    setIsLoading(true);
-    setErrorMsg('');
-    setDraftMsg('');
-    try {
-      const teacherClass = teacherData?.className || teacherData?.class;
-      const payload = {
-        ...examData,
-        questions,
-        status: 'draft',
-        createdBy: teacherData?._id,
-        class: teacherClass,
-        term: currentTerm,
-        startDate: examData.startDate ? new Date(examData.startDate).toISOString() : '',
-        endDate: examData.endDate ? new Date(examData.endDate).toISOString() : '',
-        photo: '',
-      };
-      const res = await fetch(`${API_BASE_URL}/api/exams/save-draft`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(payload),
-      });
-      const result = await res.json();
-      if (res.ok) {
-        setErrorMsg('');
-        setDraftMsg('✅ Draft saved successfully! You can continue later.');
-        localStorage.setItem('examDraft', JSON.stringify({ examData: payload, questions }));
-      } else {
-        setErrorMsg(result.error || 'Failed to save draft.');
-        setDraftMsg('');
-      }
-    } catch (err) {
-      setErrorMsg('Network error. Please check your connection and try again.');
-      setDraftMsg('');
-    }
-    setIsLoading(false);
-  };
-
   // Reset exam after publish
+  const [publishError, setPublishError] = useState('');
   const handlePublishExam = async () => {
-    // Check for missing questions
+    setPublishError('');
+    setErrorMsg('');
+    // Validate required fields before publishing
     if (!questions || questions.length === 0) {
-      setErrorMsg('Please add at least one question before publishing the exam.');
-      alert('⚠️ You must add at least one question before publishing your exam.');
+      setPublishError('Please add at least one question before publishing the exam.');
       return;
     }
-    // Check for missing required exam fields
-    const requiredFields = [
-      { key: 'title', label: 'Exam Title' },
-      { key: 'subject', label: 'Subject' },
-      { key: 'class', label: 'Class' },
-      { key: 'duration', label: 'Duration' },
-      { key: 'totalMarks', label: 'Total Marks' },
-      { key: 'passMarks', label: 'Pass Marks' },
-      { key: 'startDate', label: 'Start Date' },
-      { key: 'endDate', label: 'End Date' }
-    ];
-    const missingFields = requiredFields.filter(f => !examData[f.key] || String(examData[f.key]).trim() === '');
-    if (missingFields.length > 0) {
-      const missingLabels = missingFields.map(f => f.label).join(', ');
-      setErrorMsg(`Please fill in the following required fields before publishing: ${missingLabels}`);
-      alert(`⚠️ Please fill in the following required fields before publishing:\n${missingLabels}`);
+    if (!examData.title || !examData.subject || !examData.class || !currentTerm) {
+      setPublishError('Please fill in all required fields: Title, Subject, Class, and Term.');
+      return;
+    }
+    if (!examData.duration || isNaN(Number(examData.duration))) {
+      setPublishError('Please set a valid exam duration.');
       return;
     }
     setIsLoading(true);
-    setErrorMsg('');
     try {
       const teacherClass = teacherData?.className || teacherData?.class;
       const payload = {
@@ -269,7 +231,7 @@ const ExamCreationManagement = () => {
         status: 'published',
         createdBy: teacherData?._id,
         class: teacherClass,
-        term: currentTerm, // Ensure term is set
+        term: currentTerm,
         startDate: examData.startDate ? new Date(examData.startDate).toISOString() : '',
         endDate: examData.endDate ? new Date(examData.endDate).toISOString() : '',
         photo: '',
@@ -282,18 +244,18 @@ const ExamCreationManagement = () => {
       const result = await res.json();
       if (res.ok) {
         alert('🎉 Exam published successfully! Students will see it at the scheduled time.');
-        setExamData({ ...initialExamData, class: teacherClass, term: currentTerm });
+        // Clear draft state after publish
+        setExamData({ ...initialExamData, class: teacherClass, term: currentTerm, status: undefined, _id: undefined });
         setQuestions([]);
+        setPublishError('');
         setErrorMsg('');
         fetchExams();
         fetchAllSubmissions();
       } else {
-        setErrorMsg(result.error || 'Failed to publish exam. Please check your details and try again.');
-        alert(result.error || 'Failed to publish exam. Please check your details and try again.');
+        setPublishError(result.error || 'Failed to publish exam. Please check your details and try again.');
       }
     } catch (err) {
-      setErrorMsg('Network error. Please check your connection and try again.');
-      alert('Network error. Please check your connection and try again.');
+      setPublishError('Network error. Please check your connection and try again.');
     }
     setIsLoading(false);
   };
@@ -338,7 +300,6 @@ const ExamCreationManagement = () => {
     }
   };
 
-  // Add console logs for debugging
   useEffect(() => {
     console.log('Fetched exams:', exams.map(e => ({ id: e._id, title: e.title, status: e.status })));
   }, [exams]);
@@ -353,7 +314,6 @@ const ExamCreationManagement = () => {
     })));
   }, [submissions]);
 
-  // Filter exams and submissions by current term
   const filteredExams = exams.filter(exam => exam.term === currentTerm);
   const filteredSubmissions = submissions.map(group => ({
     ...group,
@@ -362,7 +322,6 @@ const ExamCreationManagement = () => {
       : []
   })).filter(group => group.exams.length > 0);
 
-  // Group submissions by student
   const submissionsByStudent = submissions.reduce((acc, sub) => {
     const studentId = sub.studentId?._id || sub.studentId;
     if (!acc[studentId]) acc[studentId] = { student: sub.studentId, exams: [] };
@@ -370,69 +329,197 @@ const ExamCreationManagement = () => {
     return acc;
   }, {});
 
-  // Fetch exams instantly when "My Exams" tab is active
   useEffect(() => {
     if (activeView === 'existing') {
       fetchExams();
     }
   }, [activeView, teacherData, currentTerm]);
 
-  // Fetch submitted exams instantly when "Submitted Exams" tab is active
   useEffect(() => {
     if (activeView === 'submitted') {
       fetchSubmittedExamsByStudent();
     }
   }, [activeView]);
 
-  // Optionally, fetch exams when teacherData or currentTerm changes
   useEffect(() => {
     if (teacherData && currentTerm) {
       fetchExams();
     }
   }, [teacherData, currentTerm]);
 
-  // Optionally, fetch submissions when exams change (for up-to-date data)
   useEffect(() => {
     if (activeView === 'submitted' && exams.length > 0) {
       fetchAllSubmissions();
     }
   }, [activeView, exams]);
 
-  // Polling for "My Exams" tab
-  useEffect(() => {
-    let interval;
-    if (activeView === 'existing') {
-      interval = setInterval(() => {
-        fetchExams();
-        fetchAllSubmissions();
-      }, POLLING_INTERVAL);
-    }
-    return () => clearInterval(interval);
-  }, [activeView, teacherData, currentTerm]);
+  const autoSaveTimeout = useRef(null);
 
+  // Auto-save draft logic
   useEffect(() => {
-    const autoSaveDraft = (e) => {
-      if (examData && questions.length > 0 && examData.status !== 'published') {
-        handleSaveDraft();
-        e.preventDefault();
-        e.returnValue = '';
+    if (examData.status === 'published') return;
+    if (autoSaveTimeout.current) clearTimeout(autoSaveTimeout.current);
+
+    autoSaveTimeout.current = setTimeout(() => {
+      // Save as soon as any field is filled
+      if (
+        Object.values(examData).some(val => val && String(val).trim() !== '') ||
+        questions.length > 0
+      ) {
+        const teacherClass = teacherData?.className || teacherData?.class;
+        const payload = {
+          ...examData,
+          questions,
+          createdBy: teacherData?._id,
+          class: teacherClass,
+          term: currentTerm,
+          startDate: examData.startDate ? new Date(examData.startDate).toISOString() : '',
+          endDate: examData.endDate ? new Date(examData.endDate).toISOString() : '',
+          photo: '',
+        };
+        fetch(`${API_BASE_URL}/api/exams/save-draft`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(payload),
+        })
+        .then(res => res.json())
+        .then(result => {
+          if (result.success && result.exam && result.exam._id) {
+            setExamData(prev => ({ ...prev, _id: result.exam._id, status: 'draft' }));
+          }
+        })
+        .catch(() => {});
       }
+    }, 5000);
+
+    return () => {
+      if (autoSaveTimeout.current) clearTimeout(autoSaveTimeout.current);
     };
-    window.addEventListener('beforeunload', autoSaveDraft);
-    return () => window.removeEventListener('beforeunload', autoSaveDraft);
+  }, [examData, questions, teacherData, currentTerm, API_BASE_URL]);
+
+  // Reset exam data when switching views
+  useEffect(() => {
+    if (activeView !== 'configuration') {
+      setExamData(initialExamData);
+      setQuestions([]);
+    }
+  }, [activeView]);
+
+  // Error boundary for individual components
+  const ErrorBoundary = ({ children }) => {
+    return (
+      <div className="p-4 rounded-lg border border-destructive/10 bg-destructive/5 mb-4">
+        {children}
+      </div>
+    );
+  };
+
+  // Save to localStorage instantly on every change
+  useEffect(() => {
+    const teacherId = teacherData?._id || '';
+    const teacherClass = teacherData?.className || teacherData?.class || '';
+    const key = `examDraft_${teacherId}_${teacherClass}_${currentTerm}`;
+    const draft = {
+      examData,
+      questions
+    };
+    localStorage.setItem(key, JSON.stringify(draft));
   }, [examData, questions, teacherData, currentTerm]);
 
+  // Restore from localStorage on mount (before backend fetch)
   useEffect(() => {
-    const savedDraft = localStorage.getItem('examDraft');
-    if (savedDraft) {
-      const { examData: savedExamData, questions: savedQuestions } = JSON.parse(savedDraft);
-      if (savedExamData && savedExamData.status !== 'published') {
-        setExamData(savedExamData);
-        setQuestions(savedQuestions || []);
-        setDraftMsg('📝 Draft loaded! Continue from where you stopped.');
+    const teacherId = teacherData?._id || '';
+    const teacherClass = teacherData?.className || teacherData?.class || '';
+    const key = `examDraft_${teacherId}_${teacherClass}_${currentTerm}`;
+    const saved = localStorage.getItem(key);
+    if (saved) {
+      try {
+        const draft = JSON.parse(saved);
+        if (draft.examData) setExamData(draft.examData);
+        if (draft.questions) setQuestions(draft.questions);
+      } catch {}
+    }
+  }, [teacherData, currentTerm]);
+
+  // Fetch saved draft on mount (or when teacher/class/term changes)
+  useEffect(() => {
+    async function fetchDraftExam() {
+      if (!teacherData?._id || !currentTerm) return;
+      try {
+        const teacherClass = teacherData?.className || teacherData?.class;
+        const res = await fetch(`${API_BASE_URL}/api/exams/draft?teacherId=${teacherData._id}&class=${teacherClass}&term=${currentTerm}`);
+        if (!res.ok) return;
+        const draft = await res.json();
+        if (draft && draft._id) {
+          setExamData(draft);
+          setQuestions(draft.questions || []);
+        }
+      } catch (err) {
+        // Ignore errors, just start with empty
       }
     }
-  }, []);
+    fetchDraftExam();
+  }, [teacherData, currentTerm]);
+
+  // Example: Call this when saving results
+  const handleSaveAllResults = async ({
+    subjects, // Array of subject result objects
+    overall,  // Object with overall/meta fields
+    studentId,
+    teacherId,
+    className,
+    term,
+    academicYear,
+    date,
+  }) => {
+    setIsLoading(true);
+
+    // Build payload: one object per subject, plus one for "Overall"
+    const payload = [
+      ...subjects.map(sub => ({
+        subject: sub.subject,
+        score: sub.score,
+        ca: sub.ca,
+        keyRating: sub.keyRating,
+        comments: sub.comments,
+        studentId,
+        teacherId,
+        className,
+        term,
+        academicYear,
+        date,
+        // add other fields as needed
+      })),
+      {
+        subject: "Overall",
+        ...overall,
+        studentId,
+        teacherId,
+        className,
+        term,
+        academicYear,
+        date,
+      }
+    ];
+
+    try {
+      const res = await fetch(`${API_BASE_URL}/api/results/save-all`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload),
+      });
+      const result = await res.json();
+      if (res.ok) {
+        alert('Results saved successfully!');
+        // Optionally reset form or update UI
+      } else {
+        setErrorMsg(result.error || 'Failed to save results.');
+      }
+    } catch (err) {
+      setErrorMsg('Network error. Please try again.');
+    }
+    setIsLoading(false);
+  };
 
   return (
     <div className="min-h-screen bg-background">
@@ -442,7 +529,6 @@ const ExamCreationManagement = () => {
         userName={teacherData?.name || teacherData?.fullName || 'Teacher'}
         notifications={teacherData?.notifications || 0}
       />
-      
       {/* Indicate current term */}
       <div className="p-4">
         <div className="mb-2 text-lg font-semibold text-primary">
@@ -466,15 +552,6 @@ const ExamCreationManagement = () => {
               </p>
             </div>
             <div className="flex flex-col sm:flex-row items-center space-y-2 sm:space-y-0 sm:space-x-3 mt-4 lg:mt-0 w-full sm:w-auto">
-              <Button
-                variant="outline"
-                onClick={() => setShowQuestionBank(true)}
-                iconName="Database"
-                iconPosition="left"
-                className="w-full sm:w-auto"
-              >
-                Question Bank
-              </Button>
               <Button
                 variant="outline"
                 onClick={() => setShowPreview(true)}
@@ -525,6 +602,14 @@ const ExamCreationManagement = () => {
             </button>
           </div>
 
+          {/* Show publish error if any */}
+          {publishError && (
+            <div className="mb-4 p-3 rounded bg-destructive/10 text-destructive border border-destructive flex items-center">
+              <Icon name="AlertTriangle" size={20} className="mr-2" />
+              {publishError}
+            </div>
+          )}
+
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
             {activeView === 'configuration' && (
               <>
@@ -534,11 +619,11 @@ const ExamCreationManagement = () => {
                     examData={examData}
                     onExamDataChange={setExamData}
                     onSaveExam={handleSaveExam}
-                    onSaveDraft={handleSaveDraft} // <-- Add this prop
                     onPublishExam={handlePublishExam}
                     isLoading={isLoading}
                     questions={questions}
                     setQuestions={setQuestions}
+                    onAddQuestion={handleAddQuestion} // <-- Pass this prop
                   />
                 </div>
 
@@ -582,7 +667,7 @@ const ExamCreationManagement = () => {
                   onQuestionsChange={setQuestions}
                   onAddQuestion={handleAddQuestion}
                   onDeleteQuestion={handleDeleteQuestion}
-                  onImportQuestions={() => setShowQuestionBank(true)}
+                  onImportQuestions={handleImportQuestions}
                 />
               </div>
             )}
@@ -964,11 +1049,6 @@ const ExamCreationManagement = () => {
           onClose={() => setShowQuestionBank(false)}
           onImportQuestions={handleImportQuestions}
         />
-      )}
-      {draftMsg && (
-        <div className="mb-4 px-4 py-2 rounded bg-green-100 text-green-800 font-semibold shadow">
-          {draftMsg}
-        </div>
       )}
     </div>
   );

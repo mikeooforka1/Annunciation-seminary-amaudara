@@ -191,9 +191,10 @@ const QuestionBuilder = ({
                         variant="ghost"
                         size="icon"
                         onClick={() => removeOption(index)}
-                        className="hover:bg-muted"
+                        className="icon-delete-btn ml-1"
+                        aria-label="Delete Option"
                       >
-                        <RiDeleteBin6Line size={18} color="black" />
+                        <RiDeleteBin6Line size={20} />
                       </Button>
                     )}
                   </div>
@@ -349,21 +350,9 @@ const QuestionBuilder = ({
           <h2 className="font-heading font-semibold text-lg text-foreground">
             Question Builder
           </h2>
-          <div className="flex flex-col sm:flex-row gap-2 w-full sm:w-auto">
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={onImportQuestions}
-              iconName="Upload"
-              iconPosition="left"
-              className="w-full sm:w-auto"
-            >
-              Import
-            </Button>
-            <span className="text-sm text-muted-foreground self-center sm:self-auto">
-              {questions?.length} questions
-            </span>
-          </div>
+          <span className="text-sm text-muted-foreground self-center sm:self-auto">
+            {questions?.length} questions
+          </span>
         </div>
       </div>
       {/* Question Type Tabs */}

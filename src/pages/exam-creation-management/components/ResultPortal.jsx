@@ -33,14 +33,10 @@ const ResultPortal = () => {
     const [resultsPushed, setResultsPushed] = useState({});
     const [showPushConfirm, setShowPushConfirm] = useState(false);
     const [pendingPushStudentId, setPendingPushStudentId] = useState(null);
+    const [dirtyStudents, setDirtyStudents] = useState({}); // <-- New state for tracking dirty students
 
 
     function buildSaveAllPayload(studentId) {
-  // You may need to adjust these variable names if your state is different
-  // This assumes you have access to results, caScores, overall, subjects, teacherData, selectedTerm
-  // If you define this inside the component, you can access them directly
-
-  // Example for inside the component:
   return {
     studentId,
     teacherId: teacherData?._id,
@@ -48,8 +44,8 @@ const ResultPortal = () => {
     term: selectedTerm,
     subjects,
     caScores: caScores[studentId] || {},
-    results: results[studentId] || {},
-    overall: overall[studentId] || {},
+    ...results[studentId],   // flatten subject fields
+    ...overall[studentId],   // flatten overall/meta fields
   };
 }
     // 1. Load subjects from localStorage on mount (per class/term)
@@ -70,34 +66,76 @@ const ResultPortal = () => {
     }, [subjects, teacherData, selectedTerm]);
 
     // 3. Load saved result data for selected student (including subjects)
-    useEffect(() => {
-      if (selectedStudent) {
-        const key = `resultPortal_${teacherData?.className}_${selectedTerm}_${selectedStudent._id}`;
-        const saved = localStorage.getItem(key);
-        if (saved) {
-          const parsed = JSON.parse(saved);
-          setResults(prev => ({
-            ...prev,
-            [selectedStudent._id]: parsed.results || {},
-          }));
-          setCaScores(prev => ({
-            ...prev,
-            [selectedStudent._id]: parsed.caScores || {},
-          }));
-          setOverall(prev => ({
-            ...prev,
-            [selectedStudent._id]: parsed.overall || {},
-          }));
-          // Merge subjects from localStorage for this student
-          if (Array.isArray(parsed.subjects) && parsed.subjects.length > 0) {
-            setSubjects(prev => {
-              const merged = Array.from(new Set([...prev, ...parsed.subjects]));
-              return merged;
+    // ...existing code...
+
+// Fetch and map student results when a student is selected
+useEffect(() => {
+  const fetchStudentResults = async () => {
+    if (
+      selectedStudent &&
+      teacherData?.className &&
+      selectedTerm &&
+      isValidObjectId(selectedStudent._id)
+    ) {
+      try {
+        // Fetch results for this student, class, and term
+        const res = await fetch(
+          `${API_BASE_URL}/api/results/student/${selectedStudent._id}/${selectedTerm}/${encodeURIComponent(teacherData.className)}`
+        );
+        if (!res.ok) throw new Error('Failed to fetch student results');
+        const data = await res.json();
+
+        // Map results to state
+        const subjectResults = {};
+        const overallResults = {};
+        const caScoresResults = {};
+
+        data.forEach(result => {
+          if (result.subject === 'Overall') {
+            overallResults[selectedStudent._id] = { ...result };
+          } else if (result.subject && result.subject.endsWith('C/A')) {
+            // CA scores
+            const subjectName = result.subject.replace(' C/A', '');
+            caScoresResults[selectedStudent._id] = {
+              ...(caScoresResults[selectedStudent._id] || {}),
+              [subjectName]: result.score
+            };
+          } else if (result.subject) {
+            // Subject results
+            Object.keys(result).forEach(key => {
+              subjectResults[selectedStudent._id] = {
+                ...(subjectResults[selectedStudent._id] || {}),
+                [`${result.subject}_${key}`]: result[key]
+              };
             });
           }
-        }
+        });
+
+        setResults(prev => ({
+          ...prev,
+          ...subjectResults
+        }));
+        setOverall(prev => ({
+          ...prev,
+          ...overallResults
+        }));
+        setCaScores(prev => ({
+          ...prev,
+          ...caScoresResults
+        }));
+      } catch (err) {
+        // If error, clear fields for this student
+        setResults(prev => ({ ...prev, [selectedStudent._id]: {} }));
+        setOverall(prev => ({ ...prev, [selectedStudent._id]: {} }));
+        setCaScores(prev => ({ ...prev, [selectedStudent._id]: {} }));
       }
-    }, [selectedStudent, teacherData, selectedTerm]);
+    }
+  };
+  fetchStudentResults();
+  // eslint-disable-next-line
+}, [selectedStudent, teacherData, selectedTerm]);
+
+// ...existing code...
 
     // 4. Save result data for selected student to localStorage (including subjects)
     useEffect(() => {
@@ -120,35 +158,52 @@ const ResultPortal = () => {
         if (stored) setTeacherData(JSON.parse(stored));
     }, []);
 
-    // Fetch all students registered under this class (not just those who took the exam)
-    useEffect(() => {
+    // Fetch all students registered under this class and term
+useEffect(() => {
+    const fetchStudents = async () => {
+        setIsLoadingStudents(true);
+        setStudents([]);
         if (teacherData?.className && selectedTerm) {
-            setIsLoadingStudents(true);
-            fetch(`${API_BASE_URL}/api/user/class/${encodeURIComponent(teacherData.className)}/${encodeURIComponent(selectedTerm)}/students`, {
-                credentials: 'include'
-            })
-                .then(res => res.json())
-                .then(data => setStudents(Array.isArray(data) ? data : []))
-                .catch(() => setStudents([]))
-                .finally(() => setIsLoadingStudents(false));
+            try {
+                // Use the backend route: /api/user/class/:className/:term/students
+                const res = await fetch(
+                    `${API_BASE_URL}/api/user/class/${encodeURIComponent(teacherData.className)}/${selectedTerm}/students`
+                );
+                if (!res.ok) throw new Error('Failed to fetch students');
+                const data = await res.json();
+                setStudents(Array.isArray(data) ? data : []);
+            } catch (err) {
+                setStudents([]);
+            }
         }
-    }, [teacherData, selectedTerm]);
+        setIsLoadingStudents(false);
+    };
+    fetchStudents();
+}, [teacherData, selectedTerm]);
 
     // Fetch teacher's results for the class and term
     useEffect(() => {
         if (teacherData?.className && selectedTerm) {
             setIsLoadingResults(true);
+            console.log('Fetching results for class:', teacherData.className, 'term:', selectedTerm);
             fetch(`${API_BASE_URL}/api/results/class/${encodeURIComponent(teacherData.className)}/${encodeURIComponent(selectedTerm)}`, {
                 credentials: 'include'
             })
-                .then(res => res.json())
+                .then(res => {
+                    console.log('Fetch response status:', res.status);
+                    return res.json();
+                })
                 .then(data => {
+                    console.log('Fetched data:', data);
                     setTeacherResults(Array.isArray(data) ? data : []);
                     // Merge previous state to preserve input
                     const newResults = { ...results };
                     const newCaScores = { ...caScores };
                     const newOverall = { ...overall };
                     students.forEach(student => {
+                      console.log('Mapping for student:', student._id, student.name);
+                      const studentData = data.filter(r => String(r.studentId) === String(student._id));
+                      console.log('Student data:', studentData);
                       newResults[student._id] = { ...(results[student._id] || {}) };
                       newCaScores[student._id] = { ...(caScores[student._id] || {}) };
                       subjects.forEach(subject => {
@@ -156,19 +211,34 @@ const ResultPortal = () => {
                         const foundResults = data.filter(
                           r => String(r.studentId) === String(student._id) && r.subject === subject
                         );
+                        console.log('Found results for subject:', subject, foundResults);
                         if (foundResults.length > 0) {
                           // Set all fields from backend for this subject
                           const r = foundResults[0];
+                          const fieldMap = {
+                            '_project': 'projectScore',
+                            '_cat1': 'firstCatScore',
+                            '_cat2': 'secondCatScore',
+                            '_exam': 'examScore',
+                            '_maxScore': 'maxScore',
+                            '_minScore': 'minScore',
+                            '_grade': 'grade',
+                            '_remark': 'remark',
+                            'overallScore': 'overallScore' // <-- add this line if you use fieldMap for mapping
+                          };
                           [
-                            '_project', '_cat1', '_cat2', '_exam', '_maxScore', '_minScore', '_grade', '_remark'
+                            '_project', '_cat1', '_cat2', '_exam', '_maxScore', '_minScore', '_grade', '_remark', 'overallScore'
                           ].forEach(suffix => {
-                            if (r[subject + suffix] !== undefined) {
-                              newResults[student._id][subject + suffix] = r[subject + suffix];
+                            const backendField = fieldMap[suffix];
+                            if (r[backendField] !== undefined) {
+                              newResults[student._id][subject + suffix] = r[backendField];
+                              console.log('Set', subject + suffix, 'to', r[backendField]);
                             }
                           });
                           // Also set score if present
                           if (r.score !== undefined) {
                             newResults[student._id][subject] = r.score;
+                            console.log('Set', subject, 'to', r.score);
                           }
                         }
                         // C/A scores
@@ -177,6 +247,7 @@ const ResultPortal = () => {
                         );
                         if (foundCA) {
                           newCaScores[student._id][subject] = foundCA.score;
+                          console.log('Set CA for', subject, 'to', foundCA.score);
                         }
                       });
                       // Overall
@@ -184,18 +255,22 @@ const ResultPortal = () => {
                         r => String(r.studentId) === String(student._id) && r.subject === 'Overall'
                       );
                       if (foundOverall) {
+                        console.log('Found overall:', foundOverall);
                         newOverall[student._id] = {
                           ...(overall[student._id] || {}),
-                          overallScore: foundOverall.score,
+                          overallScore: foundOverall.overallScore || foundOverall.score,
                           position: foundOverall.remarks?.replace('Position:', '').trim() || ''
                         };
+                        console.log('Set overall for student:', student._id, newOverall[student._id]);
                       }
                     });
+                    console.log('Final newResults:', newResults);
                     setResults(newResults);
                     setCaScores(newCaScores);
                     setOverall(newOverall);
                 })
-                .catch(() => {
+                .catch(err => {
+                    console.log('Error fetching results:', err);
                     setTeacherResults([]);
                     // Do NOT reset results, caScores, or overall here!
                 })
@@ -205,49 +280,95 @@ const ResultPortal = () => {
 
     // Map fetched results to local state
     useEffect(() => {
-        if (teacherResults.length && students.length && subjects.length) {
-            // Merge previous state to preserve input
-            const newResults = { ...results };
-            const newCaScores = { ...caScores };
-            students.forEach(student => {
-                newResults[student._id] = { ...(results[student._id] || {}) };
-                newCaScores[student._id] = { ...(caScores[student._id] || {}) };
-                subjects.forEach(subject => {
-                    // Only update if found in teacherResults, otherwise preserve previous value
-                    const foundExam = teacherResults.find(
-                        r => String(r.studentId) === String(student._id) && r.subject === subject
-                    );
-                    if (foundExam) {
+    if (teacherResults.length && students.length && subjects.length) {
+        // Merge previous state to preserve input
+        const newResults = { ...results };
+        const newCaScores = { ...caScores };
+        students.forEach(student => {
+            newResults[student._id] = { ...(results[student._id] || {}) };
+            newCaScores[student._id] = { ...(caScores[student._id] || {}) };
+            subjects.forEach(subject => {
+                // Only update if found in teacherResults, otherwise preserve previous value
+                const foundExam = teacherResults.find(
+                    r => String(r.studentId) === String(student._id) && r.subject === subject
+                );
+                if (foundExam) {
+                    // Map subject fields
+                    [
+                        '_project',
+                        '_cat1',
+                        '_cat2',
+                        '_exam',
+                        '_maxScore',
+                        '_minScore',
+                        '_grade',
+                        '_remark',
+                        '_overallScore'
+                    ].forEach(suffix => {
+                        const key = `${subject}${suffix}`;
+                        if (foundExam[suffix.replace('_', '')] !== undefined) {
+                            newResults[student._id][key] = foundExam[suffix.replace('_', '')];
+                        }
+                    });
+                    // Main subject score (total)
+                    if (foundExam.score !== undefined) {
                         newResults[student._id][subject] = foundExam.score;
                     }
-                    const foundCA = teacherResults.find(
-                        r => r.studentId?.toString() === student._id && r.subject === `${subject} C/A`
-                    );
-                    if (foundCA) {
-                        newCaScores[student._id][subject] = foundCA.score;
-                    }
-                });
-            });
-            setResults(newResults);
-            setCaScores(newCaScores);
-
-            // Merge overall state
-            const newOverall = { ...overall };
-            students.forEach(student => {
-                const found = teacherResults.find(
-                    r => r.studentId?.toString() === student._id && r.subject === 'Overall'
+                }
+                const foundCA = teacherResults.find(
+                    r => r.studentId?.toString() === student._id && r.subject === `${subject} C/A`
                 );
-                if (found) {
-                    newOverall[student._id] = {
-                        ...(overall[student._id] || {}),
-                        overallScore: found.score,
-                        position: found.remarks?.replace('Position:', '').trim() || ''
-                    };
+                if (foundCA && foundCA.score !== undefined) {
+                    newCaScores[student._id][subject] = foundCA.score;
                 }
             });
-            setOverall(newOverall);
-        }
-    }, [teacherResults, students, subjects]);
+
+            // --- Add this block to map key rating and meta fields ---
+            const foundMeta = teacherResults.find(
+                r => String(r.studentId) === String(student._id) && r.subject === 'Overall'
+            );
+            if (foundMeta) {
+                [
+                    'handwriting', 'punctuality', 'initiative', 'obedience', 'honesty',
+                    'neatness', 'attentiveness', 'respect', 'attitude', 'creativity',
+                    'teacherComment', 'signatureDate', 'headTeacherRemark', 'academicYear',
+                    'schoolOpened', 'present', 'absent', 'totalScore', 'projectDefence',
+                    'average', 'nextTerm', 'overallScore'
+                ].forEach(field => {
+                    if (foundMeta[field] !== undefined) {
+                        newResults[student._id][field] = foundMeta[field];
+                    }
+                });
+                // --- Ensure overallScore is set in results for UI binding ---
+                if (foundMeta.score !== undefined) {
+                    newResults[student._id].overallScore = foundMeta.score;
+                }
+            }
+            // --- End block ---
+        });
+        setResults(newResults);
+        setCaScores(newCaScores);
+
+        // Merge overall state
+        const newOverall = { ...overall };
+        students.forEach(student => {
+            const found = teacherResults.find(
+                r => r.studentId?.toString() === student._id && r.subject === 'Overall'
+            );
+            if (found) {
+                newOverall[student._id] = {
+                    ...(overall[student._id] || {}),
+                    overallScore: found.score,
+                    position: found.remarks?.replace('Position:', '').trim() || ''
+                };
+                // --- Ensure overallScore is also in results for UI binding ---
+                if (!newResults[student._id]) newResults[student._id] = {};
+                newResults[student._id].overallScore = found.score;
+            }
+        });
+        setOverall(newOverall);
+    }
+}, [teacherResults, students, subjects]);
 
     // --- ADDED: Track pushed status for each student ---
     useEffect(() => {
@@ -300,7 +421,8 @@ const ResultPortal = () => {
     `${subject}_maxScore`,
     `${subject}_minScore`,
     `${subject}_grade`,
-    `${subject}_remark`
+    `${subject}_remark`,
+    `${subject}_overallScore`
   ];
   return subjectFields.some(
     field => results?.[studentId]?.[field] !== undefined && results?.[studentId]?.[field] !== ''
@@ -388,7 +510,8 @@ const ResultPortal = () => {
           `${subject}_maxScore`,
           `${subject}_minScore`,
           `${subject}_grade`,
-          `${subject}_remark`
+          `${subject}_remark`,
+          `${subject}_overallScore`
         ].forEach(field => {
           if (!(field in updatedResults[student._id])) {
             updatedResults[student._id][field] = '';
@@ -423,6 +546,7 @@ const ResultPortal = () => {
 
     // Handle result input change
     const handleResultChange = (studentId, field, value) => {
+      setDirtyStudents(prev => ({ ...prev, [studentId]: true })); // <-- Set dirty flag
       setResults(prev => ({
         ...prev,
         [studentId]: {
@@ -500,24 +624,29 @@ const ResultPortal = () => {
                 // Save overall score and position
                 const overallScore = overall?.[student._id]?.overallScore;
                 const position = overall?.[student._id]?.position;
-                if (overallScore || position) {
-                    const res = await fetch(`${API_BASE_URL}/api/results/set`, {
-                        method: 'POST',
-                        headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify({
-                            studentId: student._id,
-                            teacherId: teacherData._id,
-                            className: teacherData.className,
-                            term: selectedTerm,
-                            subject: 'Overall',
-                            score: Number(overallScore) || 0,
-                            remarks: `Position: ${position || ''}`
-                        })
-                    });
-                    if (!res.ok) {
-                        studentSuccess = false;
-                        allSuccess = false;
-                    }
+                if (
+                  overallScore !== undefined &&
+                  overallScore !== null &&
+                  overallScore !== '' // Allow 0
+                ) {
+                  const res = await fetch(`${API_BASE_URL}/api/results/set`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                      studentId: student._id,
+                      teacherId: teacherData._id,
+                      className: teacherData.className,
+                      term: selectedTerm,
+                      subject: 'Overall',
+                      score: Number(overallScore),
+                      remarks: `Position: ${position || ''}`,
+                      isPush: true
+                    })
+                  });
+                  if (!res.ok) {
+                    studentSuccess = false;
+                    allSuccess = false;
+                  }
                 }
                 if (!studentSuccess) {
                     failedStudents.push(student.name || student._id);
@@ -547,6 +676,17 @@ const ResultPortal = () => {
   setErrorMsg('');
   let success = true;
   try {
+    // NEW: Save all fields first (ensures detailed data is in backend before pushing)
+    const savePayload = buildSaveAllPayload(studentId);
+    const saveRes = await fetch(`${API_BASE_URL}/api/results/save-all`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(savePayload),
+    });
+    if (!saveRes.ok) {
+      throw new Error('Failed to save data before pushing');
+    }
+
     for (const subject of subjects) {
       const score = results?.[studentId]?.[subject];
       if (score !== undefined && score !== '') {
@@ -608,6 +748,18 @@ const ResultPortal = () => {
     if (success) {
       setResultsPushed(prev => ({ ...prev, [studentId]: true }));
       setSuccessMsg('Student result has been successfully pushed.');
+      // Update localStorage with current state after push (retains data even if pushed)
+      localStorage.setItem(
+        `resultPortal_${teacherData.className}_${selectedTerm}_${studentId}`,
+        JSON.stringify({
+          results: results[studentId] || {},
+          caScores: caScores[studentId] || {},
+          overall: overall[studentId] || {},
+          subjects,
+        })
+      );
+      // Clear dirty flag
+      setDirtyStudents(prev => ({ ...prev, [studentId]: false }));
       setIsLoadingResults(true); // Show spinner while fetching
       fetch(`${API_BASE_URL}/api/results/class/${encodeURIComponent(teacherData.className)}/${encodeURIComponent(selectedTerm)}`, {
         credentials: 'include'
@@ -642,28 +794,23 @@ const ResultPortal = () => {
 };
 
     // Load saved result data for selected student
-    useEffect(() => {
-      if (selectedStudent) {
-        const key = `resultPortal_${teacherData?.className}_${selectedTerm}_${selectedStudent._id}`;
-        const saved = localStorage.getItem(key);
-        if (saved) {
-          const parsed = JSON.parse(saved);
-          setResults(prev => ({
-            ...prev,
-            [selectedStudent._id]: parsed.results || {},
-          }));
-          setCaScores(prev => ({
-            ...prev,
-            [selectedStudent._id]: parsed.caScores || {},
-          }));
-          setOverall(prev => ({
-            ...prev,
-            [selectedStudent._id]: parsed.overall || {},
-          }));
-        }
+   // 3. Load subjects from localStorage for selected student
+useEffect(() => {
+  if (selectedStudent) {
+    const key = `resultPortal_${teacherData?.className}_${selectedTerm}_${selectedStudent._id}`;
+    const saved = localStorage.getItem(key);
+    if (saved) {
+      const parsed = JSON.parse(saved);
+      // Merge subjects from localStorage for this student
+      if (Array.isArray(parsed.subjects) && parsed.subjects.length > 0) {
+        setSubjects(prev => {
+          const merged = Array.from(new Set([...prev, ...parsed.subjects]));
+          return merged;
+        });
       }
-      // Optionally, clear on class/term change
-    }, [selectedStudent, teacherData, selectedTerm]);
+    }
+  }
+}, [selectedStudent, teacherData, selectedTerm]);
 
     // Save result data for selected student to localStorage
     useEffect(() => {
@@ -712,6 +859,121 @@ const ResultPortal = () => {
         return () => clearTimeout(timeout);
       }
     }, [results, caScores, overall, subjects, selectedStudent, teacherData, selectedTerm]);
+
+    // Add this helper function near the top of your file
+function isValidObjectId(id) {
+  return typeof id === 'string' && id.length === 24 && /^[a-fA-F0-9]+$/.test(id);
+}
+
+// --- REPLACE THIS BLOCK WITH THE NEW UPDATE ---
+useEffect(() => {
+  if (
+    selectedStudent &&
+    teacherData?.className &&
+    selectedTerm &&
+    isValidObjectId(selectedStudent._id)
+  ) {
+    fetch(
+      `${API_BASE_URL}/api/results/student/${selectedStudent._id}/all?className=${teacherData.className}&term=${selectedTerm}`
+    )
+      .then(res => res.json())
+      .then(backendData => {
+        if (!backendData || backendData.length === 0) return;
+
+        // Prepare new state objects, but always merge with previous state
+        const prevResults = results[selectedStudent._id] || {};
+        const prevOverall = overall[selectedStudent._id] || {};
+        const prevCaScores = caScores[selectedStudent._id] || {};
+
+        const newResults = { ...prevResults };
+        const newOverall = { ...prevOverall };
+        const newCaScores = { ...prevCaScores };
+
+        backendData.forEach(item => {
+          // Subject fields
+          if (item.subject && item.subject !== 'Overall') {
+            // Map all subject fields
+            [
+              '_project',
+              '_cat1',
+              '_cat2',
+              '_exam',
+              '_maxScore',
+              '_minScore',
+              '_grade',
+              '_remark',
+              '_overallScore'
+            ].forEach(suffix => {
+              const key = `${item.subject}${suffix}`;
+              if (item[suffix.replace('_', '')] !== undefined) {
+                newResults[key] = item[suffix.replace('_', '')];
+              }
+            });
+            // Also map the main subject score (total)
+            if (item.score !== undefined) {
+              newResults[item.subject] = item.score;
+            }
+            // CA scores
+            if (item.subject.endsWith('C/A') && item.score !== undefined) {
+              const caSubject = item.subject.replace(' C/A', '');
+              newCaScores[caSubject] = item.score;
+            }
+          }
+
+          // Key Rating fields
+          [
+            'handwriting', 'punctuality', 'initiative', 'obedience', 'honesty',
+            'neatness', 'attentiveness', 'respect', 'attitude', 'creativity'
+          ].forEach(field => {
+            if (item[field] !== undefined) {
+              newResults[field] = item[field];
+            }
+          });
+
+          // Meta fields
+          if (item.teacherComment !== undefined) newResults.teacherComment = item.teacherComment;
+          if (item.signatureDate !== undefined) newResults.signatureDate = item.signatureDate;
+          if (item.headTeacherRemark !== undefined) newResults.headTeacherRemark = item.headTeacherRemark;
+          if (item.academicYear !== undefined) newResults.academicYear = item.academicYear;
+          if (item.schoolOpened !== undefined) newResults.schoolOpened = item.schoolOpened;
+          if (item.present !== undefined) newResults.present = item.present;
+          if (item.absent !== undefined) newResults.absent = item.absent;
+          if (item.totalScore !== undefined) newResults.totalScore = item.totalScore;
+          if (item.projectDefence !== undefined) newResults.projectDefence = item.projectDefence;
+          if (item.average !== undefined) newResults.average = item.average;
+          if (item.nextTerm !== undefined) newResults.nextTerm = item.nextTerm;
+
+          // Over-all Score and Position
+          if (item.subject === 'Overall') {
+            if (item.score !== undefined) {
+              newOverall.overallScore = item.score;
+              // --- Also set in results for UI binding ---
+              newResults.overallScore = item.score;
+            }
+            if (item.remarks && item.remarks.includes('Position:')) {
+              newOverall.position = item.remarks.replace('Position:', '').trim();
+            }
+          }
+        });
+
+        // Only update if we have at least one result for this student
+        if (Object.keys(newResults).length > 0) {
+          setResults(prev => ({ ...prev, [selectedStudent._id]: newResults }));
+        }
+        if (Object.keys(newOverall).length > 0) {
+          setOverall(prev => ({ ...prev, [selectedStudent._id]: newOverall }));
+        }
+        if (Object.keys(newCaScores).length > 0) {
+          setCaScores(prev => ({ ...prev, [selectedStudent._id]: newCaScores }));
+        }
+      })
+      .catch(err => {
+        console.error('[ERROR] Error fetching backend data for student:', err);
+        // Do not overwrite state on error
+      });
+  }
+}, [selectedStudent, teacherData, selectedTerm, subjects]);
+// --- END REPLACE ---
 
     // Term selection before entering main page
     if (!selectedTerm) {
@@ -1152,6 +1414,18 @@ const ResultPortal = () => {
                           const data = await res.json();
                           if (data.success) {
                             setSuccessMsg('Saved!');
+                            // Update localStorage with current state after save
+                            localStorage.setItem(
+                              `resultPortal_${teacherData.className}_${selectedTerm}_${selectedStudent._id}`,
+                              JSON.stringify({
+                                results: results[selectedStudent._id] || {},
+                                caScores: caScores[selectedStudent._id] || {},
+                                overall: overall[selectedStudent._id] || {},
+                                subjects,
+                              })
+                            );
+                            // Clear dirty flag to allow future fetches
+                            setDirtyStudents(prev => ({ ...prev, [selectedStudent._id]: false }));
                           } else {
                             setErrorMsg('Failed to save result. Please try again.');
                           }
@@ -1254,18 +1528,24 @@ const ResultPortal = () => {
                     ) : (
                         <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4">
                             {students.map(student => (
-                                <div
-                                    key={student._id}
-                                    className="bg-card border border-border rounded-lg shadow p-4 flex flex-col items-center cursor-pointer hover:bg-primary/10 transition"
-                                    onClick={() => setSelectedStudent(student)}
-                                >
-                                    <span className="w-12 h-12 rounded-full bg-primary flex items-center justify-center text-xl font-bold text-white border-2 border-primary shadow mb-2">
-                                        {student.name ? student.name.charAt(0).toUpperCase() : "S"}
-                                    </span>
-                                    <span className="font-body font-medium text-foreground">{student.name}</span>
-                                    <span className="text-xs text-muted-foreground">{student.className}</span>
-                                </div>
-                            ))}
+  <div
+    key={student._id}
+    className="relative bg-card border border-border rounded-lg shadow p-4 flex flex-col items-center cursor-pointer hover:bg-primary/10 transition"
+    onClick={() => setSelectedStudent(student)}
+  >
+    {/* Pushed badge */}
+    {resultsPushed[student._id] && (
+      <span className="absolute top-2 left-2 bg-green-600 text-white text-xs font-bold px-2 py-1 rounded shadow z-10">
+        Pushed
+      </span>
+    )}
+    <span className="w-12 h-12 rounded-full bg-primary flex items-center justify-center text-xl font-bold text-white border-2 border-primary shadow mb-2">
+      {student.name ? student.name.charAt(0).toUpperCase() : "S"}
+    </span>
+    <span className="font-body font-medium text-foreground">{student.name}</span>
+    <span className="text-xs text-muted-foreground">{student.className}</span>
+  </div>
+))}
                         </div>
                     )}
                 </div>

@@ -263,6 +263,37 @@ const LandingPage = () => {
         </div>
       </section>
 
+      {/* Rector's Welcome Address Section */}
+      <section className="py-16 bg-card/80 border-y border-border">
+        <div className="container mx-auto px-4 lg:px-6 flex flex-col md:flex-row items-center gap-10">
+          {/* Rector's Image */}
+          <div className="flex-shrink-0 w-full md:w-64 flex justify-center mb-8 md:mb-0">
+            <div className="w-48 h-48 rounded-full overflow-hidden border-4 border-primary/30 shadow-lg bg-white flex items-center justify-center">
+              <Image
+                src="/assets/images/rector-pic.WebP"
+                alt="Very Rev. Fr. Chidi Obilor"
+                className="w-full h-full object-cover object-top"
+              />
+            </div>
+          </div>
+          {/* Welcome Address Content */}
+          <div className="flex-1">
+            <h2 className="text-2xl lg:text-3xl font-heading font-bold text-primary mb-4">
+              Welcome Address from the Rector
+            </h2>
+            <p className="text-lg text-muted-foreground mb-4 font-body">
+              Dear Parents, Relatives, and Friends,<br />
+              On behalf of the entire Annunciation Seminary Amaudara community, I warmly welcome you to our cherished institution—a place where faith, knowledge, and character are nurtured in every young man entrusted to our care.
+            </p>
+            <p className="text-base text-foreground mb-4 font-body">
+              At Annunciation Seminary, we believe that true formation is a partnership between the seminary, families, and the wider community. Your support, prayers, and encouragement are invaluable as we guide our seminarians on their journey of spiritual, academic, and human growth.
+            </p>
+            {/* Collapsible full address */}
+            <WelcomeAddressFull />
+          </div>
+        </div>
+      </section>
+
       {/* Grotto and Main Gate Section (moved and reordered) */}
       <section className="py-12 bg-muted/10">
         <div className="container mx-auto px-0 lg:px-0">
@@ -274,7 +305,7 @@ const LandingPage = () => {
               transition={{ duration: 0.1 }}
               className="flex flex-col items-center"
             >
-              <div className="w-full max-w-lg rounded-2xl overflow-hidden shadow-xl border-4 border-primary/20 bg-white">
+              <div className="w-full max-w-lg rounded-2xl overflow-hidden shadow-xl border-4 border-primary/40 bg-white">
                 <Image
                   src="/assets/images/mary-grotto.jpg"
                   alt="Annunciation Seminary Grotto"
@@ -501,7 +532,7 @@ const LandingPage = () => {
                     className="w-full h-full object-cover object-top"
                   />
                 </div>
-                <Icon name="Award" size={36} className="text-primary mb-2" />
+                <Icon name="Award" size={56} className="text-primary mb-2" />
                 <h3 className="text-lg sm:text-xl font-heading font-bold text-primary mb-1">{formator.name}</h3>
                 <p className="text-sm sm:text-base font-semibold text-muted-foreground mb-2">{formator.title}</p>
                 <p className="text-xs sm:text-sm text-foreground mb-4">{formator.bio}</p>
@@ -513,6 +544,7 @@ const LandingPage = () => {
           </div>
         </div>
       </section>
+
       {/* Achievements Section */}
       <section className="py-20 bg-muted/30">
         <div className="container mx-auto px-4 lg:px-6">
@@ -986,3 +1018,45 @@ const LandingPage = () => {
 };
 
 export default LandingPage;
+
+function WelcomeAddressFull() {
+  const [showFull, setShowFull] = useState(false);
+  return (
+    <div>
+      {!showFull ? (
+        <>
+          <p className="text-base text-muted-foreground mb-4 font-body">
+            We invite you to be active partners in this mission, sharing in our vision to form future leaders for the Church and society. Together, let us create an environment where every seminarian can thrive, discover his calling, and become a beacon of hope and service.
+          </p>
+          <Button
+            variant="outline"
+            size="sm"
+            className="text-primary border-primary"
+            onClick={() => setShowFull(true)}
+          >
+            Read More
+          </Button>
+        </>
+      ) : (
+        <div className="mt-4">
+          <p className="text-base text-muted-foreground mb-4 font-body">
+            We invite you to be active partners in this mission, sharing in our vision to form future leaders for the Church and society. Together, let us create an environment where every seminarian can thrive, discover his calling, and become a beacon of hope and service.<br /><br />
+            Our doors are always open to you. We encourage you to visit, participate in our events, and engage with our formators and staff. Your presence and involvement enrich our seminary life and inspire our seminarians to reach greater heights.<br /><br />
+            May God bless you abundantly for your trust and commitment. We look forward to a fruitful partnership and a rewarding experience for your sons and all members of our seminary family.<br /><br />
+            With gratitude and prayers,<br />
+            <span className="font-heading font-bold text-primary">Very Rev. Fr. Chidi Obilor</span><br />
+            Rector, Annunciation Seminary Amaudara
+          </p>
+          <Button
+            variant="outline"
+            size="sm"
+            className="text-primary border-primary"
+            onClick={() => setShowFull(false)}
+          >
+            Show Less
+          </Button>
+        </div>
+      )}
+    </div>
+  );
+}

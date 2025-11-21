@@ -168,14 +168,19 @@ const AboutPage = () => {
     {
       src: '/assets/images/student-hostel.jpg',
       alt: 'Librarian',
-      caption: 'Student Hostel'
+      caption: 'Jubilee Hostel'
+    },
+    {
+      src: '/assets/images/PTA dormitory.jpg', // <-- PTA Dormitory image
+      alt: 'PTA Dormitory',
+      caption: 'PTA Dormitory'
     },
     {
       src: '/assets/images/administrative-complex.jpg',
       alt: 'Librarian',
       caption: 'Administrative Complex'
     },
-    {      src: '/assets/images/adminitrative-complex2.jpg',
+    {
       src: '/assets/images/administrative-complex2.jpg',
       alt: 'Librarian',
       caption: 'Administrative Complex View '
@@ -194,6 +199,16 @@ const AboutPage = () => {
       src: '/assets/images/basketball-court.jpg',
       alt: 'Farm Manager',
       caption: 'Basketball Court'
+    },
+    {
+      src: '/assets/images/lawn-tennis.jpg', // <-- Lawn Tennis image
+      alt: 'Lawn Tennis Court',
+      caption: 'Lawn Tennis Court'
+    },
+    {
+      src: '/assets/images/main-football-field.jpg', // <-- Main Football Field image
+      alt: 'Football Field',
+      caption: 'Main Football Field'
     },
     {
       src: '/assets/images/mary-grotto.jpg',
@@ -244,10 +259,10 @@ const AboutPage = () => {
                 About
               </button>
               <button 
-                onClick={() => handleNavigation('/admissions')}
+                onClick={() => handleNavigation('/announcements')}
                 className="font-body text-sm text-foreground hover:text-primary transition-colors"
               >
-                Admissions
+                Announcements & Updates
               </button>
               <button 
                 onClick={() => handleNavigation('/contact')}
@@ -293,10 +308,10 @@ const AboutPage = () => {
                   About
                 </button>
                 <button 
-                  onClick={() => handleNavigation('/admissions')}
+                  onClick={() => handleNavigation('/announcements')}
                   className="text-left font-body text-sm text-foreground hover:text-primary px-3 py-2 rounded-lg hover:bg-primary/10"
                 >
-                  Admissions
+                  Announcements & Updates
                 </button>
                 <button 
                   onClick={() => handleNavigation('/contact')}
@@ -424,6 +439,53 @@ const AboutPage = () => {
               </div>
             ))}
           </motion.div>
+        </div>
+      </section>
+      {/* Past Rectors Section */}
+      <section className="py-16 bg-card/60 border-y border-border">
+        <div className="container mx-auto px-4 lg:px-6">
+          <div className="text-center mb-10">
+            <h2 className="text-3xl lg:text-4xl font-heading font-bold text-primary mb-4">
+              Past Rectors of Annunciation Seminary
+            </h2>
+            <p className="text-lg text-muted-foreground max-w-2xl mx-auto">
+              Honoring the dedicated leaders who have shaped our seminary’s legacy.
+            </p>
+          </div>
+          <div className="grid grid-cols-2 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-6">
+            {[
+
+              { name: "Fr. Luke Odor", years: "1984–1986" },
+              { name: "Msgr. Raph Nwosu", years: "1986–1990" },
+              { name: "Fr. Peter Nwaogu", years: "1990–1991" },
+              { name: "Msgr. Innocent Ajuonu", years: "1991–1993" },
+              { name: "Fr. Emmanuel Nwaokonko", years: "1993–1994" },
+              { name: "Fr. Cajetan Uchendu", years: "1994–1995" },
+              { name: "Fr. Emeka Okite", years: "1995–1997" },
+              { name: "Fr. Callistus Onwere", years: "1997–2002" },
+              { name: "Fr. Augustine Nwankpa", years: "2002–2005" },
+              { name: "Fr. Jephthah Asuoha", years: "2005–2007" },
+              { name: "Fr. Kevin Nwosu", years: "2007–2012" },
+              { name: "Fr. Cyril Ukaforo", years: "2012–2016" },
+              { name: "Fr. Francis Onuoha", years: "2016–2021" },
+              { name: "Fr. Chidi Obilor", years: "2021–Present" },
+            ].map((rector, idx) => (
+              <div
+                key={rector.name}
+                className="bg-white/90 border border-primary/20 rounded-xl shadow-lg p-6 flex flex-col items-center justify-center transition hover:shadow-2xl"
+              >
+                <div className="w-12 h-12 mb-3 rounded-full bg-primary/10 flex items-center justify-center">
+                  <span className="font-heading font-bold text-primary text-xl">{idx + 1}</span>
+                </div>
+                <h3 className="text-lg font-heading font-semibold text-foreground mb-1 text-center">
+                  {rector.name}
+                </h3>
+                <p className="text-sm text-muted-foreground font-body text-center">
+                  {rector.years}
+                </p>
+              </div>
+            ))}
+          </div>
         </div>
       </section>
       {/* --- INSERTED: Seminary History Section --- */}
@@ -740,6 +802,11 @@ const AboutPage = () => {
                   alt="Basketball Court"
                   className="h-20 object-cover rounded-lg w-full"
                 />
+                <Image
+                  src="/assets/images/lawn-tennis.jpg"
+                  alt="Lawn Tennis Court"
+                  className="h-20 object-cover rounded-lg w-full"
+                />
               </div>
               <div className="flex items-center space-x-3 mb-2">
                 <div className="w-12 h-12 bg-primary/10 rounded-lg flex items-center justify-center flex-shrink-0">
@@ -750,7 +817,7 @@ const AboutPage = () => {
                 </h3>
               </div>
               <p className="text-muted-foreground font-body text-sm text-center">
-                Football fields, tennis, basketball, volleyball, badminton, and table tennis courts.
+                Football fields, lawn tennis, basketball, volleyball, badminton, and table tennis courts.
               </p>
             </motion.div>
             {/* Hostels */}
@@ -760,6 +827,11 @@ const AboutPage = () => {
               transition={{ duration: 0.1, delay: 0.6 }}
               className="bg-card border border-border rounded-xl p-6 hover:shadow-lg transition-shadow flex flex-col items-center"
             >
+              <Image
+                src="/assets/images/PTA dormitory.jpg"
+                alt="Hostels"
+                className="w-full h-40 object-cover rounded-lg mb-4"
+              />
               <Image
                 src="/assets/images/student-hostel.jpg"
                 alt="Hostels"
@@ -774,7 +846,7 @@ const AboutPage = () => {
                 </h3>
               </div>
               <p className="text-muted-foreground font-body text-sm text-center">
-                Comfortable and secure accommodation for seminarians.
+                Comfortable and secure accommodation for seminarians, including Jubilee Hostel and PTA Dormitory.
               </p>
             </motion.div>
             {/* Farm Complex */}

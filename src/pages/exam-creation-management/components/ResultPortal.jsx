@@ -290,6 +290,22 @@ const ResultPortal = () => {
         });
       }
     }, [teacherResults, students]);
+
+    function isSubjectFilled(studentId, subject) {
+  const subjectFields = [
+    `${subject}_project`,
+    `${subject}_cat1`,
+    `${subject}_cat2`,
+    `${subject}_exam`,
+    `${subject}_maxScore`,
+    `${subject}_minScore`,
+    `${subject}_grade`,
+    `${subject}_remark`
+  ];
+  return subjectFields.some(
+    field => results?.[studentId]?.[field] !== undefined && results?.[studentId]?.[field] !== ''
+  );
+}
     // --- END ADDED ---
 
     // Automatically update overall score and position when subject scores change, unless manually edited
@@ -363,10 +379,21 @@ const ResultPortal = () => {
       const updatedResults = { ...prevResults };
       students.forEach(student => {
         updatedResults[student._id] = { ...(prevResults[student._id] || {}) };
-        // Only add the new subject key, do not touch other fields
-        if (!(subject in updatedResults[student._id])) {
-          updatedResults[student._id][subject] = '';
-        }
+        // Initialize all expected fields for the new subject
+        [
+          `${subject}_project`,
+          `${subject}_cat1`,
+          `${subject}_cat2`,
+          `${subject}_exam`,
+          `${subject}_maxScore`,
+          `${subject}_minScore`,
+          `${subject}_grade`,
+          `${subject}_remark`
+        ].forEach(field => {
+          if (!(field in updatedResults[student._id])) {
+            updatedResults[student._id][field] = '';
+          }
+        });
       });
       return updatedResults;
     });
@@ -426,6 +453,7 @@ const ResultPortal = () => {
         setErrorMsg('');
         let allSuccess = true;
         let failedStudents = [];
+        let emptySubjects = [];
 
         try {
             for (const student of students) {
@@ -494,6 +522,11 @@ const ResultPortal = () => {
                 if (!studentSuccess) {
                     failedStudents.push(student.name || student._id);
                 }
+            }
+            if (emptySubjects.length > 0) {
+              setErrorMsg(`Please enter at least one field for: ${emptySubjects.join(', ')} before saving/pushing.`);
+              setIsSubmitting(false);
+              return;
             }
             if (allSuccess) {
                 setSuccessMsg('Results have been successfully pushed to students.');

@@ -30,6 +30,8 @@ const ProfilePage = () => {
   const [registrationData, setRegistrationData] = useState(defaultRegistrationData);
   const [editing, setEditing] = useState(false);
   const [showPhotoModal, setShowPhotoModal] = useState(false);
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState(""); // Add to state
 
   useEffect(() => {
     if (!userId) return;
@@ -83,6 +85,8 @@ const ProfilePage = () => {
 
   // Save profile to backend
   const handleSave = async () => {
+    setSaving(true);
+    setError("");
     try {
       const res = await fetch(`${API_BASE_URL}/api/profile/${userId}`, {
         method: "POST",
@@ -92,35 +96,55 @@ const ProfilePage = () => {
       if (res.ok) {
         localStorage.setItem('studentProfile', JSON.stringify(profile));
         setEditing(false);
+      } else {
+        const data = await res.json();
+        setError(data.error || "Failed to save profile.");
       }
     } catch (err) {
-      // Optionally show error
+      setError("Network error. Please try again.");
       setEditing(false);
+    } finally {
+      setSaving(false);
     }
   };
 
   return (
     <div className="max-w-2xl mx-auto bg-white rounded-lg shadow p-4 sm:p-6 mt-6 sm:mt-10">
       <div className="flex flex-col sm:flex-row items-center mb-6 gap-4 sm:gap-6">
-        <div className="relative group w-full sm:w-auto flex justify-center">
-          <img
-            src={profile.photo || "/assets/images/default_student.png"}
-            alt="Student"
-            className="w-24 h-24 sm:w-28 sm:h-28 rounded-full object-cover border cursor-pointer"
-            onClick={() => setShowPhotoModal(true)}
-            title="Click to view full photo"
-            style={{ transition: "box-shadow 0.2s" }}
-          />
-          {editing && (
-            <input
-              type="file"
-              name="photo"
-              accept="image/*"
-              className="absolute bottom-0 left-0 w-full opacity-0 cursor-pointer"
-              style={{ height: "100%" }}
-              onChange={handleChange}
-              title="Change photo"
+        <div className="flex flex-col items-center w-full sm:w-auto">
+          <div className="relative flex justify-center">
+            <img
+              src={profile.photo || "/assets/images/default_student.png"}
+              alt="Student"
+              className="w-24 h-24 sm:w-28 sm:h-28 rounded-full object-cover border cursor-pointer"
+              onClick={() => setShowPhotoModal(true)}
+              title="Click to view full photo"
+              style={{ transition: "box-shadow 0.2s" }}
             />
+            {/* Hidden file input for photo upload */}
+            {editing && (
+              <input
+                id="profile-photo-input"
+                type="file"
+                name="photo"
+                accept="image/*"
+                className="hidden"
+                onChange={handleChange}
+                title="Change photo"
+              />
+            )}
+          </div>
+          {editing && (
+            <button
+              type="button"
+              className="mt-2 bg-primary text-white rounded-full w-10 h-10 flex items-center justify-center shadow-lg border-2 border-white focus:outline-none focus:ring-2 focus:ring-primary transition"
+              onClick={() => document.getElementById('profile-photo-input').click()}
+              title="Add/Change Photo"
+              tabIndex={0}
+              style={{ zIndex: 2 }}
+            >
+              <span className="text-2xl leading-none">+</span>
+            </button>
           )}
         </div>
         <div className="text-center sm:text-left w-full">
@@ -223,13 +247,15 @@ const ProfilePage = () => {
           </div>
         </div>
       )}
+      {error && <div className="text-red-600 mb-2">{error}</div>}
       <div className="flex gap-4 mb-4">
         {editing ? (
           <button
             className="bg-primary text-white px-4 py-2 rounded font-semibold"
             onClick={handleSave}
+            disabled={saving}
           >
-            Save
+            {saving ? "Saving..." : "Save"}
           </button>
         ) : (
           <button
@@ -243,6 +269,7 @@ const ProfilePage = () => {
           <button
             className="bg-gray-200 px-4 py-2 rounded font-semibold"
             onClick={() => setEditing(false)}
+            disabled={saving}
           >
             Cancel
           </button>

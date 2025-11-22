@@ -12,6 +12,7 @@ const StudentDashboard = () => {
   const [studentData, setStudentData] = useState(null);
   const [showProfileModal, setShowProfileModal] = useState(false);
   const [profile, setProfile] = useState(null);
+  const [profileLoading, setProfileLoading] = useState(true);
   const navigate = useNavigate();
 
   // Map backend fields to dashboard fields (move this above useEffect)
@@ -90,48 +91,29 @@ const StudentDashboard = () => {
   }, [navigate]);
 
   useEffect(() => {
-    // Example: Fetch pending exams using API base URL from .env
-    if (studentData?.className && studentData?.term && studentData?._id) {
-      const API_BASE_URL = process.env.REACT_APP_API_BASE_URL;
-      fetch(
-        `${API_BASE_URL}/api/exams/categorized-exams?class=${encodeURIComponent(studentData.className)}&term=${encodeURIComponent(studentData.term)}&studentId=${studentData._id}`,
-        {
-          credentials: 'include', // <-- Send cookies/session with request
-        }
-      )
-        .then(res => res.json())
-        .then(data => {
-          // handle data (e.g
-        })
-        .catch(() => {
-          // handle error
-        });
-    }
-  }, [studentData]);
-
-  useEffect(() => {
-    // Get student ID from localStorage
-    const studentData = JSON.parse(localStorage.getItem("studentData") || "{}");
-    const userId = studentData._id;
-    if (!userId) return;
-
-    // Fetch profile from backend
+    // Fetch profile as soon as studentData is available
+    if (!studentData?._id) return;
+    setProfileLoading(true);
     const API_BASE_URL = process.env.REACT_APP_API_BASE_URL || "";
-    fetch(`${API_BASE_URL}/api/profile/${userId}`)
+    fetch(`${API_BASE_URL}/api/profile/${studentData._id}`)
       .then(res => res.ok ? res.json() : null)
       .then(data => {
         setProfile(data);
+        setProfileLoading(false);
+      })
+      .catch(() => {
+        setProfile(null);
+        setProfileLoading(false);
       });
-  }, []);
+  }, [studentData]);
 
   useEffect(() => {
+    if (profileLoading) return; // Don't check until profile is loaded
     // If profile is not loaded, show modal
     if (!profile) {
       setShowProfileModal(true);
-      console.log("Profile modal is showing because profile is not loaded yet.");
       return;
     }
-
     // List required fields (except name, which is read-only)
     const requiredFields = [
       { key: "email", value: profile.email },
@@ -142,20 +124,21 @@ const StudentDashboard = () => {
       { key: "gradeLevel", value: profile.gradeLevel },
       { key: "photo", value: profile.photo }
     ];
-
     // Find missing fields
     const missingFields = requiredFields.filter(field => !field.value || field.value === "").map(field => field.key);
-
     // Show modal if any field is missing or profile is empty
     const isProfileEmpty = Object.values(profile).every(val => !val || val === "");
     const isIncomplete = missingFields.length > 0 || isProfileEmpty;
-
     setShowProfileModal(isIncomplete);
+  }, [profile, profileLoading]);
 
-    if (isIncomplete) {
-      console.log("Profile modal is showing because these fields are missing or profile is empty:", missingFields);
-    }
-  }, [profile]);
+  if (profileLoading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-background">
+        <div className="text-lg font-semibold text-primary">Checking profile...</div>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-background">

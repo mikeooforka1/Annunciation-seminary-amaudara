@@ -11,7 +11,6 @@ const ResultsAnalyticsPortal = () => {
   const [userRole] = useState('student');
   const [selectedExam, setSelectedExam] = useState(null);
   const [isModalOpen, setIsModalOpen] = useState(false);
-  const [showNoResultsModal, setShowNoResultsModal] = useState(false);
   const [filters] = useState({
     subject: '',
     examType: '',
@@ -57,6 +56,8 @@ const ResultsAnalyticsPortal = () => {
   // Fetch results pushed by teacher for this student and term
   const [examResults, setExamResults] = useState([]);
   const [isLoadingResults, setIsLoadingResults] = useState(false);
+  const [showNoResultsModal, setShowNoResultsModal] = useState(false);
+
   const [resultsError, setResultsError] = useState('');
 
   const [hasSelected, setHasSelected] = useState(false);
@@ -80,6 +81,7 @@ const ResultsAnalyticsPortal = () => {
       }
       setIsLoadingResults(true);
       setResultsError('');
+      setShowNoResultsModal(false); // Hide modal while loading
       fetch(`${API_BASE_URL}/api/results/student/${studentData._id}/${selectedTerm}/${selectedClass}`)
         .then(res => {
           if (!res.ok) throw new Error(`Failed to fetch: ${res.status}`);
@@ -88,7 +90,7 @@ const ResultsAnalyticsPortal = () => {
         .then(data => {
           if (!Array.isArray(data) || data.length === 0) {
             setExamResults([]);
-            setShowNoResultsModal(true);
+            setShowNoResultsModal(true); // Show modal immediately if no results
             setIsLoadingResults(false);
             return;
           }
@@ -124,7 +126,7 @@ const ResultsAnalyticsPortal = () => {
           setSubjects(subjectsList);
 
           setIsLoadingResults(false);
-          setShowNoResultsModal(false);
+          setShowNoResultsModal(false); // Hide modal if results exist
         })
         .catch(err => {
           setExamResults([]);
@@ -282,16 +284,6 @@ const ResultsAnalyticsPortal = () => {
       setShowNoResultsModal(true);
     } else {
       setShowNoResultsModal(false);
-    }
-  }, [examResults]);
-
-  useEffect(() => {
-    // Only hide modal if there are real results (excluding "Overall" row)
-    const realResults = examResults.filter(r => r.subject && r.subject !== 'Overall');
-    if (realResults.length > 0) {
-      setShowNoResultsModal(false);
-    } else {
-      setShowNoResultsModal(true);
     }
   }, [examResults]);
 
@@ -652,7 +644,16 @@ const ResultsAnalyticsPortal = () => {
         }}
       />
 
-      {showNoResultsModal && (
+      {isLoadingResults && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-40">
+          <div className="bg-white rounded-lg shadow-xl p-8 max-w-sm w-full text-center">
+            <Icon name="Loader" size={32} className="animate-spin text-primary mb-4" />
+            <h2 className="font-heading text-xl font-bold mb-2 text-primary">Loading results...</h2>
+          </div>
+        </div>
+      )}
+
+      {showNoResultsModal && !isLoadingResults && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-40">
           <div className="bg-white rounded-lg shadow-xl p-8 max-w-sm w-full text-center">
             <Icon name="Info" size={32} color="#2563eb" className="mb-4" />

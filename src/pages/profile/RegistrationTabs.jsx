@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 
-const API_BASE_URL = process.env.REACT_APP_API_BASE_URL || "";
+const API_BASE_URL = process.env.REACT_APP_API_BASE_URL;
+console.log('API_BASE_URL:', API_BASE_URL);
 
 const tabList = [
   { key: 'parentGuardian', label: 'Parent/Guardian' },
@@ -9,16 +10,48 @@ const tabList = [
   { key: 'legal', label: 'Legal & Account' },
 ];
 
-const RegistrationTabs = ({ registrationData, userId }) => {
+const RegistrationTabs = ({ userId, readOnly = false }) => {
+  console.log('RegistrationTabs userId:', userId); // <-- Add this line
+
   const [activeTab, setActiveTab] = useState('parentGuardian');
-  const [data, setData] = useState(registrationData);
+  const [data, setData] = useState({});
   const [editing, setEditing] = useState(false);
   const [form, setForm] = useState({});
+  const [saving, setSaving] = useState(false);
 
+  // Fetch registration data from backend
+  const fetchRegistrationData = async (tabKey = activeTab) => {
+    console.log('[FETCH] userId:', userId); // <-- Add this line
+    if (userId) {
+      try {
+        console.log(`[FETCH] GET /api/registration/${userId}`);
+        const res = await fetch(`${API_BASE_URL}/api/registration/${userId}`);
+        if (res.ok) {
+          const reg = await res.json();
+          console.log('[FETCH] Success:', reg);
+          setData(reg);
+          setForm(reg[tabKey] || {});
+        } else {
+          const err = await res.json();
+          console.error('[FETCH] Error:', err);
+          setData({});
+          setForm({});
+        }
+      } catch (e) {
+        console.error('[FETCH] Network error:', e);
+        setData({});
+        setForm({});
+      }
+    } else {
+      console.error('[FETCH] userId is undefined or invalid!');
+    }
+  };
+
+  // Fetch on mount and when userId changes
   useEffect(() => {
-    setData(registrationData);
-    setForm(registrationData[activeTab] || {});
-  }, [registrationData, activeTab]);
+    fetchRegistrationData();
+    // eslint-disable-next-line
+  }, [userId]);
 
   const handleChange = (e) => {
     const { name, value, type, checked } = e.target;
@@ -29,22 +62,51 @@ const RegistrationTabs = ({ registrationData, userId }) => {
   };
 
   const handleSave = async () => {
+    setSaving(true);
     const updatedData = { ...data, [activeTab]: form };
     setData(updatedData);
     setEditing(false);
+    setForm(updatedData[activeTab] || {});
 
     // Save to backend
+    console.log('[SAVE] userId:', userId); // <-- Add this line
     if (userId) {
       try {
-        await fetch(`${API_BASE_URL}/api/registration/${userId}`, {
+        console.log(`[SAVE] POST /api/registration/${userId}`, updatedData);
+        const res = await fetch(`${API_BASE_URL}/api/registration/${userId}`, {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify(updatedData),
         });
-      } catch {
-        // Optionally show error
+        if (!res.ok) {
+          const err = await res.json();
+          console.error('[SAVE] Error:', err);
+          alert("Save failed: " + (err.error || res.statusText));
+        } else {
+          const result = await res.json();
+          console.log('[SAVE] Success:', result);
+          // Refetch to ensure data is in sync with DB
+          await fetchRegistrationData(activeTab);
+        }
+      } catch (e) {
+        console.error('[SAVE] Network error:', e);
+        alert("Network or server error: " + e.message);
       }
+    } else {
+      console.error('[SAVE] userId is undefined or invalid!');
     }
+    setSaving(false);
+  };
+
+  const handleTabChange = async (tabKey) => {
+    // Save current form to data before switching
+    const updatedData = { ...data, [activeTab]: form };
+    setData(updatedData);
+    setActiveTab(tabKey);
+    setEditing(false);
+
+    // Fetch latest data for the new tab
+    await fetchRegistrationData(tabKey);
   };
 
   return (
@@ -54,7 +116,7 @@ const RegistrationTabs = ({ registrationData, userId }) => {
           <button
             key={tab.key}
             className={`px-4 py-2 font-medium whitespace-nowrap ${activeTab === tab.key ? 'border-b-2 border-primary text-primary' : 'text-muted-foreground'}`}
-            onClick={() => { setActiveTab(tab.key); setEditing(false); }}
+            onClick={() => handleTabChange(tab.key)}
           >
             {tab.label}
           </button>
@@ -164,28 +226,32 @@ const RegistrationTabs = ({ registrationData, userId }) => {
           </div>
         )}
         <div className="flex gap-4 mt-4">
-          {editing ? (
+          {editing && !readOnly ? (
             <>
               <button
                 className="bg-primary text-white px-4 py-2 rounded font-semibold"
                 onClick={handleSave}
+                disabled={saving}
               >
-                Save
+                {saving ? "Saving..." : "Save"}
               </button>
               <button
                 className="bg-gray-200 px-4 py-2 rounded font-semibold"
                 onClick={() => setEditing(false)}
+                disabled={saving}
               >
                 Cancel
               </button>
             </>
           ) : (
-            <button
-              className="bg-primary text-white px-4 py-2 rounded font-semibold"
-              onClick={() => setEditing(true)}
-            >
-              Edit
-            </button>
+            !readOnly && (
+              <button
+                className="bg-primary text-white px-4 py-2 rounded font-semibold"
+                onClick={() => setEditing(true)}
+              >
+                Edit
+              </button>
+            )
           )}
         </div>
       </div>

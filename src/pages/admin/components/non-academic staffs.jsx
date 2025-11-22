@@ -101,12 +101,23 @@ const NonAcademicStaffList = () => {
                 <img
                   src={`${API_BASE_URL}/api/non-academic/${staff._id}/photo`}
                   alt={staff.name}
-                  className="w-14 h-14 rounded-full object-cover border-2 border-accent mb-2"
-                  crossOrigin="use-credentials" // <-- Ensure CORS credentials are sent
+                  className="w-20 h-20 rounded-full object-cover border-2 border-accent mb-2"
+                  style={{
+                    width: '80px',
+                    height: '80px',
+                    objectFit: 'cover',
+                    borderRadius: '50%',
+                    background: '#f3f4f6',
+                    display: 'block'
+                  }}
+                  crossOrigin="use-credentials"
                 />
               ) : (
-                <span className="w-14 h-14 rounded-full bg-accent flex items-center justify-center text-xl font-bold text-white border-2 border-accent mb-2">
-                  {staff.name ? staff.name.charAt(0).toUpperCase() : "S"}
+                <span className="w-20 h-20 rounded-full bg-accent flex items-center justify-center text-2xl font-bold text-white border-2 border-accent mb-2">
+                  <svg xmlns="http://www.w3.org/2000/svg" className="w-8 h-8" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    {/* Microphone icon */}
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 18v2m0 0a4 4 0 01-4-4h8a4 4 0 01-4 4zm0-2V6a4 4 0 018 0v6a4 4 0 01-8 0z" />
+                  </svg>
                 </span>
               )}
               <div className="font-heading font-semibold text-lg text-foreground mb-1">

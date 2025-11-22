@@ -321,15 +321,24 @@ const ResultsAnalyticsPortal = () => {
           margin: 0 !important;
           background: none !important;
           box-shadow: none !important;
-          /* Ensure background image prints */
           -webkit-print-color-adjust: exact !important;
           print-color-adjust: exact !important;
           background-image: url("/assets/images/school_logo-1754996036714.jpg") !important;
           background-repeat: no-repeat !important;
           background-position: center center !important;
           background-size: 60% !important;
+          min-height: 90vh !important;
+          padding-bottom: 48px !important; /* Add extra space at the bottom */
         }
-        /* Ensure subheading is visible */
+        #result-print-section .comments-section {
+          page-break-inside: avoid !important;
+          break-inside: avoid !important;
+          margin-bottom: 32px !important; /* Add space below comments */
+        }
+        #result-print-section .comments-section > div {
+          page-break-inside: avoid !important;
+          break-inside: avoid !important;
+        }
         #result-print-section h2 {
           visibility: visible !important;
         }
@@ -512,6 +521,10 @@ const ResultsAnalyticsPortal = () => {
                   Name: <span className="font-extrabold text-2xl text-primary" style={{ fontWeight: 900, letterSpacing: '1px' }}>
                     {userName || 'N/A'}
                   </span>
+                </div>
+                {/* Position added here */}
+                <div>
+                  Position: <span className="font-bold">{overallResult?.position || 'N/A'}</span>
                 </div>
                 {/* Removed Gender */}
                 <div>Class: <span className="font-bold">{selectedClass || 'N/A'}</span></div>

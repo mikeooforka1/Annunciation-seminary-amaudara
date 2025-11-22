@@ -1007,6 +1007,42 @@ useEffect(() => {
         // Only set read-only if result has been pushed (not after save)
         const isReadOnly = resultsPushed[selectedStudent._id] === true;
 
+        // --- Position Calculation ---
+    // Get all students' overall scores for this class/term
+    const studentScores = students
+        .map(s => ({
+            _id: s._id,
+            name: s.name,
+            overallScore: Number(overall[s._id]?.overallScore) || 0
+        }))
+        .sort((a, b) => b.overallScore - a.overallScore);
+
+    // Assign positions (1st, 2nd, 3rd, etc.), handling ties
+    let lastScore = null;
+    let lastPosition = 0;
+    let skip = 1;
+    const positions = {};
+    studentScores.forEach((s, idx) => {
+        if (s.overallScore === lastScore) {
+            positions[s._id] = lastPosition;
+            skip++;
+        } else {
+            positions[s._id] = idx + 1;
+            lastPosition = idx + 1;
+            lastScore = s.overallScore;
+            skip = 1;
+        }
+    });
+
+    // Get the auto-calculated position for the selected student
+    const autoPosition = positions[selectedStudent._id] || '';
+
+    // Use manual position if set, otherwise use auto
+    const manualPosition = overall[selectedStudent._id]?.position;
+    const positionValue = manualPosition !== undefined && manualPosition !== null && manualPosition !== ''
+        ? manualPosition
+        : autoPosition;
+
         return (
             <main className="pt-20 pb-10 bg-background min-h-screen">
           <div className="max-w-3xl mx-auto px-2 sm:px-4">
@@ -1040,6 +1076,29 @@ useEffect(() => {
                   </button>
                 </div>
               )}
+              {/* --- Position Box Field --- */}
+              <div className="mb-4 flex flex-wrap gap-4 items-center">
+                <div>
+                  <label className="font-semibold">Position:</label>
+                  <input
+                    type="text"
+                    className="border rounded px-2 py-1 w-24 ml-2"
+                    value={positionValue}
+                    readOnly={isReadOnly}
+                    onChange={e =>
+                      handleOverallChange(selectedStudent._id, 'position', e.target.value)
+                    }
+                    title={
+                      manualPosition
+                        ? "Manually set. Clear to use auto-calculated position."
+                        : "Auto-calculated. You can override by typing."
+                    }
+                  />
+                  <small className="text-xs text-gray-500 ml-2">
+                    {manualPosition ? "Manual" : "Auto"}
+                  </small>
+                </div>
+              </div>
               <form
                 onSubmit={e => {
                   e.preventDefault();

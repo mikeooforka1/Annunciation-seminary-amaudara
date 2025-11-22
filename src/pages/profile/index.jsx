@@ -22,15 +22,16 @@ const defaultRegistrationData = {
 };
 
 const ProfilePage = () => {
+  // Move this line to the top of the component
+  const studentData = JSON.parse(localStorage.getItem("studentData") || "{}");
+  const userId = studentData._id;
+
   const [profile, setProfile] = useState(defaultProfile);
   const [registrationData, setRegistrationData] = useState(defaultRegistrationData);
   const [editing, setEditing] = useState(false);
   const [showPhotoModal, setShowPhotoModal] = useState(false);
 
   useEffect(() => {
-    // Get student ID from localStorage
-    const studentData = JSON.parse(localStorage.getItem("studentData") || "{}");
-    const userId = studentData._id;
     if (!userId) return;
 
     // Fetch profile from backend
@@ -65,7 +66,7 @@ const ProfilePage = () => {
 
     const savedRegistration = JSON.parse(localStorage.getItem('goshen-registration-data')) || defaultRegistrationData;
     setRegistrationData(savedRegistration);
-  }, []);
+  }, [userId]);
 
   const handleChange = (e) => {
     const { name, value, files } = e.target;
@@ -82,8 +83,6 @@ const ProfilePage = () => {
 
   // Save profile to backend
   const handleSave = async () => {
-    const studentData = JSON.parse(localStorage.getItem("studentData") || "{}");
-    const userId = studentData._id;
     try {
       const res = await fetch(`${API_BASE_URL}/api/profile/${userId}`, {
         method: "POST",
@@ -250,7 +249,7 @@ const ProfilePage = () => {
         )}
       </div>
       <div className="w-full">
-        <RegistrationTabs registrationData={registrationData} />
+        <RegistrationTabs userId={userId} registrationData={registrationData} />
       </div>
     </div>
   );

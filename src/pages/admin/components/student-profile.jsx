@@ -110,9 +110,9 @@ const StudentProfilePage = () => {
           <p className="text-base sm:text-lg font-medium mb-1">Gender: {profile.gender || "N/A"}</p>
         </div>
       </div>
-      {/* Registration Tabs */}
+      {/* Registration Tabs (readonly for admin) */}
       <div className="w-full">
-        <RegistrationTabs registrationData={registrationData} userId={studentId} />
+        <RegistrationTabs registrationData={registrationData} userId={studentId} readOnly={true} />
       </div>
     </div>
   );

@@ -393,6 +393,11 @@ const VerifyResult = () => {
                     <span><b>Name:</b> {students.find(s => s._id === viewingStudent)?.name || 'N/A'}</span>
                     <span><b>Class:</b> {classList.find(c => c.id === selectedClass)?.name || 'N/A'}</span>
                     <span><b>Term:</b> {selectedTerm ? selectedTerm.charAt(0).toUpperCase() + selectedTerm.slice(1) + ' Term' : 'N/A'}</span>
+                    {/* --- Position Field --- */}
+                    <span>
+                      <b>Position:</b>{" "}
+                      {editResults[viewingStudent]?.position || 'N/A'}
+                    </span>
                   </div>
                 </div>
                 {/* If no result pushed */}

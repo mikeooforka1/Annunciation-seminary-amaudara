@@ -259,22 +259,23 @@ const VerifyResult = () => {
   // Finalize verification for the class (with token)
   const handleClassVerification = () => {
     const classVerifyUrl = `${API_BASE_URL}/api/results/verify-class`;
-    console.log('Verifying class:', classVerifyUrl, {
-      className: selectedClass,
-      term: selectedTerm,
-      token: "admin12@"
-    });
+    setMessage(''); // Clear previous messages
     fetch(classVerifyUrl, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
         className: selectedClass,
         term: selectedTerm,
-        token: "admin12@" // <-- this is the token admin enters
+        token: tokenInput // <-- use the actual input value
       })
     })
-      .then(res => res.json())
-      .then(() => {
+      .then(async res => {
+        const data = await res.json();
+        if (!res.ok) {
+          // Show error from backend (e.g., invalid token)
+          setMessage(data.error || 'Verification failed. Please check the token and try again.');
+          return;
+        }
         alert('Class results verified and pushed to students!');
         setSelectedClass(null);
         setStudents([]);
@@ -283,6 +284,9 @@ const VerifyResult = () => {
         setEditResults({});
         setViewingStudent(null);
         setAllVerified(false);
+      })
+      .catch(() => {
+        setMessage('Network error. Please try again.');
       });
   };
 

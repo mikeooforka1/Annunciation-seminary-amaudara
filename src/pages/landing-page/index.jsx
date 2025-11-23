@@ -305,7 +305,7 @@ const LandingPage = () => {
               transition={{ duration: 0.1 }}
               className="flex flex-col items-center"
             >
-              <div className="w-full max-w-lg rounded-2xl overflow-hidden shadow-xl border-4 border-primary/40 bg-white">
+              <div className="w-full max-w-lg rounded-2xl overflow-hidden shadow-xl border-4 border-primary/30 bg-white">
                 <Image
                   src="/assets/images/mary-grotto.jpg"
                   alt="Annunciation Seminary Grotto"
@@ -340,24 +340,60 @@ const LandingPage = () => {
         </div>
       </section>
 
-      {/* School Promo Image Section */}
+      {/* School Promo Image & Anthem Section */}
       <section className="py-12 bg-muted/10">
         <div className="container mx-auto px-0 lg:px-0">
-          <motion.div
-            initial={{ opacity: 0, y: 50 }}
-            whileInView={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.1 }}
-            className="flex flex-col items-center justify-center w-full"
-          >
-            <div className="w-full max-w-3xl mx-auto aspect-[16/9] rounded-3xl border-4 border-primary/40 bg-white shadow-2xl flex items-center justify-center overflow-hidden">
-              <Image
-                src="/assets/images/seminarians-pic.WebP"
-                alt="Seminarians Group"
-                className="w-full h-full object-cover"
-                style={{ width: '100%', height: '100%' }}
-              />
-            </div>
-          </motion.div>
+          <div className="flex flex-col lg:flex-row items-center justify-center gap-10">
+            {/* Seminarians Image */}
+            <motion.div
+              initial={{ opacity: 0, y: 50 }}
+              whileInView={{ opacity: 1, y: 0 }}
+              transition={{ duration: 0.1 }}
+              className="flex-1 w-full max-w-3xl"
+              style={{ minWidth: 0 }}
+            >
+              <div className="aspect-[16/9] rounded-3xl border-4 border-primary/40 bg-white shadow-2xl flex items-center justify-center overflow-hidden">
+                <Image
+                  src="/assets/images/seminarians-pic.WebP"
+                  alt="Seminarians Group"
+                  className="w-full h-full object-cover"
+                  style={{ width: '100%', height: '100%' }}
+                />
+              </div>
+            </motion.div>
+            {/* School Anthem */}
+            <motion.div
+              initial={{ opacity: 0, y: 50 }}
+              whileInView={{ opacity: 1, y: 0 }}
+              transition={{ duration: 0.1, delay: 0.1 }}
+              className="flex-1 w-full max-w-xl"
+              style={{ minWidth: 0 }}
+            >
+              <div className="bg-card border border-primary/30 rounded-2xl shadow-xl p-6 flex flex-col h-full justify-center">
+                <h3 className="text-2xl font-heading font-bold text-primary mb-4 text-center lg:text-left">
+                  School Anthem
+                </h3>
+                <div className="whitespace-pre-line text-base sm:text-lg font-body text-muted-foreground text-center lg:text-left leading-relaxed">
+                  We are children of Annunciation<br />
+                  A special people of God<br />
+                  Our task to proclaim the word<br />
+                  Announcers of the word of God<br /><br />
+                  The world in which we now live<br />
+                  From the original plan has departed<br />
+                  Through us may this order be re-achieved<br />
+                  Announcers of the word of God<br /><br />
+                  O Mary Mother of Jesus<br />
+                  You first the word of God born<br />
+                  Good bearers of this word may we be<br />
+                  Announcers of the word of God<br /><br />
+                  Your assistance O Lord we implore<br />
+                  This vocation to fulfil<br />
+                  Making the world a better place<br />
+                  So help us Mother of Annunciation
+                </div>
+              </div>
+            </motion.div>
+          </div>
         </div>
       </section>
 

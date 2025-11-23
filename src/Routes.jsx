@@ -48,7 +48,7 @@ const AppWrapper = ({ children }) => {
         localStorage.removeItem("user");
         alert("Session expired due to inactivity.");
         window.location.replace("/login-authentication");
-      }, 30 * 60 * 1000); // 30 minutes
+      }, 1 * 60 * 60 * 1000); // 1 hour
     };
 
     // Attach listeners only once per mount

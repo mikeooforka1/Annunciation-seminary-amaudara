@@ -24,6 +24,7 @@ const PostAnnouncement = () => {
   const [errorMsg, setErrorMsg] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
   const navigate = useNavigate();
+  const API_BASE_URL = process.env.REACT_APP_API_BASE_URL;
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -44,7 +45,7 @@ const PostAnnouncement = () => {
         date
       };
 
-      const res = await fetch('/api/announcements', {
+      const res = await fetch(`${API_BASE_URL}/api/announcements`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(announcement)

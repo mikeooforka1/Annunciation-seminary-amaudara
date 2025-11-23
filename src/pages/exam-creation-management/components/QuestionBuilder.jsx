@@ -74,7 +74,7 @@ const QuestionBuilder = ({
         type: activeQuestionType
       };
       onAddQuestion(questionToSave);
-      
+
       // Reset form for next question, keeping last selected type
       setCurrentQuestion({
         type: activeQuestionType,
@@ -84,6 +84,7 @@ const QuestionBuilder = ({
         points: 1,
         explanation: ''
       });
+      setAttachedImage(null); // <-- Clear attached image after adding question
     }
   };
 

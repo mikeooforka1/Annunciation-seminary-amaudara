@@ -282,6 +282,10 @@ const ExamConfigurationPanel = ({
     });
   }
 
+  const handleDeleteQuestion = (questionId) => {
+    setQuestions(prev => prev.filter(q => q.id !== questionId));
+  };
+
   return (
     <div className="exam-config-panel">
       <div className="bg-card border border-border rounded-lg h-full flex flex-col">
@@ -439,6 +443,7 @@ const ExamConfigurationPanel = ({
               questions={questions}
               onQuestionsChange={setQuestions}
               onAddQuestion={onAddQuestion} // <-- Pass it down
+              onDeleteQuestion={handleDeleteQuestion} // <-- Pass the delete handler
               // ...other props as needed
             />
           )}

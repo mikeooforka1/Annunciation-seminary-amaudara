@@ -114,8 +114,15 @@ const ExamCreationManagement = () => {
       const res = await fetch(`${API_BASE_URL}/api/exams/submitted-by-student?teacherId=${teacherData._id}`, {
         credentials: 'include',
       });
+      let data;
+      const contentType = res.headers.get('content-type');
+      if (contentType && contentType.includes('application/json')) {
+        data = await res.json();
+      } else {
+        const text = await res.text();
+        throw new Error(text);
+      }
       console.log('Submitted exams response status:', res.status);
-      const data = await res.json();
       console.log('Submitted exams response data:', data);
       if (!res.ok || !Array.isArray(data)) throw new Error(data.error || 'Unable to fetch submitted exams.');
       setSubmissions(data);
@@ -236,10 +243,11 @@ const ExamCreationManagement = () => {
         endDate: examData.endDate ? new Date(examData.endDate).toISOString() : '',
         photo: '',
       };
+      const { _id, ...publishPayload } = payload;
       const res = await fetch(`${API_BASE_URL}/api/exams/publish`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(payload),
+        body: JSON.stringify(publishPayload),
       });
       const result = await res.json();
       if (res.ok) {
@@ -336,52 +344,47 @@ const ExamCreationManagement = () => {
   }, [activeView, teacherData, currentTerm]);
 
   useEffect(() => {
-    if (activeView === 'submitted') {
+    if (activeView === 'submitted' && teacherData && currentTerm) {
       fetchSubmittedExamsByStudent();
     }
-  }, [activeView]);
-
-  useEffect(() => {
-    if (teacherData && currentTerm) {
-      fetchExams();
-    }
-  }, [teacherData, currentTerm]);
-
-  useEffect(() => {
-    if (activeView === 'submitted' && exams.length > 0) {
-      fetchAllSubmissions();
-    }
-  }, [activeView, exams]);
+  }, [activeView, teacherData, currentTerm]);
 
   const autoSaveTimeout = useRef(null);
 
   // Auto-save draft logic
   useEffect(() => {
     if (examData.status === 'published') return;
+
+    // Check if any field is filled or questions exist
+    const hasInput =
+      Object.values(examData).some(val => val && String(val).trim() !== '') ||
+      questions.length > 0;
+
+    if (!hasInput) {
+      // If nothing is inputted, clear any pending auto-save
+      if (autoSaveTimeout.current) clearTimeout(autoSaveTimeout.current);
+      return;
+    }
+
     if (autoSaveTimeout.current) clearTimeout(autoSaveTimeout.current);
 
     autoSaveTimeout.current = setTimeout(() => {
-      // Save as soon as any field is filled
-      if (
-        Object.values(examData).some(val => val && String(val).trim() !== '') ||
-        questions.length > 0
-      ) {
-        const teacherClass = teacherData?.className || teacherData?.class;
-        const payload = {
-          ...examData,
-          questions,
-          createdBy: teacherData?._id,
-          class: teacherClass,
-          term: currentTerm,
-          startDate: examData.startDate ? new Date(examData.startDate).toISOString() : '',
-          endDate: examData.endDate ? new Date(examData.endDate).toISOString() : '',
-          photo: '',
-        };
-        fetch(`${API_BASE_URL}/api/exams/save-draft`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(payload),
-        })
+      const teacherClass = teacherData?.className || teacherData?.class;
+      const payload = {
+        ...examData,
+        questions,
+        createdBy: teacherData?._id,
+        class: teacherClass,
+        term: currentTerm,
+        startDate: examData.startDate ? new Date(examData.startDate).toISOString() : '',
+        endDate: examData.endDate ? new Date(examData.endDate).toISOString() : '',
+        photo: '',
+      };
+      fetch(`${API_BASE_URL}/api/exams/save-draft`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload),
+      })
         .then(res => res.json())
         .then(result => {
           if (result.success && result.exam && result.exam._id) {
@@ -389,7 +392,6 @@ const ExamCreationManagement = () => {
           }
         })
         .catch(() => {});
-      }
     }, 5000);
 
     return () => {

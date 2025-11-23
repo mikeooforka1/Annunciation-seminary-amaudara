@@ -293,11 +293,11 @@ const ResultsAnalyticsPortal = () => {
   const handlePrintResult = () => {
     const style = document.createElement('style');
     style.id = 'custom-print-style';
-    style.innerHTML = `
+     style.innerHTML = `
       @media print {
         @page {
           size: A3;
-          margin: 20mm;
+          margin: 10mm;
         }
         body * {
           visibility: hidden !important;
@@ -310,6 +310,8 @@ const ResultsAnalyticsPortal = () => {
           left: 0;
           top: 0;
           width: 100vw !important;
+          max-width: 100vw !important;
+          min-width: 0 !important;
           margin: 0 !important;
           background: none !important;
           box-shadow: none !important;
@@ -319,20 +321,38 @@ const ResultsAnalyticsPortal = () => {
           background-repeat: no-repeat !important;
           background-position: center center !important;
           background-size: 60% !important;
-          min-height: 90vh !important;
-          padding-bottom: 48px !important; /* Add extra space at the bottom */
+          font-size: 14px !important;
+          overflow-wrap: break-word !important;
         }
-        #result-print-section .comments-section {
-          page-break-inside: avoid !important;
-          break-inside: avoid !important;
-          margin-bottom: 32px !important; /* Add space below comments */
+        #result-print-section h1, #result-print-section h2, #result-print-section h3 {
+          font-size: 1.2em !important;
+          word-break: break-word !important;
         }
-        #result-print-section .comments-section > div {
-          page-break-inside: avoid !important;
-          break-inside: avoid !important;
+        #result-print-section table {
+          width: 100% !important;
+          font-size: 12px !important;
+          table-layout: auto !important;
+          word-break: break-word !important;
         }
-        #result-print-section h2 {
-          visibility: visible !important;
+        #result-print-section td, #result-print-section th {
+          word-break: break-word !important;
+          padding: 2px 4px !important;
+        }
+        /* Mobile-specific print adjustments */
+        @media print and (max-width: 600px) {
+          #result-print-section {
+            width: 100vw !important;
+            max-width: 100vw !important;
+            font-size: 11px !important;
+            background-size: 90% !important;
+            padding: 0 !important;
+          }
+          #result-print-section table {
+            font-size: 10px !important;
+          }
+          #result-print-section h1, #result-print-section h2 {
+            font-size: 1em !important;
+          }
         }
       }
     `;
@@ -350,7 +370,6 @@ const ResultsAnalyticsPortal = () => {
   const allClassOptions = [
     'JSS1', 'JSS2', 'JSS3', 'SS1', 'SS2', 'SS3'
   ];
-
   // Helper to check if previous class should be shown
   const showPreviousClass =
     studentData?.className &&

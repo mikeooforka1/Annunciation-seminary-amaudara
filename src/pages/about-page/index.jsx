@@ -401,6 +401,116 @@ const AboutPage = () => {
           </motion.div>
         </div>
       </section>
+      {/* Past Rectors Section */}
+      <section className="py-16 bg-card/60 border-y border-border">
+        <div className="container mx-auto px-4 lg:px-6">
+          <div className="text-center mb-10">
+            <h2 className="text-3xl lg:text-4xl font-heading font-bold text-primary mb-4">
+              Past Rectors of Annunciation Seminary
+            </h2>
+            <p className="text-lg text-muted-foreground max-w-2xl mx-auto">
+              Honoring the dedicated leaders who have shaped our seminary’s legacy.
+            </p>
+          </div>
+          <div className="grid grid-cols-2 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-6">
+            {[
+              {
+                name: "Fr. Luke Odor",
+                years: "1984–1986",
+                img: "/assets/images/fr.luke odor.jpg"
+              },
+              {
+                name: "Msgr. Raph Nwosu",
+                years: "1986–1990",
+                img: "/assets/images/MSGR.raph nwosu.jpg"
+              },
+              {
+                name: "Fr. Peter Nwaogu",
+                years: "1990–1991",
+                img: "/assets/images/fr.peter nwaogu.jpg"
+              },
+              {
+                name: "Msgr. Innocent Ajuonu",
+                years: "1991–1993",
+                img: "/assets/images/MSGR.innocent ajuonu.jpg"
+              },
+              {
+                name: "Fr. Emmanuel Nwaokonko",
+                years: "1993–1994",
+                img: "/assets/images/fr.emmanuel nwaokonkwo.jpg"
+              },
+              {
+                name: "Fr. Cajetan Uchendu",
+                years: "1994–1995",
+                img: "/assets/images/fr cajetan uchenna.jpg"
+              },
+              {
+                name: "Fr. Emeka Okite",
+                years: "1995–1997",
+                img: "/assets/images/fr emeka okite.jpg"
+              },
+              {
+                name: "Fr. Callistus Onwere",
+                years: "1997–2002",
+                img: "/assets/images/fr.calistus onwere.jpg"
+              },
+              {
+                name: "Fr. Augustine Nwankpa",
+                years: "2002–2005",
+                img: "/assets/images/fr augustine nwankpa.jpg"
+              },
+              {
+                name: "Fr. Jephthah Asuoha",
+                years: "2005–2007",
+                img: "/assets/images/fr jephthh asuoha.jpg"
+              },
+              {
+                name: "Fr. Kevin Nwosu",
+                years: "2007–2012",
+                img: "/assets/images/fr.kelvin nwosu.jpg"
+              },
+              {
+                name: "Fr. Cyril Ukaforo",
+                years: "2012–2016",
+                img: "/assets/images/fr cyril okaforo.jpg"
+              },
+              {
+                name: "Fr. Francis Onuoha",
+                years: "2016–2021",
+                img: "/assets/images/fr.francis onuoha.jpg"
+              },
+              {
+                name: "Fr. Chidi Obilor",
+                years: "2021–Present",
+                img: "/assets/images/rector-pic.WebP"
+              }
+            ].map((rector, idx) => (
+              <div
+                key={rector.name}
+                className="bg-white/90 border border-primary/20 rounded-xl shadow-lg p-6 flex flex-col items-center justify-center transition hover:shadow-2xl"
+              >
+                <div className="w-20 h-20 mb-3 rounded-full overflow-hidden border-4 border-primary/30 bg-white flex items-center justify-center shadow">
+                  <img
+                    src={rector.img}
+                    alt={rector.name}
+                    className="w-full h-full object-cover"
+                    style={{ objectPosition: 'center' }}
+                  />
+                </div>
+                <div className="w-12 h-12 mb-3 rounded-full bg-primary/10 flex items-center justify-center">
+                  <span className="font-heading font-bold text-primary text-xl">{idx + 1}</span>
+                </div>
+                <h3 className="text-lg font-heading font-semibold text-foreground mb-1 text-center">
+                  {rector.name}
+                </h3>
+                <p className="text-sm text-muted-foreground font-body text-center">
+                  {rector.years}
+                </p>
+              </div>
+            ))}
+          </div>
+        </div>
+      </section>
       {/* School Image Gallery */}
       <section className="py-16 bg-muted/5">
         <div className="container mx-auto px-4 lg:px-6">
@@ -439,53 +549,6 @@ const AboutPage = () => {
               </div>
             ))}
           </motion.div>
-        </div>
-      </section>
-      {/* Past Rectors Section */}
-      <section className="py-16 bg-card/60 border-y border-border">
-        <div className="container mx-auto px-4 lg:px-6">
-          <div className="text-center mb-10">
-            <h2 className="text-3xl lg:text-4xl font-heading font-bold text-primary mb-4">
-              Past Rectors of Annunciation Seminary
-            </h2>
-            <p className="text-lg text-muted-foreground max-w-2xl mx-auto">
-              Honoring the dedicated leaders who have shaped our seminary’s legacy.
-            </p>
-          </div>
-          <div className="grid grid-cols-2 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-6">
-            {[
-
-              { name: "Fr. Luke Odor", years: "1984–1986" },
-              { name: "Msgr. Raph Nwosu", years: "1986–1990" },
-              { name: "Fr. Peter Nwaogu", years: "1990–1991" },
-              { name: "Msgr. Innocent Ajuonu", years: "1991–1993" },
-              { name: "Fr. Emmanuel Nwaokonko", years: "1993–1994" },
-              { name: "Fr. Cajetan Uchendu", years: "1994–1995" },
-              { name: "Fr. Emeka Okite", years: "1995–1997" },
-              { name: "Fr. Callistus Onwere", years: "1997–2002" },
-              { name: "Fr. Augustine Nwankpa", years: "2002–2005" },
-              { name: "Fr. Jephthah Asuoha", years: "2005–2007" },
-              { name: "Fr. Kevin Nwosu", years: "2007–2012" },
-              { name: "Fr. Cyril Ukaforo", years: "2012–2016" },
-              { name: "Fr. Francis Onuoha", years: "2016–2021" },
-              { name: "Fr. Chidi Obilor", years: "2021–Present" },
-            ].map((rector, idx) => (
-              <div
-                key={rector.name}
-                className="bg-white/90 border border-primary/20 rounded-xl shadow-lg p-6 flex flex-col items-center justify-center transition hover:shadow-2xl"
-              >
-                <div className="w-12 h-12 mb-3 rounded-full bg-primary/10 flex items-center justify-center">
-                  <span className="font-heading font-bold text-primary text-xl">{idx + 1}</span>
-                </div>
-                <h3 className="text-lg font-heading font-semibold text-foreground mb-1 text-center">
-                  {rector.name}
-                </h3>
-                <p className="text-sm text-muted-foreground font-body text-center">
-                  {rector.years}
-                </p>
-              </div>
-            ))}
-          </div>
         </div>
       </section>
       {/* --- INSERTED: Seminary History Section --- */}

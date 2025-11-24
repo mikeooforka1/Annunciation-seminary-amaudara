@@ -27,21 +27,35 @@ const ContactPage = () => {
               <Icon name="MapPin" size={20} />
               <span>Isiala Ngwa South, Abia State</span>
             </li>
-            <li className="flex items-center space-x-3">
-              <Icon name="Phone" size={20} />
-              <span>+2347069386013</span>
+            <li>
+              <span className="font-semibold text-primary">For School-Related Issues:</span>
+              <ul className="ml-4 mt-1 space-y-1 text-sm">
+                <li className="flex items-center space-x-2">
+                  <Icon name="Phone" size={18} />
+                  <span>+2347069386013</span>
+                </li>
+                <li className="flex items-center space-x-2">
+                  <Icon name="Briefcase" size={18} />
+                  <span>+2348039360904</span>
+                </li>
+                <li className="flex items-center space-x-2">
+                  <Icon name="Mail" size={18} />
+                  <span>annunciationseminaryamaudara84@gmail.com</span>
+                </li>
+              </ul>
             </li>
-            <li className="flex items-center space-x-3">
-              <Icon name="Smartphone" size={20} />
-              <span>+2348143316441</span>
-            </li>
-            <li className="flex items-center space-x-3">
-              <Icon name="Briefcase" size={20} />
-              <span>+2348039360904</span>
-            </li>
-            <li className="flex items-center space-x-3">
-              <Icon name="Mail" size={20} />
-              <span>annunciationseminaryamaudara84@gmail.com</span>
+            <li>
+              <span className="font-semibold text-primary">For Website/Technical Issues:</span>
+              <ul className="ml-4 mt-1 space-y-1 text-sm">
+                <li className="flex items-center space-x-2">
+                  <Icon name="Smartphone" size={18} />
+                  <span>WhatsApp: +2348143316441</span>
+                </li>
+                <li className="flex items-center space-x-2">
+                  <Icon name="Phone" size={18} />
+                  <span>Call: +2349040744911</span>
+                </li>
+              </ul>
             </li>
           </ul>
         </div>

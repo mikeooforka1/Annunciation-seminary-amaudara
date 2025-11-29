@@ -2,12 +2,18 @@ import React, { useEffect, useState } from 'react';
 import ResultsTable from '../../results-analytics-portal/components/ResultsTable';
 
 const classList = [
-  { id: 'jss1', name: 'JSS1' },
-  { id: 'jss2', name: 'JSS2' },
-  { id: 'jss3', name: 'JSS3' },
-  { id: 'ss1', name: 'SS1' },
-  { id: 'ss2', name: 'SS2' },
-  { id: 'ss3', name: 'SS3' },
+  { id: 'jss1a', name: 'JSS1A' },
+  { id: 'jss1b', name: 'JSS1B' },
+  { id: 'jss2a', name: 'JSS2A' },
+  { id: 'jss2b', name: 'JSS2B' },
+  { id: 'jss3a', name: 'JSS3A' },
+  { id: 'jss3b', name: 'JSS3B' },
+  { id: 'ss1a', name: 'SS1A' },
+  { id: 'ss1b', name: 'SS1B' },
+  { id: 'ss2a', name: 'SS2A' },
+  { id: 'ss2b', name: 'SS2B' },
+  { id: 'ss3a', name: 'SS3A' },
+  { id: 'ss3b', name: 'SS3B' },
 ];
 
 const API_BASE_URL = process.env.REACT_APP_API_BASE_URL || 'http://localhost:5001';
@@ -25,6 +31,8 @@ const VerifyResult = () => {
   const [adminId, setAdminId] = useState('');
   const [message, setMessage] = useState('');
   const [reviewLoading, setReviewLoading] = useState(false);
+  const [refreshKey, setRefreshKey] = useState(0);
+  const [classVerificationLoading, setClassVerificationLoading] = useState(false);
 
   useEffect(() => {
     // Get admin data from localStorage (adjust key as needed)
@@ -70,36 +78,59 @@ const VerifyResult = () => {
         return fetch(resultsUrl)
           .then(res => res.json())
           .then(results => {
-            const resultObj = {};
+            // --- Use this mapping here ---
+            const mapped = {};
             const subjects = [];
             let isReviewed = false;
             let isVerified = false;
-            // Always define subjectResults
             let subjectResults = [];
-            if (Array.isArray(results) && results.length > 0) {
-              // Only consider subject results (not 'Overall')
-              subjectResults = results.filter(r => r.subject && r.subject !== 'Overall');
-              // Use backend fields directly
-              isReviewed = subjectResults.length > 0 && subjectResults.every(r => r.reviewed === true && r.pending === false);
-              isVerified = subjectResults.length > 0 && subjectResults.every(r => r.verified === true && r.pending === false);
-              results.forEach(r => {
-                if (r.subject && r.subject !== 'Overall') {
-                  resultObj[r.subject] = r;
-                  subjects.push(r.subject);
-                } else if (r.subject === 'Overall') {
-                  // Map meta/key rating fields
-                  Object.assign(resultObj, r);
-                }
-              });
-              resultObj.subjects = subjects;
-            }
-            // Store backend status fields for this student
-            resultObj._status = {
-              reviewed: isReviewed,
-              verified: isVerified,
-              pending: subjectResults.some(r => r.pending === true)
-            };
-            return { studentId: student._id, resultObj };
+            results.forEach(r => {
+              if (r.subject && r.subject !== 'Overall') {
+                subjects.push(r.subject);
+                mapped[r.subject] = {
+                  cat1: r.firstCatScore ?? '',
+                  exam: r.examScore ?? '',
+                  maxScore: r.maxScore ?? '',
+                  minScore: r.minScore ?? '',
+                  grade: r.grade ?? '',
+                  remark: r.remark ?? '',
+                  _id: r._id,
+                  reviewed: r.reviewed,
+                  verified: r.verified,
+                  pending: r.pending
+                };
+                subjectResults.push(r);
+              } else if (r.subject === 'Overall') {
+                mapped._overallId = r._id; // <-- Add this line
+                mapped.position = r.position ?? '';
+                mapped.academicYear = r.academicYear ?? '';
+                mapped.schoolOpened = r.schoolOpened ?? '';
+                mapped.present = r.present ?? '';
+                mapped.absent = r.absent ?? '';
+                mapped.average = r.average ?? '';
+                mapped.nextTerm = r.nextTerm ?? '';
+                mapped.teacherComment = r.teacherComment ?? '';
+                mapped.headTeacherRemark = r.headTeacherRemark ?? '';
+                // --- Add key rating fields ---
+                mapped.handwriting = r.handwriting ?? '';
+                mapped.punctuality = r.punctuality ?? '';
+                mapped.initiative = r.initiative ?? '';
+                mapped.obedience = r.obedience ?? '';
+                mapped.honesty = r.honesty ?? '';
+                mapped.neatness = r.neatness ?? '';
+                mapped.attentiveness = r.attentiveness ?? '';
+                mapped.respect = r.respect ?? '';
+                mapped.attitude = r.attitude ?? '';
+                mapped.creativity = r.creativity ?? '';
+              }
+            });
+            mapped.subjects = subjects;
+
+            // Calculate status for this student
+            isReviewed = subjectResults.length > 0 && subjectResults.every(r => r.reviewed === true && r.pending === false);
+            isVerified = subjectResults.length > 0 && subjectResults.every(r => r.verified === true && r.pending === false);
+            mapped._status = { reviewed: isReviewed, verified: isVerified, pending: subjectResults.some(r => r.pending === true) };
+            return { studentId: student._id, resultObj: mapped };
           });
       });
 
@@ -128,18 +159,43 @@ const VerifyResult = () => {
           setLoading(false);
         });
     }
-  }, [students, selectedClass, selectedTerm]);
+  }, [students, selectedClass, selectedTerm, refreshKey]);
 
   // Handle result modification
-  const handleResultChange = (studentId, subject, updatedResult) => {
-    setEditResults(prev => ({
-      ...prev,
-      [studentId]: {
-        ...prev[studentId],
-        [subject]: updatedResult,
-        subjects: prev[studentId].subjects
+  const handleResultChange = (studentId, field, value) => {
+    setEditResults(prev => {
+      const prevStudent = prev[studentId] || {};
+      // If the field is a subject (object), handle auto grade/remark
+      if (prevStudent.subjects && prevStudent.subjects.includes(field)) {
+        // value is an object with possible cat1/exam/grade/remark etc.
+        let newResult = { ...prevStudent[field], ...value };
+        const cat1 = Number(newResult.cat1 ?? newResult.firstCatScore ?? 0);
+        const exam = Number(newResult.exam ?? newResult.examScore ?? 0);
+        const total = cat1 + exam;
+        if (!('grade' in newResult) || newResult.grade === '' || newResult.grade === undefined) {
+          newResult.grade = getGrade(total);
+        }
+        if (!('remark' in newResult) || newResult.remark === '' || newResult.remark === undefined) {
+          newResult.remark = getRemark(newResult.grade);
+        }
+        return {
+          ...prev,
+          [studentId]: {
+            ...prevStudent,
+            [field]: newResult,
+          }
+        };
+      } else {
+        // Meta/key field: value is a primitive
+        return {
+          ...prev,
+          [studentId]: {
+            ...prevStudent,
+            [field]: value,
+          }
+        };
       }
-    }));
+    });
   };
 
   // Save modified result
@@ -195,54 +251,99 @@ const VerifyResult = () => {
   };
 
   // Mark individual student result as reviewed (admin review)
- const handleReviewStudent = async (studentId, retryCount = 0) => {
-  setMessage('');
-  setReviewLoading(true);
-  if (!adminId) {
-    setMessage('Admin ID not found. Please log in again.');
-    setReviewLoading(false);
-    return;
-  }
-  if (!isValidObjectId(studentId)) {
-    setMessage('Invalid student ID.');
-    setReviewLoading(false);
-    return;
-  }
-  const normalizedClassName = selectedClass ? selectedClass.toLowerCase() : '';
-  const normalizedTerm = selectedTerm ? selectedTerm.toLowerCase() : '';
-  const reviewUrl = `${API_BASE_URL}/api/results/review-student-all`;
-  try {
-    const res = await fetch(reviewUrl, {
-      method: 'POST',
-      body: JSON.stringify({
-        studentId,
-        className: normalizedClassName,
-        term: normalizedTerm
-      }),
-      headers: { 'Content-Type': 'application/json' }
+  const handleReviewStudent = async (studentId, retryCount = 0) => {
+    setMessage('');
+    setReviewLoading(true);
+    if (!adminId) {
+      setMessage('Admin ID not found. Please log in again.');
+      setReviewLoading(false);
+      return;
+    }
+    if (!isValidObjectId(studentId)) {
+      setMessage('Invalid student ID.');
+      setReviewLoading(false);
+      return;
+    }
+    const normalizedClassName = selectedClass ? selectedClass.toLowerCase() : '';
+    const normalizedTerm = selectedTerm ? selectedTerm.toLowerCase() : '';
+
+    // 1. Update all subject results with all fields
+    const subjectUpdatePromises = (editResults[studentId]?.subjects || []).map(subject => {
+      const subj = editResults[studentId][subject];
+      if (subj && subj._id) {
+        // Use backend field names
+        const subjectPayload = {
+          firstCatScore: subj.cat1 ?? '',   // <-- correct field for C.A.T
+          examScore: subj.exam ?? '',       // <-- correct field for Exam
+          maxScore: subj.maxScore ?? '',
+          minScore: subj.minScore ?? '',
+          grade: subj.grade ?? '',
+          remark: subj.remark ?? '',
+        };
+        // Optionally, remove 'exam' if present
+        if ('exam' in subjectPayload) delete subjectPayload.exam;
+        return fetch(`${API_BASE_URL}/api/results/update/${subj._id}`, {
+          method: 'PUT',
+          body: JSON.stringify(subjectPayload),
+          headers: { 'Content-Type': 'application/json' }
+        });
+      }
+      return Promise.resolve();
     });
-    const data = await res.json();
-    if (res.ok && data.success) {
-      setMessage('Result marked as reviewed!');
-      setTimeout(() => setMessage(''), 1500);
-      // Always re-fetch latest pushed results after status change
-      setTimeout(async () => {
-        let studentsUrl = `${API_BASE_URL}/api/user/class/${selectedClass}/all/students`;
-        if (selectedTerm) studentsUrl += `?term=${selectedTerm}`;
-        const studentsRes = await fetch(studentsUrl);
-        const studentsData = await studentsRes.json();
-        setStudents(Array.isArray(studentsData) ? studentsData : []);
-        setReviewLoading(false); // <-- Move here so it always resets after re-fetch
-      }, 700);
-    } else {
-      setMessage(data.error || 'Failed to mark as reviewed.');
+
+    // 2. Update the "Overall" result (key ratings/meta fields/comments/header)
+    const overallId = editResults[studentId]?._overallId;
+    if (overallId) {
+      const overallFields = {};
+      [
+        'position', 'academicYear', 'schoolOpened', 'present', 'absent', 'average', 'nextTerm',
+        'teacherComment', 'headTeacherRemark', // comments
+        'handwriting', 'punctuality', 'initiative', 'obedience', 'honesty', 'neatness',
+        'attentiveness', 'respect', 'attitude', 'creativity' // key ratings
+      ].forEach(field => {
+        if (editResults[studentId][field] !== undefined) {
+          overallFields[field] = editResults[studentId][field];
+        }
+      });
+      await fetch(`${API_BASE_URL}/api/results/update/${overallId}`, {
+        method: 'PUT',
+        body: JSON.stringify(overallFields),
+        headers: { 'Content-Type': 'application/json' }
+      });
+    }
+
+    try {
+      // Wait for all subject updates to finish
+      await Promise.all(subjectUpdatePromises);
+
+      // 3. Now mark as reviewed
+      const reviewUrl = `${API_BASE_URL}/api/results/review-student-all`;
+      const res = await fetch(reviewUrl, {
+        method: 'POST',
+        body: JSON.stringify({
+          studentId,
+          className: normalizedClassName,
+          term: normalizedTerm
+        }),
+        headers: { 'Content-Type': 'application/json' }
+      });
+      const data = await res.json();
+      if (res.ok && data.success) {
+        setMessage('Result updated and marked as reviewed!');
+        setTimeout(() => setMessage(''), 1500);
+        setTimeout(() => {
+          setRefreshKey(prev => prev + 1);
+        }, 700);
+        setReviewLoading(false);
+      } else {
+        setMessage(data.error || 'Failed to mark as reviewed.');
+        setReviewLoading(false);
+      }
+    } catch (err) {
+      setMessage('Network error. Please try again.');
       setReviewLoading(false);
     }
-  } catch (err) {
-    setMessage('Network error. Please try again.');
-    setReviewLoading(false);
-  }
-};
+  };
 
   // Check if all students are reviewed
   useEffect(() => {
@@ -260,6 +361,7 @@ const VerifyResult = () => {
   const handleClassVerification = () => {
     const classVerifyUrl = `${API_BASE_URL}/api/results/verify-class`;
     setMessage(''); // Clear previous messages
+    setClassVerificationLoading(true);
     fetch(classVerifyUrl, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -272,8 +374,8 @@ const VerifyResult = () => {
       .then(async res => {
         const data = await res.json();
         if (!res.ok) {
-          // Show error from backend (e.g., invalid token)
           setMessage(data.error || 'Verification failed. Please check the token and try again.');
+          setClassVerificationLoading(false);
           return;
         }
         alert('Class results verified and pushed to students!');
@@ -284,14 +386,37 @@ const VerifyResult = () => {
         setEditResults({});
         setViewingStudent(null);
         setAllVerified(false);
+        setClassVerificationLoading(false);
       })
       .catch(() => {
         setMessage('Network error. Please try again.');
+        setClassVerificationLoading(false);
       });
   };
 
   // Utility function for ObjectId validation
   const isValidObjectId = id => typeof id === 'string' && /^[a-fA-F0-9]{24}$/.test(id);
+
+  // --- Add these helper functions at the top, just like in the teacher portal ---
+  function getGrade(score) {
+    if (score >= 75 && score <= 100) return "A1";
+    if (score >= 70 && score < 75) return "B2";
+    if (score >= 65 && score < 70) return "B3";
+    if (score >= 60 && score < 65) return "C4";
+    if (score >= 55 && score < 60) return "C5";
+    if (score >= 50 && score < 55) return "C6";
+    if (score >= 45 && score < 50) return "D7";
+    if (score >= 40 && score < 45) return "E8";
+    return "F9";
+  }
+  function getRemark(grade) {
+    if (grade === "A1") return "Excellent";
+    if (grade === "B2" || grade === "B3") return "Very Good";
+    if (grade === "C4" || grade === "C5" || grade === "C6") return "Good";
+    if (grade === "D7" || grade === "E8") return "Pass";
+    if (grade === "F9") return "Fail";
+    return "";
+  }
 
   return (
     <div>
@@ -414,26 +539,105 @@ const VerifyResult = () => {
                 ) : (
                   <>
                     {/* Results Table */}
-                    <ResultsTable
-                      results={
-                        editResults[viewingStudent] && editResults[viewingStudent].subjects
-                          ? Object.values(editResults[viewingStudent])
-                              .filter(r => typeof r === 'object' && r.subject)
-                              .map(r => ({
-                                ...r,
-                                remarks: r.remarks || '',
-                                score: r.score || 0,
-                              }))
-                          : []
-                      }
-                      editable={true}
-                      onChange={(subject, field, value) =>
-                        handleResultChange(viewingStudent, subject, {
-                          ...editResults[viewingStudent][subject],
-                          [field]: value
-                        })
-                      }
-                    />
+                    <table className="min-w-full border border-border rounded mb-4">
+                      <thead>
+                        <tr>
+                          <th className="px-2 py-2 border-r border-border text-center">Subject</th>
+                          <th className="px-2 py-2 border-r border-border text-center">C.A.T (30%)</th>
+                          <th className="px-2 py-2 border-r border-border text-center">Exam (70%)</th>
+                          <th className="px-2 py-2 border-r border-border text-center">Total (100%)</th>
+                          <th className="px-2 py-2 border-r border-border text-center">Max Score</th>
+                          <th className="px-2 py-2 border-r border-border text-center">Min Score</th>
+                          <th className="px-2 py-2 border-r border-border text-center">Grade</th>
+                          <th className="px-2 py-2 text-center">Remark</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {editResults[viewingStudent]?.subjects?.map(subject => {
+                          const cat1 = Number(editResults[viewingStudent]?.[subject]?.cat1 ?? 0);
+                          const exam = Number(editResults[viewingStudent]?.[subject]?.exam ?? 0);
+                          const total = cat1 + exam;
+                          const maxScore = editResults[viewingStudent]?.[subject]?.maxScore || '';
+                          const minScore = editResults[viewingStudent]?.[subject]?.minScore || '';
+                          const grade = editResults[viewingStudent]?.[subject]?.grade || '';
+                          const remark = editResults[viewingStudent]?.[subject]?.remark || '';
+                          return (
+                            <tr key={subject}>
+                              <td className="px-2 py-2 border-r border-border text-center">{subject}</td>
+                              <td className="px-2 py-2 border-r border-border text-center">
+                                <input
+                                  type="number"
+                                  min="0"
+                                  max="30"
+                                  value={editResults[viewingStudent]?.[subject]?.cat1 ?? ''}
+                                  onChange={e => handleResultChange(viewingStudent, subject, { ...editResults[viewingStudent][subject], cat1: e.target.value })}
+                                  className="border rounded px-2 py-1 w-16 text-center"
+                                />
+                              </td>
+                              <td className="px-2 py-2 border-r border-border text-center">
+                                <input
+                                  type="number"
+                                  min="0"
+                                  max="70"
+                                  value={editResults[viewingStudent]?.[subject]?.exam ?? ''}
+                                  onChange={e => handleResultChange(viewingStudent, subject, { ...editResults[viewingStudent][subject], exam: e.target.value })}
+                                  className="border rounded px-2 py-1 w-16 text-center"
+                                />
+                              </td>
+                              <td className="px-2 py-2 border-r border-border text-center font-bold text-primary">{total}</td>
+                              <td className="px-2 py-2 border-r border-border text-center">
+                                <input
+                                  type="number"
+                                  min="0"
+                                  max="100"
+                                  value={maxScore}
+                                  onChange={e => handleResultChange(viewingStudent, subject, { ...editResults[viewingStudent][subject], maxScore: e.target.value })}
+                                  className="border rounded px-2 py-1 w-16 text-center"
+                                />
+                              </td>
+                              <td className="px-2 py-2 border-r border-border text-center">
+                                <input
+                                  type="number"
+                                  min="0"
+                                  max="100"
+                                  value={minScore}
+                                  onChange={e => handleResultChange(viewingStudent, subject, { ...editResults[viewingStudent][subject], minScore: e.target.value })}
+                                  className="border rounded px-2 py-1 w-16 text-center"
+                                />
+                              </td>
+                              <td className="px-2 py-2 border-r border-border text-center">
+                                <input
+                                  type="text"
+                                  value={
+                                    editResults[viewingStudent]?.[subject]?.grade !== undefined && editResults[viewingStudent]?.[subject]?.grade !== ''
+                                      ? editResults[viewingStudent]?.[subject]?.grade
+                                      : getGrade(Number(editResults[viewingStudent]?.[subject]?.cat1 ?? 0) + Number(editResults[viewingStudent]?.[subject]?.exam ?? 0))
+                                  }
+                                  onChange={e => handleResultChange(viewingStudent, subject, { ...editResults[viewingStudent][subject], grade: e.target.value })}
+                                  className="border rounded px-2 py-1 w-16 text-center"
+                                />
+                              </td>
+                              <td className="px-2 py-2 text-center">
+                                <input
+                                  type="text"
+                                  value={
+                                    editResults[viewingStudent]?.[subject]?.remark !== undefined && editResults[viewingStudent]?.[subject]?.remark !== ''
+                                      ? editResults[viewingStudent]?.[subject]?.remark
+                                      : getRemark(
+                                          editResults[viewingStudent]?.[subject]?.grade !== undefined && editResults[viewingStudent]?.[subject]?.grade !== ''
+                                            ? editResults[viewingStudent]?.[subject]?.grade
+                                            : getGrade(Number(editResults[viewingStudent]?.[subject]?.cat1 ?? 0) + Number(editResults[viewingStudent]?.[subject]?.exam ?? 0))
+                                      )
+                                  }
+                                  onChange={e => handleResultChange(viewingStudent, subject, { ...editResults[viewingStudent][subject], remark: e.target.value })}
+                                  className="border rounded px-2 py-1 w-24 text-center"
+                                />
+                              </td>
+                            </tr>
+                          );
+                        })}
+                      </tbody>
+                    </table>
 
                     {/* Subjects List */}
                     <div className="my-4">
@@ -511,16 +715,16 @@ const VerifyResult = () => {
                           className="border rounded px-2 py-1 w-full"
                         />
                       </div>
-                      <div className="flex-1">
-                        <label className="font-semibold">Signature & Date:</label>
-                        <input
-                          type="text"
-                          value={editResults[viewingStudent]?.signatureDate || ''}
-                          onChange={e =>
-                            handleResultChange(viewingStudent, 'signatureDate', e.target.value)
-                          }
-                          className="border rounded px-2 py-1 w-full"
-                        />
+                      <div className="flex-1 flex flex-col items-center justify-center">
+                        <label className="font-semibold">Rector's Signature:</label>
+                        <div className="flex items-center mt-2 justify-center">
+                          <img
+                            src="/assets/images/rector-signature.jpg"
+                            alt="Rector's Signature"
+                            className="h-16 object-contain"
+                            style={{ background: '#fff', borderRadius: '4px', border: '1px solid #eee', padding: '4px' }}
+                          />
+                        </div>
                       </div>
                       <div className="flex-1 mt-4 md:mt-0">
                         <label className="font-semibold">Rectors Remark:</label>
@@ -581,49 +785,37 @@ const VerifyResult = () => {
                           className="border rounded px-2 py-1 w-full"
                         />
                       </div>
-                      <div>
-                        <label className="font-semibold">Total Score:</label>
-                        <input
-                          type="number"
-                          value={editResults[viewingStudent]?.totalScore || ''}
-                          onChange={e =>
-                            handleResultChange(viewingStudent, 'totalScore', e.target.value)
-                          }
-                          className="border rounded px-2 py-1 w-full"
-                        />
-                      </div>
-                      <div>
-                        <label className="font-semibold">Project Defence:</label>
-                        <input
-                          type="text"
-                          value={editResults[viewingStudent]?.projectDefence || ''}
-                          onChange={e =>
-                            handleResultChange(viewingStudent, 'projectDefence', e.target.value)
-                          }
-                          className="border rounded px-2 py-1 w-full"
-                        />
-                      </div>
-                      <div>
-                        <label className="font-semibold">Over-all Score:</label>
-                        <input
-                          type="number"
-                          value={editResults[viewingStudent]?.overallScore || ''}
-                          onChange={e =>
-                            handleResultChange(viewingStudent, 'overallScore', e.target.value)
-                          }
-                          className="border rounded px-2 py-1 w-full"
-                        />
-                      </div>
+                      {/* --- Average (auto-calculate, read-only) --- */}
                       <div>
                         <label className="font-semibold">Average:</label>
-                        <input
-                          type="number"
-                          value={editResults[viewingStudent]?.average || ''}
-                          onChange={e =>
-                            handleResultChange(viewingStudent, 'average', e.target.value)
-                          }
-                          className="border rounded px-2 py-1 w-full"
-                        />
+                        {(() => {
+                          const manualAverage = editResults[viewingStudent]?.average;
+                          const subjectTotals = editResults[viewingStudent]?.subjects?.map(subject => {
+                            const subjObj = editResults[viewingStudent]?.[subject];
+                            const cat1 = Number(subjObj?.cat1 || subjObj?.[`${subject}_cat1`] || 0);
+                            const exam = Number(subjObj?.exam || subjObj?.[`${subject}_exam`] || 0);
+                            return cat1 + exam;
+                          }) || [];
+                          let autoAverage =
+                            subjectTotals.length > 0
+                              ? (subjectTotals.reduce((a, b) => a + b, 0) / subjectTotals.length)
+                              : '';
+                          if (autoAverage !== '' && autoAverage > 100) autoAverage = 100;
+                          autoAverage = autoAverage !== '' ? Number(autoAverage).toFixed(1) : '';
+                          const displayAverage =
+                            manualAverage !== undefined && manualAverage !== null && manualAverage !== ''
+                              ? manualAverage
+                              : autoAverage;
+                          return (
+                            <input
+                              type="number"
+                              step="0.1"
+                              className="border rounded px-2 py-1 w-full"
+                              value={displayAverage}
+                              readOnly
+                            />
+                          );
+                        })()}
                       </div>
                       <div>
                         <label className="font-semibold">Next Term Begins:</label>
@@ -676,9 +868,9 @@ const VerifyResult = () => {
               <button
                 className="px-4 py-2 bg-success text-white rounded hover:bg-success/80 transition"
                 onClick={handleClassVerification}
-                disabled={!tokenInput}
+                disabled={!tokenInput || classVerificationLoading}
               >
-                Confirm Class Verification
+                {classVerificationLoading ? 'Verifying...' : 'Confirm Class Verification'}
               </button>
             </div>
           )}

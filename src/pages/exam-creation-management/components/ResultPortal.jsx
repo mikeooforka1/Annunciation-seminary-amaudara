@@ -12,12 +12,147 @@ const terms = [
 ];
 
 const API_BASE_URL = process.env.REACT_APP_API_BASE_URL;
-
+function getGrade(score) {
+  if (score >= 75 && score <= 100) return "A1";
+  if (score >= 70 && score < 75) return "B2";
+  if (score >= 65 && score < 70) return "B3";
+  if (score >= 60 && score < 65) return "C4";
+  if (score >= 55 && score < 60) return "C5";
+  if (score >= 50 && score < 55) return "C6";
+  if (score >= 45 && score < 50) return "D7";
+  if (score >= 40 && score < 45) return "E8";
+  return "F9";
+}
+function getRemark(grade) {
+  if (grade === "A1") return "Excellent";
+  if (grade === "B2" || grade === "B3") return "Very Good";
+  if (grade === "C4" || grade === "C5" || grade === "C6") return "Good";
+  if (grade === "D7" || grade === "E8") return "Pass";
+  if (grade === "F9") return "Fail";
+  return "";
+}
 const ResultPortal = () => {
     const [teacherData, setTeacherData] = useState(null);
     const [selectedTerm, setSelectedTerm] = useState('');
     const [students, setStudents] = useState([]);
-    const [subjects, setSubjects] = useState(['Mathematics', 'English', 'Biology', 'Physics', 'Chemistry']);
+    const [subjects, setSubjects] = useState(() => {
+  const className = (typeof teacherData?.className === 'string' ? teacherData.className.toLowerCase() : '');
+  if (className === 'ss3a') {
+    return [
+      'Maths',
+      'Biology',
+      'Geography',
+      'Chemistry',
+      'Livestock Management',
+      'Computer',
+      'CRS',
+      'Igbo'
+    ];
+  }
+  if (className === 'ss3b') {
+    return [
+      'Maths',
+      'Lit-in-Eng',
+      'Igbo',
+      'Live Stock  Management',
+      'CRS',
+      'Computer',
+      'Government'
+    ];
+  }
+  if (className === 'ss2a') {
+    return [
+      'Maths',
+      'CRS',
+      'Igbo',
+      'Latin',
+      'French',
+      'Physics',
+      'Chemistry',
+      'Biology',
+      'Geography',
+      'Computer'
+    ];
+  }
+  if (className === 'ss2b') {
+    return [
+      'Maths',
+      'CRS',
+      'Igbo',
+      'French',
+      'Latin',
+      'Computer',
+      'Lit-in-Eng',
+      'Government',
+      'History',
+      'Commerce',
+      'Economics'
+    ];
+  }
+  if (className === 'ss1' || className === 'ss1a' || className === 'ss1b') {
+    return [
+      'Maths',
+      'Chemistry',
+      'Physics',
+      'Government',
+      'Lit-in-Eng',
+      'Latin',
+      'CRS',
+      'Computer',
+      'Geography',
+      'Igbo',
+      'French'
+    ];
+  }
+  if (className === 'jss3' || className === 'jss3a' || className === 'jss3b') {
+    return [
+      'English Language',
+      'Maths',
+      'Agric',
+      'PHE',
+      'Civic',
+      'Igbo',
+      'Social',
+      'Computer',
+      'Home Economics',
+      'French',
+      'CRS',
+      'Music'
+    ];
+  }
+  if (className === 'jss2' || className === 'jss2a' || className === 'jss2b') {
+    return [
+      'English Language',
+      'Maths',
+      'Agric',
+      'PHE',
+      'Social Studies',
+      'Civic',
+      'Basic Science',
+      'Home Economics',
+      'Basic Tech',
+      'French',
+      'CRS',
+      'Music'
+    ];
+  }
+  // Default to JSS1 subjects
+  return [
+    'English Language',
+    'Mathematics',
+    'Agric Science',
+    'Civic Education',
+    'Social Science',
+    'Igbo Language',
+    'Basic Science',
+    'Home Economics',
+    'Computer',
+    'Basic Tech',
+    'French',
+    'CRS',
+    'Music'
+  ];
+});
     const [newSubject, setNewSubject] = useState('');
     const [results, setResults] = useState({});
     const [overall, setOverall] = useState({});
@@ -37,6 +172,25 @@ const ResultPortal = () => {
 
 
     function buildSaveAllPayload(studentId, isPush = false) {
+  // Calculate average if not set
+  const studentResults = results[studentId] || {};
+  const studentSubjects = subjects || [];
+  let manualAverage = studentResults.average;
+  let autoAverage = '';
+  if (!manualAverage) {
+    const subjectTotals = studentSubjects.map(subject => {
+      const cat1 = Number(studentResults[`${subject}_cat1`] || 0);
+      const exam = Number(studentResults[`${subject}_exam`] || 0);
+      return cat1 + exam;
+    });
+    autoAverage =
+      subjectTotals.length > 0
+        ? (subjectTotals.reduce((a, b) => a + b, 0) / subjectTotals.length)
+        : '';
+    if (autoAverage !== '' && autoAverage > 100) autoAverage = 100;
+    autoAverage = autoAverage !== '' ? Number(autoAverage).toFixed(1) : '';
+  }
+
   return {
     studentId,
     teacherId: teacherData?._id,
@@ -44,10 +198,14 @@ const ResultPortal = () => {
     term: selectedTerm,
     subjects,
     caScores: caScores[studentId] || {},
-    ...results[studentId],   // flatten subject fields
-    ...overall[studentId],   // flatten overall/meta fields
-    isPush, // <-- Always include isPush
+    ...results[studentId],
+    ...overall[studentId],
+    average: manualAverage !== undefined && manualAverage !== null && manualAverage !== ''
+      ? manualAverage
+      : autoAverage,
+    isPush,
   };
+  
 }
     // 1. Load subjects from localStorage on mount (per class/term)
     useEffect(() => {
@@ -371,6 +529,7 @@ useEffect(() => {
     }
 }, [teacherResults, students, subjects]);
 
+
     // --- ADDED: Track pushed status for each student ---
     useEffect(() => {
       if (teacherResults.length && students.length) {
@@ -547,14 +706,37 @@ useEffect(() => {
 
     // Handle result input change
     const handleResultChange = (studentId, field, value) => {
-      setDirtyStudents(prev => ({ ...prev, [studentId]: true })); // <-- Set dirty flag
-      setResults(prev => ({
-        ...prev,
-        [studentId]: {
-          ...(prev[studentId] || {}),
-          [field]: keyRatingFields.includes(field) && value !== '' ? Number(value) : value
+      setDirtyStudents(prev => ({ ...prev, [studentId]: true }));
+
+      setResults(prev => {
+        const updated = {
+          ...prev,
+          [studentId]: {
+            ...(prev[studentId] || {}),
+            [field]: value
+          }
+        };
+
+        // Auto-calculate total, grade, and remark for the subject if any score field changes
+        const [subject, part] = field.split('_');
+        if (subjects.includes(subject)) {
+          const cat1 = Number(updated[studentId][`${subject}_cat1`] || 0);
+          const exam = Number(updated[studentId][`${subject}_exam`] || 0);
+          const total = cat1 + exam;
+
+          // Only auto-fill if user hasn't manually set total/grade/remark
+          if (!updated[studentId][`${subject}_total_manual`]) {
+            updated[studentId][`${subject}_total`] = total;
+          }
+          if (!updated[studentId][`${subject}_grade_manual`]) {
+            updated[studentId][`${subject}_grade`] = getGrade(total);
+          }
+          if (!updated[studentId][`${subject}_remark_manual`]) {
+            updated[studentId][`${subject}_remark`] = getRemark(getGrade(total));
+          }
         }
-      }));
+        return updated;
+      });
     };
 
     // Handle overall score and position change (manual edit)
@@ -573,112 +755,48 @@ useEffect(() => {
 
     // Submit results for all students
     const handleSubmitResults = async () => {
-        setIsSubmitting(true);
-        setSuccessMsg('');
-        setErrorMsg('');
-        let allSuccess = true;
-        let failedStudents = [];
-        let emptySubjects = [];
+  setIsSubmitting(true);
+  setSuccessMsg('');
+  setErrorMsg('');
+  let allSuccess = true;
+  let failedStudents = [];
+  let emptySubjects = [];
 
-        try {
-            for (const student of students) {
-                let studentSuccess = true;
-                for (const subject of subjects) {
-                    const score = results?.[student._id]?.[subject];
-                    if (score !== undefined && score !== '') {
-                        const res = await fetch(`${API_BASE_URL}/api/results/set`, {
-                            method: 'POST',
-                            headers: { 'Content-Type': 'application/json' },
-                            body: JSON.stringify({
-                                studentId: student._id,
-                                teacherId: teacherData._id,
-                                className: teacherData.className,
-                                term: selectedTerm,
-                                subject,
-                                score: Number(score),
-                                remarks: ''
-                            })
-                        });
-                        if (!res.ok) {
-                            studentSuccess = false;
-                            allSuccess = false;
-                        }
-                    }
-                    // Push C/A score (moved inside subject loop)
-                    const caScore = caScores?.[student._id]?.[subject];
-                    if (caScore !== undefined && caScore !== '') {
-                        await fetch(`${API_BASE_URL}/api/results/set`, {
-                            method: 'POST',
-                            headers: { 'Content-Type': 'application/json' },
-                            body: JSON.stringify({
-                                studentId: student._id,
-                                teacherId: teacherData._id,
-                                className: teacherData.className,
-                                term: selectedTerm,
-                                subject: `${subject} C/A`,
-                                score: Number(caScore),
-                                remarks: ''
-                            })
-                        });
-                    }
-                }
-                // Save overall score and position
-                const overallScore = overall?.[student._id]?.overallScore;
-                const position = overall?.[student._id]?.position;
-                if (
-                  overallScore !== undefined &&
-                  overallScore !== null &&
-                  overallScore !== '' // Allow 0
-                ) {
-                  const res = await fetch(`${API_BASE_URL}/api/results/set`, {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({
-                      studentId: student._id,
-                      teacherId: teacherData._id,
-                      className: teacherData.className,
-                      term: selectedTerm,
-                      subject: 'Overall',
-                      score: Number(overallScore),
-                      remarks: `Position: ${position || ''}`,
-                      isPush: true
-                    })
-                  });
-                  if (!res.ok) {
-                    studentSuccess = false;
-                    allSuccess = false;
-                  }
-                }
-                if (!studentSuccess) {
-                    failedStudents.push(student.name || student._id);
-                }
-            }
-            if (emptySubjects.length > 0) {
-              setErrorMsg(`Please enter at least one field for: ${emptySubjects.join(', ')} before saving/pushing.`);
-              setIsSubmitting(false);
-              return;
-            }
-            if (allSuccess) {
-                setSuccessMsg('Results have been successfully pushed to students.');
-            } else {
-                setErrorMsg(`Failed to push results for: ${failedStudents.join(', ')}. Please try again.`);
-            }
-        } catch (err) {
-            setErrorMsg('Failed to push results. Please try again.');
-        }
-        setIsSubmitting(false);
-    };
+  try {
+    for (const student of students) {
+      // Always use buildSaveAllPayload to include average, C.A.T, Exam, etc.
+      const savePayload = buildSaveAllPayload(student._id, false); // isPush: false for save
+      const res = await fetch(`${API_BASE_URL}/api/results/save-all`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(savePayload),
+      });
+      if (!res.ok) {
+        allSuccess = false;
+        failedStudents.push(student.name);
+      }
+    }
+    if (allSuccess) {
+      setSuccessMsg('Results have been successfully saved for all students.');
+    } else {
+      setErrorMsg(`Failed to save results for: ${failedStudents.join(', ')}. Please try again.`);
+    }
+  } catch (err) {
+    setErrorMsg('Failed to save results. Please try again.');
+  }
+  setIsSubmitting(false);
+};
 
-    // Push individual student result
-    const handlePushIndividualResult = async (studentId) => {
+// Push individual student result
+const handlePushIndividualResult = async (studentId) => {
   if (resultsPushed[studentId]) return; // Prevent double push
   setIsSubmitting(true);
   setSuccessMsg('');
   setErrorMsg('');
   let success = true;
   try {
-    // Save all fields first (ensures detailed data is in backend before pushing)
-    const savePayload = buildSaveAllPayload(studentId, true); // Always isPush: true for push
+    // Always use buildSaveAllPayload to include average, C.A.T, Exam, etc.
+    const savePayload = buildSaveAllPayload(studentId, true); // isPush: true for push
     const saveRes = await fetch(`${API_BASE_URL}/api/results/save-all`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -972,6 +1090,8 @@ useEffect(() => {
 }, [selectedStudent, teacherData, selectedTerm, subjects]);
 // --- END REPLACE ---
 
+
+
     // Term selection before entering main page
     if (!selectedTerm) {
         return (
@@ -1017,7 +1137,7 @@ useEffect(() => {
         }))
         .sort((a, b) => b.overallScore - a.overallScore);
 
-    // Assign positions (1st, 2nd, 3rd, etc.), handling ties
+    // Assign positions (1st, 2nd, 3rd, 4th, ...), handling ties
     let lastScore = null;
     let lastPosition = 0;
     let skip = 1;
@@ -1110,10 +1230,8 @@ useEffect(() => {
                     <thead>
                       <tr>
                         <th className="px-2 py-2 text-left font-semibold text-muted-foreground">Subject</th>
-                        <th className="px-2 py-2 text-left font-semibold text-muted-foreground">Project (10%)</th>
-                        <th className="px-2 py-2 text-left font-semibold text-muted-foreground">1st C.A.T (20%)</th>
-                        <th className="px-2 py-2 text-left font-semibold text-muted-foreground">2nd C.A.T (20%)</th>
-                        <th className="px-2 py-2 text-left font-semibold text-muted-foreground">Exam (50%)</th>
+                        <th className="px-2 py-2 text-left font-semibold text-muted-foreground">C.A.T (30%)</th>
+                        <th className="px-2 py-2 text-left font-semibold text-muted-foreground">Exam (70%)</th>
                         <th className="px-2 py-2 text-left font-semibold text-muted-foreground">Total (100%)</th>
                         <th className="px-2 py-2 text-left font-semibold text-muted-foreground">Max Score</th>
                         <th className="px-2 py-2 text-left font-semibold text-muted-foreground">Min Score</th>
@@ -1123,57 +1241,33 @@ useEffect(() => {
                     </thead>
                     <tbody>
                       {subjects.map(subject => {
-                        // Calculate total automatically
-                        const project = Number(results?.[selectedStudent._id]?.[`${subject}_project`] || 0);
+                        // Only one C.A.T (cat1, 30) and Exam (70)
                         const cat1 = Number(results?.[selectedStudent._id]?.[`${subject}_cat1`] || 0);
-                        const cat2 = Number(results?.[selectedStudent._id]?.[`${subject}_cat2`] || 0);
                         const exam = Number(results?.[selectedStudent._id]?.[`${subject}_exam`] || 0);
-                        const total = project + cat1 + cat2 + exam;
+                        const total = cat1 + exam;
 
                         return (
                           <tr key={subject}>
                             <td className="px-2 py-2">{subject}</td>
+                            {/* Only one C.A.T */}
                             <td className="px-2 py-2">
                               <input
                                 type="number"
                                 min="0"
-                                max="10"
-                                className="w-16 border rounded-lg px-2 py-1"
-                                value={results?.[selectedStudent._id]?.[`${subject}_project`] || ''}
-                                onChange={e => !isReadOnly && handleResultChange(selectedStudent._id, `${subject}_project`, e.target.value)}
-                                placeholder="Project"
-                                readOnly={isReadOnly}
-                              />
-                            </td>
-                            <td className="px-2 py-2">
-                              <input
-                                type="number"
-                                min="0"
-                                max="20"
+                                max="30"
                                 className="w-16 border rounded-lg px-2 py-1"
                                 value={results?.[selectedStudent._id]?.[`${subject}_cat1`] || ''}
                                 onChange={e => !isReadOnly && handleResultChange(selectedStudent._id, `${subject}_cat1`, e.target.value)}
-                                placeholder="1st C.A.T"
+                                placeholder="C.A.T"
                                 readOnly={isReadOnly}
                               />
                             </td>
+                            {/* Exam */}
                             <td className="px-2 py-2">
                               <input
                                 type="number"
                                 min="0"
-                                max="20"
-                                className="w-16 border rounded-lg px-2 py-1"
-                                value={results?.[selectedStudent._id]?.[`${subject}_cat2`] || ''}
-                                onChange={e => !isReadOnly && handleResultChange(selectedStudent._id, `${subject}_cat2`, e.target.value)}
-                                placeholder="2nd C.A.T"
-                                readOnly={isReadOnly}
-                              />
-                            </td>
-                            <td className="px-2 py-2">
-                              <input
-                                type="number"
-                                min="0"
-                                max="50"
+                                max="70"
                                 className="w-16 border rounded-lg px-2 py-1"
                                 value={results?.[selectedStudent._id]?.[`${subject}_exam`] || ''}
                                 onChange={e => !isReadOnly && handleResultChange(selectedStudent._id, `${subject}_exam`, e.target.value)}
@@ -1181,9 +1275,11 @@ useEffect(() => {
                                 readOnly={isReadOnly}
                               />
                             </td>
+                            {/* Total */}
                             <td className="px-2 py-2 font-bold text-primary">
                               {total}
                             </td>
+                            {/* Max Score */}
                             <td className="px-2 py-2">
                               <input
                                 type="number"
@@ -1191,11 +1287,21 @@ useEffect(() => {
                                 max="100"
                                 className="w-16 border rounded-lg px-2 py-1"
                                 value={results?.[selectedStudent._id]?.[`${subject}_maxScore`] || ''}
-                                onChange={e => !isReadOnly && handleResultChange(selectedStudent._id, `${subject}_maxScore`, e.target.value)}
+                                onChange={e => {
+                                  handleResultChange(selectedStudent._id, `${subject}_maxScore`, e.target.value);
+                                  setResults(prev => ({
+                                    ...prev,
+                                    [selectedStudent._id]: {
+                                      ...(prev[selectedStudent._id] || {}),
+                                      [`${subject}_maxScore_manual`]: true
+                                    }
+                                  }));
+                                }}
                                 placeholder="Max"
                                 readOnly={isReadOnly}
                               />
                             </td>
+                            {/* Min Score */}
                             <td className="px-2 py-2">
                               <input
                                 type="number"
@@ -1203,27 +1309,56 @@ useEffect(() => {
                                 max="100"
                                 className="w-16 border rounded-lg px-2 py-1"
                                 value={results?.[selectedStudent._id]?.[`${subject}_minScore`] || ''}
-                                onChange={e => !isReadOnly && handleResultChange(selectedStudent._id, `${subject}_minScore`, e.target.value)}
+                                onChange={e => {
+                                  handleResultChange(selectedStudent._id, `${subject}_minScore`, e.target.value);
+                                  setResults(prev => ({
+                                    ...prev,
+                                    [selectedStudent._id]: {
+                                      ...(prev[selectedStudent._id] || {}),
+                                      [`${subject}_minScore_manual`]: true
+                                    }
+                                  }));
+                                }}
                                 placeholder="Min"
                                 readOnly={isReadOnly}
                               />
                             </td>
+                            {/* Grade */}
                             <td className="px-2 py-2">
                               <input
                                 type="text"
                                 className="w-16 border rounded-lg px-2 py-1"
                                 value={results?.[selectedStudent._id]?.[`${subject}_grade`] || ''}
-                                onChange={e => !isReadOnly && handleResultChange(selectedStudent._id, `${subject}_grade`, e.target.value)}
+                                onChange={e => {
+                                  handleResultChange(selectedStudent._id, `${subject}_grade`, e.target.value);
+                                  setResults(prev => ({
+                                    ...prev,
+                                    [selectedStudent._id]: {
+                                      ...(prev[selectedStudent._id] || {}),
+                                      [`${subject}_grade_manual`]: true
+                                    }
+                                  }));
+                                }}
                                 placeholder="Grade"
                                 readOnly={isReadOnly}
                               />
                             </td>
+                            {/* Remark */}
                             <td className="px-2 py-2">
                               <input
                                 type="text"
                                 className="w-24 border rounded-lg px-2 py-1"
                                 value={results?.[selectedStudent._id]?.[`${subject}_remark`] || ''}
-                                onChange={e => !isReadOnly && handleResultChange(selectedStudent._id, `${subject}_remark`, e.target.value)}
+                                onChange={e => {
+                                  handleResultChange(selectedStudent._id, `${subject}_remark`, e.target.value);
+                                  setResults(prev => ({
+                                    ...prev,
+                                    [selectedStudent._id]: {
+                                      ...(prev[selectedStudent._id] || {}),
+                                      [`${subject}_remark_manual`]: true
+                                    }
+                                  }));
+                                }}
                                 placeholder="Remark"
                                 readOnly={isReadOnly}
                               />
@@ -1322,17 +1457,17 @@ useEffect(() => {
                             readOnly={isReadOnly}
                         />
                     </div>
-                    <div>
-                        <label className="font-semibold">Signature & Date:</label>
-                        <input
-                            type="text"
-                            className="border rounded px-2 py-1 w-full"
-                            value={results?.[selectedStudent._id]?.signatureDate || ''}
-                            onChange={e => handleResultChange(selectedStudent._id, 'signatureDate', e.target.value)}
-                            placeholder="Signature & Date"
-                            readOnly={isReadOnly}
-                        />
-                    </div>
+                  <div>
+    <label className="font-semibold">Rector's Signature:</label>
+    <div className="flex items-center mt-2">
+        <img
+            src="/assets/images/rector-signature.jpg"
+            alt="Rector's Signature"
+            className="h-16 object-contain"
+            style={{ background: '#fff', borderRadius: '4px', border: '1px solid #eee', padding: '4px' }}
+        />
+    </div>
+</div>
                     <div>
                         <label className="font-semibold">Rectors Remark:</label>
                         <textarea
@@ -1390,50 +1525,47 @@ useEffect(() => {
                       readOnly={isReadOnly}
                     />
                   </div>
-                  <div>
-                    <label className="font-semibold">Total Score:</label>
-                    <input
-                      type="number"
-                      className="border rounded px-2 py-1 w-full"
-                      value={results?.[selectedStudent._id]?.totalScore || ''}
-                      onChange={e => handleResultChange(selectedStudent._id, 'totalScore', e.target.value)}
-                      placeholder="Total Score"
-                      readOnly={isReadOnly}
-                    />
-                  </div>
-                  <div>
-                    <label className="font-semibold">Project Defence:</label>
-                    <input
-                      type="text"
-                      className="border rounded px-2 py-1 w-full"
-                      value={results?.[selectedStudent._id]?.projectDefence || ''}
-                      onChange={e => handleResultChange(selectedStudent._id, 'projectDefence', e.target.value)}
-                      placeholder="Project Defence"
-                      readOnly={isReadOnly}
-                    />
-                  </div>
-                  <div>
-                    <label className="font-semibold">Over-all Score:</label>
-                    <input
-                      type="number"
-                      className="border rounded px-2 py-1 w-full"
-                      value={results?.[selectedStudent._id]?.overallScore || ''}
-                      onChange={e => handleResultChange(selectedStudent._id, 'overallScore', e.target.value)}
-                      placeholder="Over-all Score"
-                      readOnly={isReadOnly}
-                    />
-                  </div>
-                  <div>
-                    <label className="font-semibold">Average:</label>
-                    <input
-                      type="number"
-                      className="border rounded px-2 py-1 w-full"
-                      value={results?.[selectedStudent._id]?.average || ''}
-                      onChange={e => handleResultChange(selectedStudent._id, 'average', e.target.value)}
-                      placeholder="Average"
-                      readOnly={isReadOnly}
-                    />
-                  </div>
+                 <div>
+  <label className="font-semibold">Average:</label>
+  {(() => {
+    // Calculate average of subject totals
+    const subjectTotals = subjects.map(subject => {
+      const cat1 = Number(results?.[selectedStudent._id]?.[`${subject}_cat1`] || 0);
+      const exam = Number(results?.[selectedStudent._id]?.[`${subject}_exam`] || 0);
+      return cat1 + exam;
+    });
+    let autoAverage =
+      subjectTotals.length > 0
+        ? (subjectTotals.reduce((a, b) => a + b, 0) / subjectTotals.length)
+        : '';
+    // Clamp to 100
+    if (autoAverage !== '' && autoAverage > 100) autoAverage = 100;
+    autoAverage = autoAverage !== '' ? Number(autoAverage).toFixed(1) : '';
+    // Use manual value if set, else auto
+    const manualAverage = results?.[selectedStudent._id]?.average;
+    const displayAverage =
+      manualAverage !== undefined && manualAverage !== null && manualAverage !== ''
+        ? manualAverage
+        : autoAverage;
+    return (
+      <input
+        type="number"
+        step="0.1"
+        className="border rounded px-2 py-1 w-full"
+        value={displayAverage}
+        onChange={e => handleResultChange(selectedStudent._id, 'average', e.target.value)}
+        placeholder="Average"
+        readOnly={isReadOnly}
+        max={100}
+        title={
+          manualAverage !== undefined && manualAverage !== null && manualAverage !== ''
+            ? 'Manual'
+            : 'Auto-calculated'
+        }
+      />
+    );
+  })()}
+</div>
                   <div>
                     <label className="font-semibold">Next Term Begins:</label>
                     <input

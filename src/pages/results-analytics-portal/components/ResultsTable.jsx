@@ -41,7 +41,7 @@ const ResultsTable = ({
     const baseSubject = result.subject.replace(' C/A', '');
     if (!groupedResults[baseSubject]) groupedResults[baseSubject] = {};
     if (result.subject.endsWith('C/A')) {
-      groupedResults[baseSubject].ca = result;
+      groupedResults[baseSubject].cat1 = result; // Only one C.A.T
     } else if (result.subject !== 'Overall') {
       groupedResults[baseSubject].exam = result;
     }
@@ -49,29 +49,23 @@ const ResultsTable = ({
 
   const getGradeColor = (grade) => {
     switch (String(grade).toUpperCase()) {
-      case 'A':
+      case 'A1':
         return 'text-success';
-      case 'B':
+      case 'B2':
+      case 'B3':
         return 'text-primary';
-      case 'C':
+      case 'C4':
+      case 'C5':
+      case 'C6':
         return 'text-warning';
-      case 'D':
+      case 'D7':
+      case 'E8':
         return 'text-info';
-      case 'E':
-        return 'text-muted-foreground';
-      case 'F':
+      case 'F9':
         return 'text-error';
       default:
         return 'text-muted-foreground';
     }
-  };
-
-  const getPerformanceCategory = (percentage) => {
-    if (percentage >= 90) return 'Excellent';
-    if (percentage >= 80) return 'Very Good';
-    if (percentage >= 70) return 'Good';
-    if (percentage >= 60) return 'Satisfactory';
-    return 'Needs Improvement';
   };
 
   const SortButton = ({ field, children }) => (
@@ -95,12 +89,6 @@ const ResultsTable = ({
     </button>
   );
 
-  // Calculate overall score and position
-  const totalScore = results.reduce((sum, r) => sum + (r.score || 0), 0);
-  const totalMarks = results.reduce((sum, r) => sum + (r.totalMarks || 0), 0);
-  const overallPercentage = totalMarks > 0 ? Math.round((totalScore / totalMarks) * 100) : 0;
-  const position = results[0]?.position || '';
-
   return (
     <div className={`bg-card border border-border rounded-lg ${className} results-table-responsive`}>
       <div className="p-6 border-b border-border">
@@ -108,14 +96,12 @@ const ResultsTable = ({
         <p className="font-body text-sm text-muted-foreground">Complete history of your academic performance</p>
       </div>
       <div className="w-full overflow-x-auto">
-        <table className="min-w-[800px] w-full table-fixed md:table-auto text-xs md:text-sm border border-border rounded-lg overflow-hidden">
+        <table className="min-w-[700px] w-full table-fixed md:table-auto text-xs md:text-sm border border-border rounded-lg overflow-hidden">
           <thead className="bg-muted">
             <tr>
               <th className="px-2 py-2 border-r border-border bg-muted/50 text-center">Subject</th>
-              <th className="px-2 py-2 border-r border-border bg-muted/50 text-center">Project<br /><span className="text-xs text-muted-foreground">(10%)</span></th>
-              <th className="px-2 py-2 border-r border-border bg-muted/50 text-center">1st C.A.T<br /><span className="text-xs text-muted-foreground">(20%)</span></th>
-              <th className="px-2 py-2 border-r border-border bg-muted/50 text-center">2nd C.A.T<br /><span className="text-xs text-muted-foreground">(20%)</span></th>
-              <th className="px-2 py-2 border-r border-border bg-muted/50 text-center">Exam<br /><span className="text-xs text-muted-foreground">(50%)</span></th>
+              <th className="px-2 py-2 border-r border-border bg-muted/50 text-center">C.A.T<br /><span className="text-xs text-muted-foreground">(30%)</span></th>
+              <th className="px-2 py-2 border-r border-border bg-muted/50 text-center">Exam<br /><span className="text-xs text-muted-foreground">(70%)</span></th>
               <th className="px-2 py-2 border-r border-border bg-muted/50 text-center">Total<br /><span className="text-xs text-muted-foreground">(100%)</span></th>
               <th className="px-2 py-2 border-r border-border bg-muted/50 text-center">Max Score</th>
               <th className="px-2 py-2 border-r border-border bg-muted/50 text-center">Min Score</th>
@@ -127,101 +113,63 @@ const ResultsTable = ({
             {Object.keys(groupedResults)
               .filter(subject => subject !== 'Overall')
               .map(subject => {
+                const cat1 = groupedResults[subject].cat1 || {};
                 const exam = groupedResults[subject].exam || {};
-                const safeSubject = typeof subject === 'string' ? subject.replace(' C/A', '') : '';
+                const cat1Score = cat1.score ?? '';
+                const examScore = exam.score ?? '';
+                const total = (Number(cat1Score) || 0) + (Number(examScore) || 0);
                 return (
                   <tr key={subject} className="hover:bg-muted/50 transition-colors">
                     <td className="px-2 py-2 border-r border-border bg-white font-semibold text-center break-words whitespace-normal max-w-[120px] md:max-w-none">
-                      {safeSubject || <span className="italic text-muted-foreground">N/A</span>}
+                      {subject || <span className="italic text-muted-foreground">N/A</span>}
                     </td>
-                    {/* Editable cells for scores */}
+                    {/* C.A.T (30%) */}
                     <td className="px-2 py-2 border-r border-border bg-white text-center">
                       {editable ? (
                         <input
                           type="number"
                           min="0"
-                          max="10"
-                          value={exam.projectScore ?? ''}
-                          onChange={e => onChange(exam.subject, 'projectScore', Number(e.target.value))}
-                          className="border rounded px-2 py-1 w-16 text-center"
-                        />
-                      ) : (
-                        <span className="block p-1 rounded bg-primary/10 border border-primary/20">
-                          {exam.projectScore ?? <span className="italic text-muted-foreground">N/A</span>}
-                        </span>
-                      )}
-                    </td>
-                    <td className="px-2 py-2 border-r border-border bg-white text-center">
-                      {editable ? (
-                        <input
-                          type="number"
-                          min="0"
-                          max="20"
-                          value={exam.firstCatScore ?? ''}
-                          onChange={e => onChange(exam.subject, 'firstCatScore', Number(e.target.value))}
+                          max="30"
+                          value={cat1Score}
+                          onChange={e => onChange(subject, 'cat1', Number(e.target.value))}
                           className="border rounded px-2 py-1 w-16 text-center"
                         />
                       ) : (
                         <span className="block p-1 rounded bg-warning/10 border border-warning/20">
-                          {exam.firstCatScore ?? <span className="italic text-muted-foreground">N/A</span>}
+                          {cat1Score !== '' ? cat1Score : <span className="italic text-muted-foreground">N/A</span>}
                         </span>
                       )}
                     </td>
+                    {/* Exam (70%) */}
                     <td className="px-2 py-2 border-r border-border bg-white text-center">
                       {editable ? (
                         <input
                           type="number"
                           min="0"
-                          max="20"
-                          value={exam.secondCatScore ?? ''}
-                          onChange={e => onChange(exam.subject, 'secondCatScore', Number(e.target.value))}
-                          className="border rounded px-2 py-1 w-16 text-center"
-                        />
-                      ) : (
-                        <span className="block p-1 rounded bg-warning/10 border border-warning/20">
-                          {exam.secondCatScore ?? <span className="italic text-muted-foreground">N/A</span>}
-                        </span>
-                      )}
-                    </td>
-                    <td className="px-2 py-2 border-r border-border bg-white text-center">
-                      {editable ? (
-                        <input
-                          type="number"
-                          min="0"
-                          max="50"
-                          value={exam.examScore ?? exam.score ?? ''}
-                          onChange={e => onChange(exam.subject, 'examScore', Number(e.target.value))}
+                          max="70"
+                          value={examScore}
+                          onChange={e => onChange(subject, 'exam', Number(e.target.value))}
                           className="border rounded px-2 py-1 w-16 text-center"
                         />
                       ) : (
                         <span className="block p-1 rounded bg-success/10 border border-success/20">
-                          {exam.examScore ?? exam.score ?? <span className="italic text-muted-foreground">N/A</span>}
+                          {examScore !== '' ? examScore : <span className="italic text-muted-foreground">N/A</span>}
                         </span>
                       )}
                     </td>
+                    {/* Total (100%) */}
+                    <td className="px-2 py-2 border-r border-border bg-white text-center font-bold text-primary">
+                      {total}
+                    </td>
+                    {/* Max Score */}
                     <td className="px-2 py-2 border-r border-border bg-white text-center">
                       {editable ? (
                         <input
                           type="number"
                           min="0"
                           max="100"
-                          value={exam.totalScore ?? ''}
-                          onChange={e => onChange(exam.subject, 'totalScore', Number(e.target.value))}
-                          className="border rounded px-2 py-1 w-16 text-center"
-                        />
-                      ) : (
-                        <span className="block p-1 rounded bg-muted/10 border border-muted/20">
-                          {exam.totalScore ?? <span className="italic text-muted-foreground">N/A</span>}
-                        </span>
-                      )}
-                    </td>
-                    <td className="px-2 py-2 border-r border-border bg-white text-center">
-                      {editable ? (
-                        <input
-                          type="number"
-                          min="0"
                           value={exam.maxScore ?? ''}
-                          onChange={e => onChange(exam.subject, 'maxScore', Number(e.target.value))}
+                          onChange={e => onChange(subject, 'maxScore', Number(e.target.value))}
                           className="border rounded px-2 py-1 w-16 text-center"
                         />
                       ) : (
@@ -230,13 +178,15 @@ const ResultsTable = ({
                         </span>
                       )}
                     </td>
+                    {/* Min Score */}
                     <td className="px-2 py-2 border-r border-border bg-white text-center">
                       {editable ? (
                         <input
                           type="number"
                           min="0"
+                          max="100"
                           value={exam.minScore ?? ''}
-                          onChange={e => onChange(exam.subject, 'minScore', Number(e.target.value))}
+                          onChange={e => onChange(subject, 'minScore', Number(e.target.value))}
                           className="border rounded px-2 py-1 w-16 text-center"
                         />
                       ) : (
@@ -245,26 +195,31 @@ const ResultsTable = ({
                         </span>
                       )}
                     </td>
+                    {/* Grade */}
                     <td className="px-2 py-2 border-r border-border bg-white text-center">
                       {editable ? (
                         <input
                           type="text"
                           value={exam.grade ?? ''}
-                          onChange={e => onChange(exam.subject, 'grade', e.target.value)}
-                          className={`border rounded px-2 py-1 w-16 text-center ${getGradeColor(exam.grade)}`}
+                          onChange={e => onChange(subject, 'grade', e.target.value)}
+                          className={`border rounded px-2 py-1 w-16 text-center font-bold ${getGradeColor(exam.grade)}`}
                         />
                       ) : (
-                        <span className={`block p-1 rounded border ${getGradeColor(exam.grade)} border-border`}>
+                        <span
+                          className={`block p-1 rounded font-bold ${getGradeColor(exam.grade)}`}
+                          style={{ minWidth: 40 }}
+                        >
                           {exam.grade ?? <span className="italic text-muted-foreground">N/A</span>}
                         </span>
                       )}
                     </td>
+                    {/* Remark */}
                     <td className="px-2 py-2 bg-white text-center">
                       {editable ? (
                         <input
                           type="text"
                           value={exam.remark ?? ''}
-                          onChange={e => onChange(exam.subject, 'remark', e.target.value)}
+                          onChange={e => onChange(subject, 'remark', e.target.value)}
                           className="border rounded px-2 py-1 w-24 text-center"
                         />
                       ) : (

@@ -90,39 +90,34 @@ const ResultsAnalyticsPortal = () => {
         .then(data => {
           if (!Array.isArray(data) || data.length === 0) {
             setExamResults([]);
-            setShowNoResultsModal(true); // Show modal immediately if no results
+            setShowNoResultsModal(true);
             setIsLoadingResults(false);
             return;
           }
-          const formattedResults = data.map((result, idx) => ({
-            ...result,
-            id: idx + 1,
-            date: result.date ? new Date(result.date).toISOString().slice(0, 10) : '',
-            subject: result.subject,
-            subjectIcon: 'BookOpen',
-            examType: '',
-            score: result.score,
-            totalMarks: 100,
-            percentage: result.score,
-            duration: '',
-            remarks: result.remarks || '',
-            term: result.term,
-            className: result.className
-          }));
-
-          const totalScore = formattedResults.reduce((sum, r) => sum + (r.score || 0), 0);
-          const totalMarks = formattedResults.reduce((sum, r) => sum + (r.totalMarks || 0), 0);
-          const overallPercentage = totalMarks > 0 ? Math.round((totalScore / totalMarks) * 100) : 0;
-
-          formattedResults.push({
-            subject: 'Overall',
-            score: overallPercentage,
-            remarks: `Position: ${data[0]?.position || 'N/A'}`
+          // --- INSERT THE MAPPING CODE HERE ---
+          const mappedResults = [];
+          data.forEach(r => {
+            if (r.subject && r.subject !== 'Overall') {
+              mappedResults.push(r);
+              if (typeof r.firstCatScore === 'number' || (typeof r.firstCatScore === 'string' && r.firstCatScore !== '')) {
+                mappedResults.push({
+                  ...r,
+                  subject: r.subject + ' C/A',
+                  score: r.firstCatScore,
+                  examScore: undefined,
+                  grade: undefined,
+                  remark: undefined,
+                  maxScore: undefined,
+                  minScore: undefined,
+                });
+              }
+            } else {
+              mappedResults.push(r);
+            }
           });
+          setExamResults(mappedResults);
 
-          setExamResults(formattedResults);
-
-          const subjectsList = [...new Set(formattedResults.filter(r => r.subject && r.subject !== 'Overall').map(r => r.subject))];
+          const subjectsList = [...new Set(mappedResults.filter(r => r.subject && r.subject !== 'Overall').map(r => r.subject))];
           setSubjects(subjectsList);
 
           setIsLoadingResults(false);
@@ -368,7 +363,12 @@ const ResultsAnalyticsPortal = () => {
   };
 
   const allClassOptions = [
-    'JSS1', 'JSS2', 'JSS3', 'SS1', 'SS2', 'SS3'
+    'JSS1A', 'JSS1B',
+    'JSS2A', 'JSS2B',
+    'JSS3A', 'JSS3B',
+    'SS1A', 'SS1B',
+    'SS2A', 'SS2B',
+    'SS3A', 'SS3B'
   ];
   // Helper to check if previous class should be shown
   const showPreviousClass =
@@ -533,11 +533,9 @@ const ResultsAnalyticsPortal = () => {
                     {userName || 'N/A'}
                   </span>
                 </div>
-                {/* Position added here */}
                 <div>
                   Position: <span className="font-bold">{overallResult?.position || 'N/A'}</span>
                 </div>
-                {/* Removed Gender */}
                 <div>Class: <span className="font-bold">{selectedClass || 'N/A'}</span></div>
                 <div>Term: <span className="font-bold">{selectedTerm || 'N/A'}</span></div>
               </div>
@@ -546,9 +544,6 @@ const ResultsAnalyticsPortal = () => {
                 <div>No. of Times School Opened: <span className="font-bold">{overallResult?.schoolOpened || '____'}</span></div>
                 <div>No. of Time Present: <span className="font-bold">{overallResult?.present || '____'}</span></div>
                 <div>No. of Time Absent: <span className="font-bold">{overallResult?.absent || '____'}</span></div>
-                <div>Total Score: <span className="font-bold">{overallResult?.totalScore || '____'}</span></div>
-                <div>Project Defence: <span className="font-bold">{overallResult?.projectDefence || '____'}</span></div>
-                <div>Over-all Score: <span className="font-bold">{overallResult?.overallScore || '____'}</span></div>
                 <div>Average: <span className="font-bold">{overallResult?.average || '____'}</span></div>
               </div>
               <div className="mt-2 text-sm text-gray-700 px-2 w-full">
@@ -638,9 +633,16 @@ const ResultsAnalyticsPortal = () => {
                 <label className="font-semibold">Deans Remark:</label>
                 <div className="border rounded px-2 py-1 min-h-[32px]">{overallResult?.teacherComment || '_________________________'}</div>
               </div>
-              <div className="flex-1">
-                <label className="font-semibold">Signature & Date:</label>
-                <div className="border rounded px-2 py-1 min-h-[32px]">{overallResult?.signatureDate || '_________________________'}</div>
+              <div className="flex-1 flex flex-col items-center justify-center">
+                <label className="font-semibold">Rector's Signature:</label>
+                <div className="flex items-center mt-2 justify-center">
+                  <img
+                    src="/assets/images/rector-signature.jpg"
+                    alt="Rector's Signature"
+                    className="h-16 object-contain"
+                    style={{ background: '#fff', borderRadius: '4px', border: '1px solid #eee', padding: '4px' }}
+                  />
+                </div>
               </div>
               <div className="flex-1 mt-4 md:mt-0">
                 <label className="font-semibold">Rectors Remark:</label>

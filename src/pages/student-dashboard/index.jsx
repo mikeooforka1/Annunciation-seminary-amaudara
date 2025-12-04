@@ -116,7 +116,6 @@ const StudentDashboard = () => {
     }
     // List required fields (except name, which is read-only)
     const requiredFields = [
-      { key: "email", value: profile.email },
       { key: "gender", value: profile.gender },
       { key: "dob", value: profile.dob },
       { key: "address", value: profile.address },

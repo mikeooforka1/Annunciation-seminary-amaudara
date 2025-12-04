@@ -158,14 +158,7 @@ const ProfilePage = () => {
                 placeholder="Full Name"
                 className="w-full border rounded px-2 py-1 mb-2"
               />
-              <input
-                type="email"
-                name="email"
-                value={profile.email}
-                onChange={handleChange}
-                placeholder="Email"
-                className="w-full border rounded px-2 py-1 mb-2"
-              />
+              {/* Removed email input */}
               <input
                 type="text"
                 name="gradeLevel"
@@ -212,7 +205,7 @@ const ProfilePage = () => {
           ) : (
             <>
               <h2 className="text-xl sm:text-2xl font-bold text-primary mb-2">{profile.name || "Student Name"}</h2>
-              <p className="text-base sm:text-lg font-medium mb-1">Email: {profile.email || "student@email.com"}</p>
+              {/* Removed email display */}
               <p className="text-base sm:text-lg font-medium mb-1">
                 Grade Level: {profile.gradeLevel || "N/A"}
               </p>

@@ -160,6 +160,63 @@ const ResourceLibrarySection = ({ className = '' }) => {
     { id: 'popular', label: 'Popular', icon: 'TrendingUp' }
   ];
 
+  // 1. Get className from localStorage (or props/context)
+  const studentData = JSON.parse(localStorage.getItem("studentData") || "{}");
+  const studentClassName = (typeof studentData?.className === 'string' ? studentData.className.toLowerCase() : '');
+
+  // 2. Define default subjects for each class (copy from ResultPortal.jsx)
+  const getDefaultSubjects = (className) => {
+    if (className === 'ss3a') {
+      return [
+        'Maths', 'Biology', 'Geography', 'Chemistry', 'Livestock Management', 'Computer', 'CRS', 'Igbo'
+      ];
+    }
+    if (className === 'ss3b') {
+      return [
+        'Maths', 'Lit-in-Eng', 'Igbo', 'Live Stock  Management', 'CRS', 'Computer', 'Government'
+      ];
+    }
+    if (className === 'ss2a') {
+      return [
+        'Maths', 'CRS', 'Igbo', 'Latin', 'French', 'Physics', 'Chemistry', 'Biology', 'Geography', 'Computer'
+      ];
+    }
+    if (className === 'ss2b') {
+      return [
+        'Maths', 'CRS', 'Igbo', 'French', 'Latin', 'Computer', 'Lit-in-Eng', 'Government', 'History', 'Commerce', 'Economics'
+      ];
+    }
+    if (className === 'ss1' || className === 'ss1a' || className === 'ss1b') {
+      return [
+        'Maths', 'Chemistry', 'Physics', 'Government', 'Lit-in-Eng', 'Latin', 'CRS', 'Computer', 'Geography', 'Igbo', 'French'
+      ];
+    }
+    if (className === 'jss3' || className === 'jss3a' || className === 'jss3b') {
+      return [
+        'English Language', 'Maths', 'Agric', 'PHE', 'Civic', 'Igbo', 'Social', 'Computer', 'Home Economics', 'French', 'CRS', 'Music'
+      ];
+    }
+    if (className === 'jss2' || className === 'jss2a' || className === 'jss2b') {
+      return [
+        'English Language', 'Maths', 'Agric', 'PHE', 'Social Studies', 'Civic', 'Basic Science', 'Home Economics', 'Basic Tech', 'French', 'CRS', 'Music'
+      ];
+    }
+    // Default to JSS1 subjects
+    return [
+      'English Language', 'Mathematics', 'Agric Science', 'Civic Education', 'Social Science', 'Igbo Language', 'Basic Science', 'Home Economics', 'Computer', 'Basic Tech', 'French', 'CRS', 'Music'
+    ];
+  };
+
+  const defaultSubjects = getDefaultSubjects(studentClassName);
+
+  // 3. Filter resources to only show those matching the default subjects
+  const filteredResources = {};
+  Object.keys(resources).forEach(tab => {
+    filteredResources[tab] = resources[tab].filter(resource =>
+      defaultSubjects.includes(resource.subject)
+    );
+  });
+
   return (
     <div id="resources" className={`bg-card border border-border rounded-lg p-6 ${className}`}>
       <div className="flex items-center justify-between mb-6">
@@ -200,7 +257,7 @@ const ResourceLibrarySection = ({ className = '' }) => {
       </div>
       {/* Resources Grid */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-        {resources?.[activeTab]?.map((resource) => (
+        {filteredResources?.[activeTab]?.map((resource) => (
           <div
             key={resource?.id}
             className="border border-border rounded-lg p-4 hover:shadow-md transition-all duration-200 cursor-pointer hover:border-primary/20 group"

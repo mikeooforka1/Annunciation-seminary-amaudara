@@ -8,11 +8,14 @@ import QuickActionButtons from './components/QuickActionButtons';
 import AcademicCalendarWidget from './components/AcademicCalendarWidget';
 import ResourceLibrarySection from './components/ResourceLibrarySection';
 
+const VOCATION_REPORT_URL = "/assets/docs/vacation_report.pdf"; // Ensure this path is correct
+
 const StudentDashboard = () => {
   const [studentData, setStudentData] = useState(null);
   const [showProfileModal, setShowProfileModal] = useState(false);
   const [profile, setProfile] = useState(null);
   const [profileLoading, setProfileLoading] = useState(true);
+  const [showXmasModal, setShowXmasModal] = useState(false); // New state for xmas modal
   const navigate = useNavigate();
 
   // Map backend fields to dashboard fields (move this above useEffect)
@@ -129,6 +132,11 @@ const StudentDashboard = () => {
     const isProfileEmpty = Object.values(profile).every(val => !val || val === "");
     const isIncomplete = missingFields.length > 0 || isProfileEmpty;
     setShowProfileModal(isIncomplete);
+
+    // Show xmas modal only if profile is complete and not loading
+    if (!isIncomplete && !profileLoading) {
+      setShowXmasModal(true);
+    }
   }, [profile, profileLoading]);
 
   if (profileLoading) {
@@ -158,12 +166,43 @@ const StudentDashboard = () => {
           </div>
         </div>
       )}
+
+      {/* Merry Christmas Modal (same as login page) */}
+      {showXmasModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60">
+          <div className="bg-white rounded-xl shadow-lg max-w-md w-full p-6 text-center relative">
+            <button
+              className="absolute top-2 right-2 text-gray-400 hover:text-gray-700 text-xl"
+              onClick={() => setShowXmasModal(false)}
+              aria-label="Close"
+            >
+              &times;
+            </button>
+            <h2 className="text-2xl font-bold text-green-700 mb-2">🎄 Merry Christmas!</h2>
+            <p className="mb-3 text-base font-semibold text-gray-700">
+              Wishing you a joyful Christmas and a successful academic year ahead!
+            </p>
+            <p className="mb-4 text-sm text-gray-600">
+              <span className="font-bold text-red-600">Important:</span> All students are required to download and print their <span className="font-bold">Vacation Report</span> before returning to school. <br />
+              <span className="text-red-600 font-semibold">Strict Warning:</span> <span className="font-semibold">You must print and fill the vacation report. Failure to do so may affect your resumption process.</span>
+            </p>
+            <a
+              href={VOCATION_REPORT_URL}
+              download
+              className="inline-block bg-primary text-white font-bold px-6 py-3 rounded-lg shadow hover:bg-primary/90 transition"
+            >
+              Download Vacation Report
+            </a>
+          </div>
+        </div>
+      )}
+
       {/* Header */}
       <RoleBasedHeader
         userRole="student"
         userName={data.name}
         notifications={data.notifications}
-        lockHeader={showProfileModal} // <-- Pass lockHeader prop
+        lockHeader={showProfileModal}
       />
       {/* Main Content */}
       <main className="pt-16 pb-20 lg:pb-8 transition-all duration-300">

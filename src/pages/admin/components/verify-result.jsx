@@ -546,8 +546,8 @@ const VerifyResult = () => {
                           <th className="px-2 py-2 border-r border-border text-center">C.A.T (30%)</th>
                           <th className="px-2 py-2 border-r border-border text-center">Exam (70%)</th>
                           <th className="px-2 py-2 border-r border-border text-center">Total (100%)</th>
-                          <th className="px-2 py-2 border-r border-border text-center">Max Score</th>
-                          <th className="px-2 py-2 border-r border-border text-center">Min Score</th>
+                          {/* Removed Max Score */}
+                          {/* Removed Min Score */}
                           <th className="px-2 py-2 border-r border-border text-center">Grade</th>
                           <th className="px-2 py-2 text-center">Remark</th>
                         </tr>
@@ -557,8 +557,6 @@ const VerifyResult = () => {
                           const cat1 = Number(editResults[viewingStudent]?.[subject]?.cat1 ?? 0);
                           const exam = Number(editResults[viewingStudent]?.[subject]?.exam ?? 0);
                           const total = cat1 + exam;
-                          const maxScore = editResults[viewingStudent]?.[subject]?.maxScore || '';
-                          const minScore = editResults[viewingStudent]?.[subject]?.minScore || '';
                           const grade = editResults[viewingStudent]?.[subject]?.grade || '';
                           const remark = editResults[viewingStudent]?.[subject]?.remark || '';
                           return (
@@ -585,26 +583,8 @@ const VerifyResult = () => {
                                 />
                               </td>
                               <td className="px-2 py-2 border-r border-border text-center font-bold text-primary">{total}</td>
-                              <td className="px-2 py-2 border-r border-border text-center">
-                                <input
-                                  type="number"
-                                  min="0"
-                                  max="100"
-                                  value={maxScore}
-                                  onChange={e => handleResultChange(viewingStudent, subject, { ...editResults[viewingStudent][subject], maxScore: e.target.value })}
-                                  className="border rounded px-2 py-1 w-16 text-center"
-                                />
-                              </td>
-                              <td className="px-2 py-2 border-r border-border text-center">
-                                <input
-                                  type="number"
-                                  min="0"
-                                  max="100"
-                                  value={minScore}
-                                  onChange={e => handleResultChange(viewingStudent, subject, { ...editResults[viewingStudent][subject], minScore: e.target.value })}
-                                  className="border rounded px-2 py-1 w-16 text-center"
-                                />
-                              </td>
+                              {/* Removed Max Score */}
+                              {/* Removed Min Score */}
                               <td className="px-2 py-2 border-r border-border text-center">
                                 <input
                                   type="text"

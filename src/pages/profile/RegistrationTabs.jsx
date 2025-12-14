@@ -3,11 +3,12 @@ import React, { useState, useEffect } from 'react';
 const API_BASE_URL = process.env.REACT_APP_API_BASE_URL;
 console.log('API_BASE_URL:', API_BASE_URL);
 
+// Remove 'emergencyContact' and 'legal' from tabList
 const tabList = [
   { key: 'parentGuardian', label: 'Parent/Guardian' },
-  { key: 'emergencyContact', label: 'Emergency Contact' },
+  // { key: 'emergencyContact', label: 'Emergency Contact' }, // Removed
   { key: 'medical', label: 'Medical Info' },
-  { key: 'legal', label: 'Legal & Account' },
+  // { key: 'legal', label: 'Legal & Account' }, // Removed
 ];
 
 const RegistrationTabs = ({ userId, readOnly = false }) => {
@@ -150,29 +151,7 @@ const RegistrationTabs = ({ userId, readOnly = false }) => {
             )}
           </div>
         )}
-        {activeTab === 'emergencyContact' && (
-          <div>
-            <h3 className="font-bold mb-2">Emergency Contact</h3>
-            {editing ? (
-              <>
-                <input type="text" name="name" value={form.name || ""} onChange={handleChange} placeholder="Name" className="mb-2 w-full border rounded px-2 py-1" />
-                <input type="text" name="relationship" value={form.relationship || ""} onChange={handleChange} placeholder="Relationship" className="mb-2 w-full border rounded px-2 py-1" />
-                <input type="text" name="phone" value={form.phone || ""} onChange={handleChange} placeholder="Phone" className="mb-2 w-full border rounded px-2 py-1" />
-                <label className="flex items-center gap-2 mb-2">
-                  <input type="checkbox" name="medicalAuth" checked={form.medicalAuth || false} onChange={handleChange} />
-                  Medical Authorization
-                </label>
-              </>
-            ) : (
-              <>
-                <p>Name: {form.name}</p>
-                <p>Relationship: {form.relationship}</p>
-                <p>Phone: {form.phone}</p>
-                <p>Medical Authorization: {form.medicalAuth ? 'Yes' : 'No'}</p>
-              </>
-            )}
-          </div>
-        )}
+        {/* Removed Emergency Contact and Legal & Account tabs and content */}
         {activeTab === 'medical' && (
           <div>
             <h3 className="font-bold mb-2">Medical Information</h3>
@@ -192,35 +171,6 @@ const RegistrationTabs = ({ userId, readOnly = false }) => {
                 <p>Medications: {form.medications}</p>
                 <p>Physician: {form.physicianName} ({form.physicianPhone})</p>
                 <p>Insurance: {form.insurance}</p>
-              </>
-            )}
-          </div>
-        )}
-        {activeTab === 'legal' && (
-          <div>
-            <h3 className="font-bold mb-2">Legal & Account</h3>
-            {editing ? (
-              <>
-                <label className="flex items-center gap-2 mb-2">
-                  <input type="checkbox" name="mediaConsent" checked={form.mediaConsent || false} onChange={handleChange} />
-                  Media Consent
-                </label>
-                <label className="flex items-center gap-2 mb-2">
-                  <input type="checkbox" name="emergencyConsent" checked={form.emergencyConsent || false} onChange={handleChange} />
-                  Emergency Consent
-                </label>
-                <label className="flex items-center gap-2 mb-2">
-                  <input type="checkbox" name="privacyPolicy" checked={form.privacyPolicy || false} onChange={handleChange} />
-                  Privacy Policy
-                </label>
-                <input type="email" name="email" value={form.email || ""} onChange={handleChange} placeholder="Email" className="mb-2 w-full border rounded px-2 py-1" />
-              </>
-            ) : (
-              <>
-                <p>Media Consent: {form.mediaConsent ? 'Yes' : 'No'}</p>
-                <p>Emergency Consent: {form.emergencyConsent ? 'Yes' : 'No'}</p>
-                <p>Privacy Policy: {form.privacyPolicy ? 'Agreed' : 'Not Agreed'}</p>
-                <p>Email: {form.email}</p>
               </>
             )}
           </div>

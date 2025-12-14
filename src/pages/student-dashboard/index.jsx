@@ -163,6 +163,7 @@ const StudentDashboard = () => {
         userRole="student"
         userName={data.name}
         notifications={data.notifications}
+        lockHeader={showProfileModal} // <-- Pass lockHeader prop
       />
       {/* Main Content */}
       <main className="pt-16 pb-20 lg:pb-8 transition-all duration-300">

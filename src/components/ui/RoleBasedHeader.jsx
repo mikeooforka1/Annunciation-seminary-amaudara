@@ -6,10 +6,12 @@ import Image from '../AppImage';
 
 
 const RoleBasedHeader = ({ 
-  userRole,      // Pass actual user role from login
-  userName,      // Pass actual user name from login
+  userRole,
+  userName,
   isCollapsed = false,
-  onToggleSidebar}) => {
+  onToggleSidebar,
+  lockHeader = false // <-- Add this prop
+}) => {
   const [isProfileOpen, setIsProfileOpen] = useState(false);
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const profileRef = useRef(null);
@@ -67,6 +69,58 @@ const RoleBasedHeader = ({
 
   const navigationItems = getNavigationItems();
   const visibleItems = navigationItems?.slice(0, 4);
+
+  if (lockHeader) {
+    // Only show the profile dropdown (right section)
+    return (
+      <header className="fixed top-0 left-0 right-0 bg-card border-b border-border z-1000">
+        <div className="flex items-center justify-end h-16 px-4 lg:px-6">
+          {/* User Profile */}
+          <div className="relative" ref={profileRef}>
+            <Button
+              variant="ghost"
+              className="flex items-center space-x-2 px-3"
+              onClick={() => setIsProfileOpen(!isProfileOpen)}
+            >
+              <div className="w-8 h-8 bg-primary rounded-full flex items-center justify-center">
+                <Icon name="User" size={16} color="white" />
+              </div>
+              <div className="hidden sm:block text-left">
+                <p className="text-sm font-body font-medium text-foreground">{userName}</p>
+                <p className="text-xs font-caption text-muted-foreground capitalize">{userRole}</p>
+              </div>
+              <Icon name="ChevronDown" size={16} />
+            </Button>
+            {isProfileOpen && (
+              <div className="absolute top-full right-0 mt-1 w-48 bg-popover border border-border rounded-md shadow-elevation z-1010">
+                <div className="py-1">
+                  {userRole === 'student' && (
+                    <button 
+                      className="w-full px-3 py-2 text-left text-sm font-body text-foreground hover:bg-muted flex items-center"
+                      onClick={() => {
+                        setIsProfileOpen(false);
+                        window.location.href = '/profile';
+                      }}
+                    >
+                      <Icon name="User" size={16} className="mr-2" />
+                      Profile
+                    </button>
+                  )}
+                  <button 
+                    className="w-full px-3 py-2 text-left text-sm font-body text-destructive hover:bg-muted flex items-center"
+                    onClick={handleLogout}
+                  >
+                    <Icon name="LogOut" size={16} className="mr-2" />
+                    Sign Out
+                  </button>
+                </div>
+              </div>
+            )}
+          </div>
+        </div>
+      </header>
+    );
+  }
 
   return (
     <header className="fixed top-0 left-0 right-0 bg-card border-b border-border z-1000">

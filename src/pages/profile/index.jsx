@@ -154,9 +154,9 @@ const ProfilePage = () => {
                 type="text"
                 name="name"
                 value={profile.name}
-                onChange={handleChange}
+                readOnly
+                className="w-full border rounded px-2 py-1 mb-2 bg-gray-100 cursor-not-allowed"
                 placeholder="Full Name"
-                className="w-full border rounded px-2 py-1 mb-2"
               />
               {/* Removed email input */}
               <input

@@ -1129,39 +1129,56 @@ useEffect(() => {
 
         // --- Position Calculation ---
     // Get all students' overall scores for this class/term
-    const studentScores = students
-        .map(s => ({
-            _id: s._id,
-            name: s.name,
-            overallScore: Number(overall[s._id]?.overallScore) || 0
-        }))
-        .sort((a, b) => b.overallScore - a.overallScore);
+    const studentScores = students.map(s => {
+      const overallScore = Number(overall[s._id]?.overallScore) || 0;
+      // If you want to use average as a tiebreaker, get it here:
+      const average = Number(results?.[s._id]?.average) || 0;
+      return {
+        _id: s._id,
+        name: s.name,
+        overallScore,
+        average
+      };
+    });
+
+    // Sort by overallScore DESC, then by average DESC
+    studentScores.sort((a, b) => {
+      if (b.overallScore !== a.overallScore) return b.overallScore - a.overallScore;
+      return b.average - a.average;
+    });
 
     // Assign positions (1st, 2nd, 3rd, 4th, ...), handling ties
     let lastScore = null;
+    let lastAverage = null;
     let lastPosition = 0;
-    let skip = 1;
+    let actualPosition = 1;
     const positions = {};
     studentScores.forEach((s, idx) => {
-        if (s.overallScore === lastScore) {
-            positions[s._id] = lastPosition;
-            skip++;
+        if (
+          s.overallScore === lastScore &&
+          s.average === lastAverage
+        ) {
+          positions[s._id] = lastPosition; // Same score & average, same position
         } else {
-            positions[s._id] = idx + 1;
-            lastPosition = idx + 1;
-            lastScore = s.overallScore;
-            skip = 1;
+          positions[s._id] = actualPosition;
+          lastScore = s.overallScore;
+          lastAverage = s.average;
+          lastPosition = actualPosition;
         }
-    });
-
+        actualPosition++;
+      });
+    
     // Get the auto-calculated position for the selected student
     const autoPosition = positions[selectedStudent._id] || '';
 
     // Use manual position if set, otherwise use auto
     const manualPosition = overall[selectedStudent._id]?.position;
-    const positionValue = manualPosition !== undefined && manualPosition !== null && manualPosition !== ''
+    const positionValue =
+      manualPosition !== undefined && manualPosition !== null && manualPosition !== ''
         ? manualPosition
-        : autoPosition;
+        : autoPosition
+          ? `${autoPosition}${autoPosition === 1 ? 'st' : autoPosition === 2 ? 'nd' : autoPosition === 3 ? 'rd' : 'th'}`
+          : '';
 
         return (
             <main className="pt-20 pb-10 bg-background min-h-screen">
@@ -1196,29 +1213,70 @@ useEffect(() => {
                   </button>
                 </div>
               )}
-              {/* --- Position Box Field --- */}
+              {/* --- Position and Average Box Fields --- */}
               <div className="mb-4 flex flex-wrap gap-4 items-center">
-                <div>
-                  <label className="font-semibold">Position:</label>
-                  <input
-                    type="text"
-                    className="border rounded px-2 py-1 w-24 ml-2"
-                    value={positionValue}
-                    readOnly={isReadOnly}
-                    onChange={e =>
-                      handleOverallChange(selectedStudent._id, 'position', e.target.value)
-                    }
-                    title={
-                      manualPosition
-                        ? "Manually set. Clear to use auto-calculated position."
-                        : "Auto-calculated. You can override by typing."
-                    }
-                  />
-                  <small className="text-xs text-gray-500 ml-2">
-                    {manualPosition ? "Manual" : "Auto"}
-                  </small>
-                </div>
-              </div>
+  <div>
+    <label className="font-semibold">Position:</label>
+    <input
+      type="text"
+      className="border rounded px-2 py-1 w-24 ml-2"
+      value={positionValue}
+      readOnly={isReadOnly}
+      onChange={e =>
+        handleOverallChange(selectedStudent._id, 'position', e.target.value)
+      }
+      title={
+        manualPosition
+          ? "Manually set. Clear to use auto-calculated position."
+          : "Auto-calculated. You can override by typing."
+      }
+    />
+    <small className="text-xs text-gray-500 ml-2">
+      {manualPosition ? "Manual" : "Auto"}
+    </small>
+  </div>
+  <div>
+    <label className="font-semibold">Average:</label>
+    {(() => {
+      // Calculate average of subject totals
+      const subjectTotals = subjects.map(subject => {
+        const cat1 = Number(results?.[selectedStudent._id]?.[`${subject}_cat1`] || 0);
+        const exam = Number(results?.[selectedStudent._id]?.[`${subject}_exam`] || 0);
+        return cat1 + exam;
+      });
+      let autoAverage =
+        subjectTotals.length > 0
+          ? (subjectTotals.reduce((a, b) => a + b, 0) / subjectTotals.length)
+          : '';
+      // Clamp to 100
+      if (autoAverage !== '' && autoAverage > 100) autoAverage = 100;
+      autoAverage = autoAverage !== '' ? Number(autoAverage).toFixed(1) : '';
+      // Use manual value if set, else auto
+      const manualAverage = results?.[selectedStudent._id]?.average;
+      const displayAverage =
+        manualAverage !== undefined && manualAverage !== null && manualAverage !== ''
+          ? manualAverage
+          : autoAverage;
+      return (
+        <input
+          type="number"
+          step="0.1"
+          className="border rounded px-2 py-1 w-24 ml-2"
+          value={displayAverage}
+          onChange={e => handleResultChange(selectedStudent._id, 'average', e.target.value)}
+          placeholder="Average"
+          readOnly={isReadOnly}
+          max={100}
+          title={
+            manualAverage !== undefined && manualAverage !== null && manualAverage !== ''
+              ? 'Manual'
+              : 'Auto-calculated'
+          }
+        />
+      );
+    })()}
+  </div>
+</div>
               <form
                 onSubmit={e => {
                   e.preventDefault();
@@ -1233,8 +1291,8 @@ useEffect(() => {
                         <th className="px-2 py-2 text-left font-semibold text-muted-foreground">C.A.T (30%)</th>
                         <th className="px-2 py-2 text-left font-semibold text-muted-foreground">Exam (70%)</th>
                         <th className="px-2 py-2 text-left font-semibold text-muted-foreground">Total (100%)</th>
-                        <th className="px-2 py-2 text-left font-semibold text-muted-foreground">Max Score</th>
-                        <th className="px-2 py-2 text-left font-semibold text-muted-foreground">Min Score</th>
+                        {/* Removed Max Score */}
+                        {/* Removed Min Score */}
                         <th className="px-2 py-2 text-left font-semibold text-muted-foreground">Grade</th>
                         <th className="px-2 py-2 text-left font-semibold text-muted-foreground">Remark</th>
                       </tr>
@@ -1279,50 +1337,8 @@ useEffect(() => {
                             <td className="px-2 py-2 font-bold text-primary">
                               {total}
                             </td>
-                            {/* Max Score */}
-                            <td className="px-2 py-2">
-                              <input
-                                type="number"
-                                min="0"
-                                max="100"
-                                className="w-16 border rounded-lg px-2 py-1"
-                                value={results?.[selectedStudent._id]?.[`${subject}_maxScore`] || ''}
-                                onChange={e => {
-                                  handleResultChange(selectedStudent._id, `${subject}_maxScore`, e.target.value);
-                                  setResults(prev => ({
-                                    ...prev,
-                                    [selectedStudent._id]: {
-                                      ...(prev[selectedStudent._id] || {}),
-                                      [`${subject}_maxScore_manual`]: true
-                                    }
-                                  }));
-                                }}
-                                placeholder="Max"
-                                readOnly={isReadOnly}
-                              />
-                            </td>
-                            {/* Min Score */}
-                            <td className="px-2 py-2">
-                              <input
-                                type="number"
-                                min="0"
-                                max="100"
-                                className="w-16 border rounded-lg px-2 py-1"
-                                value={results?.[selectedStudent._id]?.[`${subject}_minScore`] || ''}
-                                onChange={e => {
-                                  handleResultChange(selectedStudent._id, `${subject}_minScore`, e.target.value);
-                                  setResults(prev => ({
-                                    ...prev,
-                                    [selectedStudent._id]: {
-                                      ...(prev[selectedStudent._id] || {}),
-                                      [`${subject}_minScore_manual`]: true
-                                    }
-                                  }));
-                                }}
-                                placeholder="Min"
-                                readOnly={isReadOnly}
-                              />
-                            </td>
+                            {/* Removed Max Score */}
+                            {/* Removed Min Score */}
                             {/* Grade */}
                             <td className="px-2 py-2">
                               <input
@@ -1525,47 +1541,6 @@ useEffect(() => {
                       readOnly={isReadOnly}
                     />
                   </div>
-                 <div>
-  <label className="font-semibold">Average:</label>
-  {(() => {
-    // Calculate average of subject totals
-    const subjectTotals = subjects.map(subject => {
-      const cat1 = Number(results?.[selectedStudent._id]?.[`${subject}_cat1`] || 0);
-      const exam = Number(results?.[selectedStudent._id]?.[`${subject}_exam`] || 0);
-      return cat1 + exam;
-    });
-    let autoAverage =
-      subjectTotals.length > 0
-        ? (subjectTotals.reduce((a, b) => a + b, 0) / subjectTotals.length)
-        : '';
-    // Clamp to 100
-    if (autoAverage !== '' && autoAverage > 100) autoAverage = 100;
-    autoAverage = autoAverage !== '' ? Number(autoAverage).toFixed(1) : '';
-    // Use manual value if set, else auto
-    const manualAverage = results?.[selectedStudent._id]?.average;
-    const displayAverage =
-      manualAverage !== undefined && manualAverage !== null && manualAverage !== ''
-        ? manualAverage
-        : autoAverage;
-    return (
-      <input
-        type="number"
-        step="0.1"
-        className="border rounded px-2 py-1 w-full"
-        value={displayAverage}
-        onChange={e => handleResultChange(selectedStudent._id, 'average', e.target.value)}
-        placeholder="Average"
-        readOnly={isReadOnly}
-        max={100}
-        title={
-          manualAverage !== undefined && manualAverage !== null && manualAverage !== ''
-            ? 'Manual'
-            : 'Auto-calculated'
-        }
-      />
-    );
-  })()}
-</div>
                   <div>
                     <label className="font-semibold">Next Term Begins:</label>
                     <input

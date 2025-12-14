@@ -123,6 +123,19 @@ const LoginAuthentication = () => {
                   onLogin={handleLogin}
                   isLoading={isLoading}
                 />
+                {/* Support instruction */}
+                <div className="mt-4 flex flex-col items-center justify-center text-base font-semibold text-muted-foreground">
+                  <span>
+                    If you are having any issue with your login or dashboard, please reach out to our support team.
+                  </span>
+                  <button
+                    className="mt-2 text-primary underline hover:text-primary/80 transition"
+                    onClick={() => navigate('/contact')}
+                    type="button"
+                  >
+                    Contact support
+                  </button>
+                </div>
               </div>
             </div>
           </div>

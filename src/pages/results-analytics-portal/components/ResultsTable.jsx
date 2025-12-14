@@ -103,8 +103,8 @@ const ResultsTable = ({
               <th className="px-2 py-2 border-r border-border bg-muted/50 text-center">C.A.T<br /><span className="text-xs text-muted-foreground">(30%)</span></th>
               <th className="px-2 py-2 border-r border-border bg-muted/50 text-center">Exam<br /><span className="text-xs text-muted-foreground">(70%)</span></th>
               <th className="px-2 py-2 border-r border-border bg-muted/50 text-center">Total<br /><span className="text-xs text-muted-foreground">(100%)</span></th>
-              <th className="px-2 py-2 border-r border-border bg-muted/50 text-center">Max Score</th>
-              <th className="px-2 py-2 border-r border-border bg-muted/50 text-center">Min Score</th>
+              {/* Removed Max Score */}
+              {/* Removed Min Score */}
               <th className="px-2 py-2 border-r border-border bg-muted/50 text-center">Grade</th>
               <th className="px-2 py-2 bg-muted/50 text-center">Remark</th>
             </tr>
@@ -161,40 +161,8 @@ const ResultsTable = ({
                     <td className="px-2 py-2 border-r border-border bg-white text-center font-bold text-primary">
                       {total}
                     </td>
-                    {/* Max Score */}
-                    <td className="px-2 py-2 border-r border-border bg-white text-center">
-                      {editable ? (
-                        <input
-                          type="number"
-                          min="0"
-                          max="100"
-                          value={exam.maxScore ?? ''}
-                          onChange={e => onChange(subject, 'maxScore', Number(e.target.value))}
-                          className="border rounded px-2 py-1 w-16 text-center"
-                        />
-                      ) : (
-                        <span className="block p-1 rounded bg-info/10 border border-info/20">
-                          {exam.maxScore ?? <span className="italic text-muted-foreground">N/A</span>}
-                        </span>
-                      )}
-                    </td>
-                    {/* Min Score */}
-                    <td className="px-2 py-2 border-r border-border bg-white text-center">
-                      {editable ? (
-                        <input
-                          type="number"
-                          min="0"
-                          max="100"
-                          value={exam.minScore ?? ''}
-                          onChange={e => onChange(subject, 'minScore', Number(e.target.value))}
-                          className="border rounded px-2 py-1 w-16 text-center"
-                        />
-                      ) : (
-                        <span className="block p-1 rounded bg-error/10 border border-error/20">
-                          {exam.minScore ?? <span className="italic text-muted-foreground">N/A</span>}
-                        </span>
-                      )}
-                    </td>
+                    {/* Removed Max Score */}
+                    {/* Removed Min Score */}
                     {/* Grade */}
                     <td className="px-2 py-2 border-r border-border bg-white text-center">
                       {editable ? (

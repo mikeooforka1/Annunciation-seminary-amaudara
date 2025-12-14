@@ -21,6 +21,7 @@ const ContactPage = () => {
     setLoading(true);
     setError("");
     setSent(false);
+    console.log("[Contact] Submitting support form:", form);
     try {
       const res = await fetch(`${API_BASE_URL}/api/support/contact`, {
         method: "POST",
@@ -28,14 +29,16 @@ const ContactPage = () => {
         body: JSON.stringify(form)
       });
       const data = await res.json();
+      console.log("[Contact] Server response:", data);
       if (res.ok && data.success) {
         setSent(true);
-        setForm({ name: "", email: "", message: "" });
+        setForm({ name: "", email: "", message: "", responseEmail: "" });
       } else {
         setError(data.message || "Failed to send message.");
       }
-    } catch {
+    } catch (err) {
       setError("Network error. Please try again.");
+      console.error("[Contact] Network error:", err);
     }
     setLoading(false);
   };

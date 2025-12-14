@@ -23,6 +23,28 @@ const updates = [
     ),
     highlight: true,
   },
+  {
+    title: "Merry Christmas & Happy New Year to All Seminarians!",
+    date: "December 14, 2025",
+    image: "/assets/images/seminarians-pic.WebP", // Use a group photo of the seminarians
+    content: (
+      <>
+        <span className="block mb-2">
+          <strong>Wishing all our beloved seminarians a joyful Christmas and a prosperous New Year!</strong>
+        </span>
+        <span className="block mb-2">
+          As we celebrate the birth of our Lord Jesus Christ, may your hearts be filled with peace, love, and renewed zeal for your vocation. We are proud of your dedication, discipline, and the spirit of brotherhood you show every day at Annunciation Seminary Amaudara.
+        </span>
+        <span className="block mb-2">
+          May the coming year bring you greater wisdom, academic excellence, and spiritual growth. Remember, you are the light of the world and the hope of the Church. Keep striving for holiness and let your actions inspire others.
+        </span>
+        <span className="block">
+          <strong>God bless you all and your families. Merry Christmas and a Happy New Year!</strong>
+        </span>
+      </>
+    ),
+    highlight: false,
+  },
   // You can add more updates here as needed
 ];
 

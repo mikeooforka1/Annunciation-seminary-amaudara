@@ -4,7 +4,7 @@ import Icon from '../components/AppIcon';
 
 const ContactPage = () => {
   // --- Contact form state and handlers ---
-  const [form, setForm] = useState({ name: "", email: "", message: "" });
+  const [form, setForm] = useState({ name: "", studentClass: "", message: "", responseEmail: "" });
   const [loading, setLoading] = useState(false);
   const [sent, setSent] = useState(false);
   const [error, setError] = useState("");
@@ -32,7 +32,7 @@ const ContactPage = () => {
       console.log("[Contact] Server response:", data);
       if (res.ok && data.success) {
         setSent(true);
-        setForm({ name: "", email: "", message: "", responseEmail: "" });
+        setForm({ name: "", studentClass: "", message: "", responseEmail: "" });
       } else {
         setError(data.message || "Failed to send message.");
       }
@@ -134,18 +134,23 @@ const ContactPage = () => {
                   value={form.name}
                   onChange={handleChange}
                   required
+                  autoComplete="off" // Prevent suggestions
                 />
                 <div className="text-xs text-muted-foreground font-semibold -mt-3 mb-2">
                   Enter the full name of the student.
                 </div>
                 <input
-                  name="email"
+                  name="studentClass" // changed from "email"
                   className="rounded-xl bg-background border border-border px-4 py-3 outline-none text-foreground placeholder-muted-foreground focus:ring-2 focus:ring-primary"
                   placeholder="Student's class"
                   type="text"
-                  value={form.email}
+                  value={form.studentClass || ""} // changed from form.email
                   onChange={handleChange}
                   required
+                  autoComplete="off"
+                  autoCorrect="off"
+                  spellCheck={false}
+                  inputMode="text"
                 />
                 <div className="text-xs text-muted-foreground font-semibold -mt-3 mb-2">
                   Enter the current class of the student (e.g., JSS1, SS2).

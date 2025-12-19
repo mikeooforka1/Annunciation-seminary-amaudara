@@ -485,6 +485,33 @@ const VerifyResult = () => {
     setReviewLoading(false);
   };
 
+  const noResultsPushed = students.every(
+    s => !editResults[s._id] || !editResults[s._id].subjects || editResults[s._id].subjects.length === 0
+  );
+
+  const allResultsPushedAndComplete = students.length > 0 && students.every(student => {
+    const result = editResults[student._id];
+    if (!result || !result.subjects || result.subjects.length === 0) return false;
+    // All subject fields must have a value (including 0)
+    return result.subjects.every(subject => {
+      const subj = result[subject];
+      return subj &&
+        (subj.cat1 !== '' && subj.cat1 !== undefined && subj.cat1 !== null) &&
+        (subj.exam !== '' && subj.exam !== undefined && subj.exam !== null);
+    });
+  });
+const incompleteStudents = students
+  .filter(student => {
+    const result = editResults[student._id];
+    if (!result || !result.subjects || result.subjects.length === 0) return true;
+    return result.subjects.some(subject => {
+      const subj = result[subject];
+      return !subj ||
+        subj.cat1 === '' || subj.cat1 === undefined || subj.cat1 === null ||
+        subj.exam === '' || subj.exam === undefined || subj.exam === null;
+    });
+  })
+  .map(student => student.name);
   return (
     <div>
       <h2 className="text-xl font-bold mb-4">Verify Results</h2>
@@ -532,17 +559,25 @@ const VerifyResult = () => {
       )}
 
 {selectedClass && selectedTerm && students.length > 0 && (
-  <div className="flex justify-end mb-4">
+  <div className="flex flex-col items-end mb-4">
+    {incompleteStudents.length > 0 && (
+      <div className="mb-2 text-warning font-semibold text-right">
+        Incomplete results for: {incompleteStudents.join(', ')}
+      </div>
+    )}
     <button
       className="px-4 py-2 bg-info text-white rounded hover:bg-info/80 transition"
       onClick={handleReviewAllStudents}
       disabled={
         reviewLoading ||
+        !allResultsPushedAndComplete ||
         (students.length > 0 &&
           students.every(s => verifiedStudents[s._id] === 'reviewed' || verifiedStudents[s._id] === 'verified'))
       }
     >
-      {reviewLoading
+      {!allResultsPushedAndComplete
+        ? 'All results must be pushed and complete'
+        : reviewLoading
         ? 'Reviewing All...'
         : students.length > 0 && students.every(s => verifiedStudents[s._id] === 'verified')
         ? 'Verified'

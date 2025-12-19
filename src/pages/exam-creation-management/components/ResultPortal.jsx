@@ -995,7 +995,14 @@ useEffect(() => {
       .then(backendData => {
         if (!backendData || backendData.length === 0) return;
 
-        // Prepare new state objects, but always merge with previous state
+        // --- Collect all subjects from backend ---
+        const backendSubjects = backendData
+          .filter(item => item.subject && item.subject !== 'Overall' && !item.subject.endsWith('C/A'))
+          .map(item => item.subject);
+        // Merge with current subjects
+        setSubjects(prev => Array.from(new Set([...prev, ...backendSubjects])));
+
+        // Prepare new state objects, always merge with previous state
         const prevResults = results[selectedStudent._id] || {};
         const prevOverall = overall[selectedStudent._id] || {};
         const prevCaScores = caScores[selectedStudent._id] || {};
@@ -1007,7 +1014,6 @@ useEffect(() => {
         backendData.forEach(item => {
           // Subject fields
           if (item.subject && item.subject !== 'Overall') {
-            // Map all subject fields
             [
               '_project',
               '_cat1',
@@ -1034,8 +1040,7 @@ useEffect(() => {
               newCaScores[caSubject] = item.score;
             }
           }
-
-          // Key Rating fields
+          // Key ratings and meta fields
           [
             'handwriting', 'punctuality', 'initiative', 'obedience', 'honesty',
             'neatness', 'attentiveness', 'respect', 'attitude', 'creativity'
@@ -1044,8 +1049,6 @@ useEffect(() => {
               newResults[field] = item[field];
             }
           });
-
-          // Meta fields
           if (item.teacherComment !== undefined) newResults.teacherComment = item.teacherComment;
           if (item.signatureDate !== undefined) newResults.signatureDate = item.signatureDate;
           if (item.headTeacherRemark !== undefined) newResults.headTeacherRemark = item.headTeacherRemark;
@@ -1057,17 +1060,28 @@ useEffect(() => {
           if (item.projectDefence !== undefined) newResults.projectDefence = item.projectDefence;
           if (item.average !== undefined) newResults.average = item.average;
           if (item.nextTerm !== undefined) newResults.nextTerm = item.nextTerm;
-
-          // Over-all Score and Position
+          // Overall
           if (item.subject === 'Overall') {
             if (item.score !== undefined) {
               newOverall.overallScore = item.score;
-              // --- Also set in results for UI binding ---
               newResults.overallScore = item.score;
             }
             if (item.remarks && item.remarks.includes('Position:')) {
               newOverall.position = item.remarks.replace('Position:', '').trim();
             }
+            // --- Tie all meta fields to "Overall" ---
+            [
+              'handwriting', 'punctuality', 'initiative', 'obedience', 'honesty',
+              'neatness', 'attentiveness', 'respect', 'attitude', 'creativity',
+              'teacherComment', 'signatureDate', 'headTeacherRemark', 'academicYear',
+              'schoolOpened', 'present', 'absent', 'totalScore', 'projectDefence',
+              'average', 'nextTerm'
+            ].forEach(field => {
+              if (item[field] !== undefined) {
+                newOverall[field] = item[field];
+                newResults[field] = item[field];
+              }
+            });
           }
         });
 

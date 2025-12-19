@@ -426,6 +426,65 @@ const VerifyResult = () => {
     return "";
   }
 
+  // New function to handle reviewing all students
+  const handleReviewAllStudents = async () => {
+    setMessage('');
+    setReviewLoading(true);
+    if (!adminId) {
+      setMessage('Admin ID not found. Please log in again.');
+      setReviewLoading(false);
+      return;
+    }
+    if (!selectedClass || !selectedTerm) {
+      setMessage('Please select a class and term.');
+      setReviewLoading(false);
+      return;
+    }
+
+    // Check for incomplete students
+    const incompleteStudents = [];
+    for (const student of students) {
+      const result = editResults[student._id];
+      if (!result || !result.subjects || result.subjects.length === 0) {
+        incompleteStudents.push(student.name);
+        continue;
+      }
+      for (const subject of result.subjects) {
+        const subj = result[subject];
+        if (
+          !subj ||
+          subj.cat1 === '' || subj.cat1 === undefined ||
+          subj.exam === '' || subj.exam === undefined
+        ) {
+          incompleteStudents.push(student.name);
+          break;
+        }
+      }
+    }
+    if (incompleteStudents.length > 0) {
+      setMessage(
+        `Cannot review all. The following students have incomplete subject fields: ${incompleteStudents.join(', ')}`
+      );
+      setReviewLoading(false);
+      return;
+    }
+
+    // Review all students
+    try {
+      for (const student of students) {
+        await handleReviewStudent(student._id);
+      }
+      setMessage('All students reviewed!');
+      setTimeout(() => setMessage(''), 1500);
+      setTimeout(() => {
+        setRefreshKey(prev => prev + 1);
+      }, 700);
+    } catch (err) {
+      setMessage('An error occurred while reviewing all students.');
+    }
+    setReviewLoading(false);
+  };
+
   return (
     <div>
       <h2 className="text-xl font-bold mb-4">Verify Results</h2>
@@ -472,6 +531,27 @@ const VerifyResult = () => {
         <p className="text-center text-muted-foreground mt-4">No students were found for that term.</p>
       )}
 
+{selectedClass && selectedTerm && students.length > 0 && (
+  <div className="flex justify-end mb-4">
+    <button
+      className="px-4 py-2 bg-info text-white rounded hover:bg-info/80 transition"
+      onClick={handleReviewAllStudents}
+      disabled={
+        reviewLoading ||
+        (students.length > 0 &&
+          students.every(s => verifiedStudents[s._id] === 'reviewed' || verifiedStudents[s._id] === 'verified'))
+      }
+    >
+      {reviewLoading
+        ? 'Reviewing All...'
+        : students.length > 0 && students.every(s => verifiedStudents[s._id] === 'verified')
+        ? 'Verified'
+        : students.length > 0 && students.every(s => verifiedStudents[s._id] === 'reviewed' || verifiedStudents[s._id] === 'verified')
+        ? 'Reviewed'
+        : 'Review for All'}
+    </button>
+  </div>
+)}
       {selectedClass && selectedTerm && students.length > 0 && (
         <div>
           <h3 className="text-lg font-semibold mb-2">

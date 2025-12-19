@@ -296,15 +296,23 @@ const VerifyResult = () => {
     if (overallId) {
       const overallFields = {};
       [
-        'position', 'academicYear', 'schoolOpened', 'present', 'absent', 'average', 'nextTerm',
-        'teacherComment', 'headTeacherRemark', // comments
+        'position', 'average', // keep these dynamic
+        // The following are now always permanent:
+        // 'academicYear', 'nextTerm', 'teacherComment', 'headTeacherRemark'
+        // Key ratings:
         'handwriting', 'punctuality', 'initiative', 'obedience', 'honesty', 'neatness',
-        'attentiveness', 'respect', 'attitude', 'creativity' // key ratings
+        'attentiveness', 'respect', 'attitude', 'creativity'
       ].forEach(field => {
         if (editResults[studentId][field] !== undefined) {
           overallFields[field] = editResults[studentId][field];
         }
       });
+      // --- Always set these permanent fields ---
+      overallFields.academicYear = "2025/2026";
+      overallFields.nextTerm = "18/10/2026";
+      overallFields.teacherComment = "Good performance push harder";
+      overallFields.headTeacherRemark = "Average performance needs more improvement";
+
       await fetch(`${API_BASE_URL}/api/results/update/${overallId}`, {
         method: 'PUT',
         body: JSON.stringify(overallFields),
@@ -686,13 +694,13 @@ const VerifyResult = () => {
                     <div className="comments-section flex flex-col md:flex-row gap-4 justify-between mt-4">
                       <div className="flex-1">
                         <label className="font-semibold">Deans Remark:</label>
-                        <input
-                          type="text"
-                          value={editResults[viewingStudent]?.teacherComment || ''}
-                          onChange={e =>
-                            handleResultChange(viewingStudent, 'teacherComment', e.target.value)
-                          }
+                        <textarea
                           className="border rounded px-2 py-1 w-full"
+                          rows={2}
+                          value="Good performance push harder"
+                          readOnly
+                          disabled
+                          placeholder="Deans Remark"
                         />
                       </div>
                       <div className="flex-1 flex flex-col items-center justify-center">
@@ -708,64 +716,31 @@ const VerifyResult = () => {
                       </div>
                       <div className="flex-1 mt-4 md:mt-0">
                         <label className="font-semibold">Rectors Remark:</label>
-                        <input
-                          type="text"
-                          value={editResults[viewingStudent]?.headTeacherRemark || ''}
-                          onChange={e =>
-                            handleResultChange(viewingStudent, 'headTeacherRemark', e.target.value)
-                          }
+                        <textarea
                           className="border rounded px-2 py-1 w-full"
+                          rows={2}
+                          value="Average performance needs more improvement"
+                          readOnly
+                          disabled
+                          placeholder="Rectors Remark"
                         />
                       </div>
                     </div>
 
                     {/* Meta Fields Section */}
-                    <div className="meta-fields-section grid grid-cols-1 md:grid-cols-2 gap-4 mt-6">
+                    <div className="meta-fields-section grid grid-cols-1 md:grid-cols-3 gap-4 mt-6">
                       <div>
                         <label className="font-semibold">Academic Season:</label>
                         <input
                           type="text"
-                          value={editResults[viewingStudent]?.academicYear || ''}
-                          onChange={e =>
-                            handleResultChange(viewingStudent, 'academicYear', e.target.value)
-                          }
                           className="border rounded px-2 py-1 w-full"
+                          value="2025/2026"
+                          readOnly
+                          disabled
+                          placeholder="Academic Season"
                         />
                       </div>
-                      <div>
-                        <label className="font-semibold">No. of Times School Opened:</label>
-                        <input
-                          type="number"
-                          value={editResults[viewingStudent]?.schoolOpened || ''}
-                          onChange={e =>
-                            handleResultChange(viewingStudent, 'schoolOpened', e.target.value)
-                          }
-                          className="border rounded px-2 py-1 w-full"
-                        />
-                      </div>
-                      <div>
-                        <label className="font-semibold">No. of Time Present:</label>
-                        <input
-                          type="number"
-                          value={editResults[viewingStudent]?.present || ''}
-                          onChange={e =>
-                            handleResultChange(viewingStudent, 'present', e.target.value)
-                          }
-                          className="border rounded px-2 py-1 w-full"
-                        />
-                      </div>
-                      <div>
-                        <label className="font-semibold">No. of Time Absent:</label>
-                        <input
-                          type="number"
-                          value={editResults[viewingStudent]?.absent || ''}
-                          onChange={e =>
-                            handleResultChange(viewingStudent, 'absent', e.target.value)
-                          }
-                          className="border rounded px-2 py-1 w-full"
-                        />
-                      </div>
-                      {/* --- Average (auto-calculate, read-only) --- */}
+                      {/* Average (auto-calculate, read-only) */}
                       <div>
                         <label className="font-semibold">Average:</label>
                         {(() => {
@@ -801,11 +776,11 @@ const VerifyResult = () => {
                         <label className="font-semibold">Next Term Begins:</label>
                         <input
                           type="text"
-                          value={editResults[viewingStudent]?.nextTerm || ''}
-                          onChange={e =>
-                            handleResultChange(viewingStudent, 'nextTerm', e.target.value)
-                          }
                           className="border rounded px-2 py-1 w-full"
+                          value="18/10/2026"
+                          readOnly
+                          disabled
+                          placeholder="Next Term Begins"
                         />
                       </div>
                     </div>

@@ -541,9 +541,6 @@ const ResultsAnalyticsPortal = () => {
               </div>
               <div className="flex flex-wrap justify-between items-center mt-2 text-sm text-gray-700 gap-2 px-2 w-full">
                 <div>Academic Season: <span className="font-bold">{overallResult?.academicYear || '____'}</span></div>
-                <div>No. of Times School Opened: <span className="font-bold">{overallResult?.schoolOpened || '____'}</span></div>
-                <div>No. of Time Present: <span className="font-bold">{overallResult?.present || '____'}</span></div>
-                <div>No. of Time Absent: <span className="font-bold">{overallResult?.absent || '____'}</span></div>
                 <div>Average: <span className="font-bold">{overallResult?.average || '____'}</span></div>
               </div>
               <div className="mt-2 text-sm text-gray-700 px-2 w-full">

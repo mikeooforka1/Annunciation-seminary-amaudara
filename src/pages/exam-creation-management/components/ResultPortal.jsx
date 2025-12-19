@@ -200,6 +200,11 @@ const ResultPortal = () => {
     caScores: caScores[studentId] || {},
     ...results[studentId],
     ...overall[studentId],
+    // --- Always set these permanent fields ---
+    headTeacherRemark: "Average performance needs more improvement",
+    teacherComment: "Good performance push harder",
+    academicYear: "2025/2026",
+    nextTerm: "18/10/2026",
     average: manualAverage !== undefined && manualAverage !== null && manualAverage !== ''
       ? manualAverage
       : autoAverage,
@@ -1476,39 +1481,39 @@ useEffect(() => {
 
                 {/* Teacher's Comment, Signature, Head Teacher's Remark */}
                 <div className="mb-4 grid grid-cols-1 sm:grid-cols-3 gap-4">
-                    <div>
-                        <label className="font-semibold">Deans Remark:</label>
-                        <textarea
-                            className="border rounded px-2 py-1 w-full"
-                            rows={2}
-                            value={results?.[selectedStudent._id]?.teacherComment || ''}
-                            onChange={e => handleResultChange(selectedStudent._id, 'teacherComment', e.target.value)}
-                            placeholder="Deans Remark"
-                            readOnly={isReadOnly}
-                        />
-                    </div>
                   <div>
-    <label className="font-semibold">Rector's Signature:</label>
-    <div className="flex items-center mt-2">
-        <img
-            src="/assets/images/rector-signature.jpg"
-            alt="Rector's Signature"
-            className="h-16 object-contain"
-            style={{ background: '#fff', borderRadius: '4px', border: '1px solid #eee', padding: '4px' }}
-        />
-    </div>
-</div>
-                    <div>
-                        <label className="font-semibold">Rectors Remark:</label>
-                        <textarea
-                            className="border rounded px-2 py-1 w-full"
-                            rows={2}
-                            value={results?.[selectedStudent._id]?.headTeacherRemark || ''}
-                            onChange={e => handleResultChange(selectedStudent._id, 'headTeacherRemark', e.target.value)}
-                            placeholder="Rectors Remark"
-                            readOnly={isReadOnly}
-                        />
+                    <label className="font-semibold">Deans Remark:</label>
+                    <textarea
+                      className="border rounded px-2 py-1 w-full"
+                      rows={2}
+                      value="Good performance push harder"
+                      readOnly
+                      disabled
+                      placeholder="Deans Remark"
+                    />
+                  </div>
+                  <div>
+                    <label className="font-semibold">Rector's Signature:</label>
+                    <div className="flex items-center mt-2">
+                      <img
+                          src="/assets/images/rector-signature.jpg"
+                          alt="Rector's Signature"
+                          className="h-16 object-contain"
+                          style={{ background: '#fff', borderRadius: '4px', border: '1px solid #eee', padding: '4px' }}
+                      />
                     </div>
+                  </div>
+                  <div>
+                    <label className="font-semibold">Rectors Remark:</label>
+                    <textarea
+                      className="border rounded px-2 py-1 w-full"
+                      rows={2}
+                      value="Average performance needs more improvement"
+                      readOnly
+                      disabled
+                      placeholder="Rectors Remark"
+                    />
+                  </div>
                 </div>
                 <div className="mb-6 grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4">
                   <div>
@@ -1516,43 +1521,10 @@ useEffect(() => {
                     <input
                       type="text"
                       className="border rounded px-2 py-1 w-full"
-                      value={results?.[selectedStudent._id]?.academicYear || ''}
-                      onChange={e => handleResultChange(selectedStudent._id, 'academicYear', e.target.value)}
+                      value="2025/2026"
+                      readOnly
+                      disabled
                       placeholder="Academic Season"
-                      readOnly={isReadOnly}
-                    />
-                  </div>
-                  <div>
-                    <label className="font-semibold">No. of Times School Opened:</label>
-                    <input
-                      type="number"
-                      className="border rounded px-2 py-1 w-full"
-                      value={results?.[selectedStudent._id]?.schoolOpened || ''}
-                      onChange={e => handleResultChange(selectedStudent._id, 'schoolOpened', e.target.value)}
-                      placeholder="School Opened"
-                      readOnly={isReadOnly}
-                    />
-                  </div>
-                  <div>
-                    <label className="font-semibold">No. of Time Present:</label>
-                    <input
-                      type="number"
-                      className="border rounded px-2 py-1 w-full"
-                      value={results?.[selectedStudent._id]?.present || ''}
-                      onChange={e => handleResultChange(selectedStudent._id, 'present', e.target.value)}
-                      placeholder="Present"
-                      readOnly={isReadOnly}
-                    />
-                  </div>
-                  <div>
-                    <label className="font-semibold">No. of Time Absent:</label>
-                    <input
-                      type="number"
-                      className="border rounded px-2 py-1 w-full"
-                      value={results?.[selectedStudent._id]?.absent || ''}
-                      onChange={e => handleResultChange(selectedStudent._id, 'absent', e.target.value)}
-                      placeholder="Absent"
-                      readOnly={isReadOnly}
                     />
                   </div>
                   <div>
@@ -1560,10 +1532,10 @@ useEffect(() => {
                     <input
                       type="text"
                       className="border rounded px-2 py-1 w-full"
-                      value={results?.[selectedStudent._id]?.nextTerm || ''}
-                      onChange={e => handleResultChange(selectedStudent._id, 'nextTerm', e.target.value)}
+                      value="18/10/2026"
+                      readOnly
+                      disabled
                       placeholder="Next Term Begins"
-                      readOnly={isReadOnly}
                     />
                   </div>
                 </div>

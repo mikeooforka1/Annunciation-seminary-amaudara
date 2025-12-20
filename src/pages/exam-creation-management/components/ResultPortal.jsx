@@ -1004,8 +1004,14 @@ useEffect(() => {
         const backendSubjects = backendData
           .filter(item => item.subject && item.subject !== 'Overall' && !item.subject.endsWith('C/A'))
           .map(item => item.subject);
-        // Merge with current subjects
-        setSubjects(prev => Array.from(new Set([...prev, ...backendSubjects])));
+
+        // Merge backend subjects with current, but do NOT re-add removed subjects
+        setSubjects(prev => {
+          // Only add backend subjects that are not already present
+          const merged = Array.from(new Set([...prev, ...backendSubjects]));
+          // Optionally, you can persist a "removedSubjects" list in localStorage to never re-add them
+          return merged;
+        });
 
         // Prepare new state objects, always merge with previous state
         const prevResults = results[selectedStudent._id] || {};
@@ -1090,9 +1096,24 @@ useEffect(() => {
           }
         });
 
+        // --- Filter out removed subjects from results ---
+        const validSubjects = new Set(subjects);
+        const filteredResults = {};
+        Object.entries(newResults).forEach(([key, value]) => {
+          const match = key.match(/^(.+?)_/);
+          if (match) {
+            const subj = match[1];
+            if (validSubjects.has(subj)) {
+              filteredResults[key] = value;
+            }
+          } else if (validSubjects.has(key) || !key.includes('_')) {
+            filteredResults[key] = value;
+          }
+        });
+
         // Only update if we have at least one result for this student
-        if (Object.keys(newResults).length > 0) {
-          setResults(prev => ({ ...prev, [selectedStudent._id]: newResults }));
+        if (Object.keys(filteredResults).length > 0) {
+          setResults(prev => ({ ...prev, [selectedStudent._id]: filteredResults }));
         }
         if (Object.keys(newOverall).length > 0) {
           setOverall(prev => ({ ...prev, [selectedStudent._id]: newOverall }));

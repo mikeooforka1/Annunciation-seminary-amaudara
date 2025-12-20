@@ -21,6 +21,8 @@ const defaultRegistrationData = {
   legal: {},
 };
 
+const MAX_IMAGE_SIZE_MB = 200;
+
 const ProfilePage = () => {
   // Move this line to the top of the component
   const studentData = JSON.parse(localStorage.getItem("studentData") || "{}");
@@ -73,11 +75,17 @@ const ProfilePage = () => {
   const handleChange = (e) => {
     const { name, value, files } = e.target;
     if (name === "photo" && files && files[0]) {
+      const file = files[0];
+      if (file.size > MAX_IMAGE_SIZE_MB * 1024 * 1024) {
+        setError(`Image too large. Maximum size is ${MAX_IMAGE_SIZE_MB}MB.`);
+        return;
+      }
+      setError(""); // Clear previous error
       const reader = new FileReader();
       reader.onload = (ev) => {
         setProfile((prev) => ({ ...prev, photo: ev.target.result }));
       };
-      reader.readAsDataURL(files[0]);
+      reader.readAsDataURL(file);
     } else {
       setProfile((prev) => ({ ...prev, [name]: value }));
     }
@@ -98,10 +106,15 @@ const ProfilePage = () => {
         setEditing(false);
       } else {
         const data = await res.json();
-        setError(data.error || "Failed to save profile.");
+        // Friendly error for common backend errors
+        if (data.error && data.error.toLowerCase().includes("image")) {
+          setError("There was a problem with your photo. Please use a valid image under 100MB.");
+        } else {
+          setError(data.error || "Failed to save profile. Please check your details and try again.");
+        }
       }
     } catch (err) {
-      setError("Network error. Please try again.");
+      setError("Network error. Please check your internet connection and try again.");
       setEditing(false);
     } finally {
       setSaving(false);

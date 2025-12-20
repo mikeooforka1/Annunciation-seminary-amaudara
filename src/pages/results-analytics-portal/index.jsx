@@ -528,7 +528,12 @@ const ResultsAnalyticsPortal = () => {
                 <img
                   src="/assets/images/school_logo-1754996036714.jpg"
                   alt="School Logo"
-                  style={{ width: 100, borderRadius: '50%', marginBottom: 12 }}
+                  style={{
+                    width: 100,
+                    borderRadius: '50%',
+                    marginBottom: 12,
+                    border: '4px solid #22c55e' // Tailwind's green-500
+                  }}
                 />
                 <h1
                   className="font-extrabold text-3xl md:text-4xl text-gray-900 tracking-wide mb-1 text-center"

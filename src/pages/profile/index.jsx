@@ -42,27 +42,27 @@ const ProfilePage = () => {
     const fetchProfile = async () => {
       try {
         const res = await fetch(`${API_BASE_URL}/api/profile/${userId}`);
+        let profileData = {};
         if (res.ok) {
-          const data = await res.json();
-          setProfile((prev) => ({
-            ...prev,
-            ...data, // Use all backend profile fields
-          }));
-        } else {
-          // fallback: fetch basic info from user endpoint
-          const resUser = await fetch(`${API_BASE_URL}/api/user/${userId}`);
-          const dataUser = await resUser.json();
-          setProfile((prev) => ({
-            ...prev,
-            gradeLevel: dataUser.className || dataUser.gradeLevel || prev.gradeLevel,
-            name: dataUser.name || prev.name,
-            email: dataUser.email || prev.email,
-            dob: dataUser.dob || prev.dob,
-            gender: dataUser.gender || prev.gender,
-          }));
+          profileData = await res.json();
         }
+        // Always fetch user data for the latest name
+        const resUser = await fetch(`${API_BASE_URL}/api/user/${userId}`);
+        let dataUser = {};
+        if (resUser.ok) {
+          dataUser = await resUser.json();
+        }
+        setProfile((prev) => ({
+          ...prev,
+          ...profileData,
+          name: dataUser.name || profileData.name || prev.name,
+          gradeLevel: dataUser.className || dataUser.gradeLevel || profileData.gradeLevel || prev.gradeLevel,
+          email: dataUser.email || profileData.email || prev.email,
+          dob: dataUser.dob || profileData.dob || prev.dob,
+          gender: dataUser.gender || profileData.gender || prev.gender,
+        }));
       } catch (err) {
-        // fallback: use localStorage
+        // fallback: use localStorage or previous state
       }
     };
 
@@ -96,19 +96,27 @@ const ProfilePage = () => {
     setSaving(true);
     setError("");
     try {
+      // 1. Update Profile collection
       const res = await fetch(`${API_BASE_URL}/api/profile/${userId}`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(profile),
       });
       if (res.ok) {
+        // 2. Also update User collection with the new name
+        await fetch(`${API_BASE_URL}/api/user/${userId}`, {
+          method: "PUT",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ name: profile.name }),
+        });
         localStorage.setItem('studentProfile', JSON.stringify(profile));
         setEditing(false);
+        // Optionally, re-fetch profile to ensure latest name is displayed
+        // fetchProfile();
       } else {
         const data = await res.json();
-        // Friendly error for common backend errors
         if (data.error && data.error.toLowerCase().includes("image")) {
-          setError("There was a problem with your photo. Please use a valid image under 100MB.");
+          setError("There was a problem with your photo. Please use a valid image under 200MB.");
         } else {
           setError(data.error || "Failed to save profile. Please check your details and try again.");
         }

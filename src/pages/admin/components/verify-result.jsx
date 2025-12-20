@@ -1,7 +1,8 @@
 import React, { useEffect, useState } from 'react';
 import ResultsTable from '../../results-analytics-portal/components/ResultsTable';
 
-const classList = [
+// Add ss1c to the manual class list
+const manualClassList = [
   { id: 'jss1a', name: 'JSS1A' },
   { id: 'jss1b', name: 'JSS1B' },
   { id: 'jss2a', name: 'JSS2A' },
@@ -10,6 +11,7 @@ const classList = [
   { id: 'jss3b', name: 'JSS3B' },
   { id: 'ss1a', name: 'SS1A' },
   { id: 'ss1b', name: 'SS1B' },
+  { id: 'ss1c', name: 'SS1C' }, // Added
   { id: 'ss2a', name: 'SS2A' },
   { id: 'ss2b', name: 'SS2B' },
   { id: 'ss3a', name: 'SS3A' },
@@ -33,6 +35,7 @@ const VerifyResult = () => {
   const [reviewLoading, setReviewLoading] = useState(false);
   const [refreshKey, setRefreshKey] = useState(0);
   const [classVerificationLoading, setClassVerificationLoading] = useState(false);
+  const [classList, setClassList] = useState(manualClassList);
 
   useEffect(() => {
     // Get admin data from localStorage (adjust key as needed)
@@ -44,6 +47,28 @@ const VerifyResult = () => {
       } catch {}
     }
   }, []);
+
+  // Fetch additional classes from backend
+  useEffect(() => {
+    fetch(`${API_BASE_URL}/api/user/classes/all`)
+      .then(res => res.json())
+      .then(data => {
+        if (Array.isArray(data)) {
+          // Support both string and object formats from backend
+          const backendClasses = data
+            .map(cls =>
+              typeof cls === 'string'
+                ? { id: cls.toLowerCase(), name: cls.toUpperCase() }
+                : { id: cls.id?.toLowerCase() || '', name: cls.name || (cls.id ? cls.id.toUpperCase() : '') }
+            )
+            .filter(cls => cls.id && !manualClassList.some(m => m.id === cls.id));
+          setClassList([...manualClassList, ...backendClasses]);
+        }
+      })
+      .catch(() => {
+        setClassList(manualClassList); // fallback to manual list
+      });
+  }, [API_BASE_URL]);
 
   // Fetch students and their pushed results when class is selected
   useEffect(() => {

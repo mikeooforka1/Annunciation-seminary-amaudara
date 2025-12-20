@@ -362,18 +362,38 @@ const ResultsAnalyticsPortal = () => {
     };
   };
 
-  const allClassOptions = [
+  const manualClassOptions = [
     'JSS1A', 'JSS1B',
     'JSS2A', 'JSS2B',
     'JSS3A', 'JSS3B',
-    'SS1A', 'SS1B',
+    'SS1A', 'SS1B', 'SS1C', // <-- Added SS1C
     'SS2A', 'SS2B',
     'SS3A', 'SS3B'
   ];
+
+  const [classOptions, setClassOptions] = useState(manualClassOptions);
+
+  useEffect(() => {
+    fetch(`${API_BASE_URL}/api/user/classes/all`)
+      .then(res => res.json())
+      .then(data => {
+        if (Array.isArray(data)) {
+          // Merge backend classes with manual list, avoiding duplicates
+          const backendClasses = data
+            .filter(cls => typeof cls === 'string' && !manualClassOptions.includes(cls))
+            .map(cls => cls);
+          setClassOptions([...manualClassOptions, ...backendClasses]);
+        }
+      })
+      .catch(() => {
+        setClassOptions(manualClassOptions); // fallback to manual list
+      });
+  }, [API_BASE_URL]);
+
   // Helper to check if previous class should be shown
   const showPreviousClass =
     studentData?.className &&
-    !allClassOptions.includes(studentData.className) &&
+    !manualClassOptions.includes(studentData.className) &&
     selectedClass !== studentData.className;
 
   // Reset results/loading when class/term changes before "Continue"
@@ -417,7 +437,7 @@ const ResultsAnalyticsPortal = () => {
                   className="border rounded px-3 py-2"
                 >
                   <option value="">Select Class</option>
-                  {allClassOptions.map(cls => (
+                  {classOptions.map(cls => (
                     <option key={cls} value={cls}>{cls}</option>
                   ))}
                   {showPreviousClass && (

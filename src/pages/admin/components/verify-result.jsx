@@ -165,25 +165,29 @@ const VerifyResult = () => {
   const handleResultChange = (studentId, field, value) => {
     setEditResults(prev => {
       const prevStudent = prev[studentId] || {};
-      // If the field is a subject (object), handle auto grade/remark
+      // If it's a subject field (cat1, exam, grade, remark)
       if (prevStudent.subjects && prevStudent.subjects.includes(field)) {
-        // value is an object with possible cat1/exam/grade/remark etc.
         let newResult = { ...prevStudent[field], ...value };
-        const cat1 = Number(newResult.cat1 ?? newResult.firstCatScore ?? 0);
-        const exam = Number(newResult.exam ?? newResult.examScore ?? 0);
+        // Auto-calculate grade and remark if cat1 or exam changes
+        const cat1 = Number(newResult.cat1 ?? '');
+        const exam = Number(newResult.exam ?? '');
         const total = cat1 + exam;
-        if (!('grade' in newResult) || newResult.grade === '' || newResult.grade === undefined) {
+        // Only auto-calculate if the field being changed is cat1 or exam
+        if ('cat1' in value || 'exam' in value) {
           newResult.grade = getGrade(total);
-        }
-        if (!('remark' in newResult) || newResult.remark === '' || newResult.remark === undefined) {
           newResult.remark = getRemark(newResult.grade);
+        }
+        // --- Clear manual average if CAT or Exam is changed ---
+        let newStudent = {
+          ...prevStudent,
+          [field]: newResult,
+        };
+        if ('cat1' in value || 'exam' in value) {
+          newStudent.average = '';
         }
         return {
           ...prev,
-          [studentId]: {
-            ...prevStudent,
-            [field]: newResult,
-          }
+          [studentId]: newStudent,
         };
       } else {
         // Meta/key field: value is a primitive
@@ -271,17 +275,15 @@ const VerifyResult = () => {
     const subjectUpdatePromises = (editResults[studentId]?.subjects || []).map(subject => {
       const subj = editResults[studentId][subject];
       if (subj && subj._id) {
-        // Use backend field names
+        // Use backend field names and always send latest values as numbers
         const subjectPayload = {
-          firstCatScore: subj.cat1 ?? '',   // <-- correct field for C.A.T
-          examScore: subj.exam ?? '',       // <-- correct field for Exam
+          firstCatScore: Number(subj.cat1 ?? 0),
+          examScore: Number(subj.exam ?? 0),
           maxScore: subj.maxScore ?? '',
           minScore: subj.minScore ?? '',
           grade: subj.grade ?? '',
           remark: subj.remark ?? '',
         };
-        // Optionally, remove 'exam' if present
-        if ('exam' in subjectPayload) delete subjectPayload.exam;
         return fetch(`${API_BASE_URL}/api/results/update/${subj._id}`, {
           method: 'PUT',
           body: JSON.stringify(subjectPayload),
@@ -296,20 +298,40 @@ const VerifyResult = () => {
     if (overallId) {
       const overallFields = {};
       [
-        'position', 'average', // keep these dynamic
-        // The following are now always permanent:
-        // 'academicYear', 'nextTerm', 'teacherComment', 'headTeacherRemark'
-        // Key ratings:
+        'position', 'average',
         'handwriting', 'punctuality', 'initiative', 'obedience', 'honesty', 'neatness',
         'attentiveness', 'respect', 'attitude', 'creativity'
       ].forEach(field => {
         if (editResults[studentId][field] !== undefined) {
-          overallFields[field] = editResults[studentId][field];
+          // Always send average as a number
+          overallFields[field] = field === 'average'
+            ? (
+                editResults[studentId][field] !== undefined &&
+                editResults[studentId][field] !== null &&
+                editResults[studentId][field] !== ''
+                  ? Number(editResults[studentId][field])
+                  : (() => {
+                      // Auto-calculate average if manual is empty
+                      const subjectTotals = (editResults[studentId]?.subjects || []).map(subject => {
+                        const subjObj = editResults[studentId]?.[subject];
+                        const cat1 = Number(subjObj?.cat1 ?? 0);
+                        const exam = Number(subjObj?.exam ?? 0);
+                        return cat1 + exam;
+                      });
+                      let autoAverage =
+                        subjectTotals.length > 0
+                          ? (subjectTotals.reduce((a, b) => a + b, 0) / subjectTotals.length)
+                          : 0;
+                      if (autoAverage > 100) autoAverage = 100;
+                      return Number(autoAverage.toFixed(1));
+                    })()
+            )
+          : editResults[studentId][field];
         }
       });
       // --- Always set these permanent fields ---
       overallFields.academicYear = "2025/2026";
-      overallFields.nextTerm = "18/10/2026";
+      overallFields.nextTerm = "18/01/2026";
       overallFields.teacherComment = "Good performance push harder";
       overallFields.headTeacherRemark = "Average performance needs more improvement";
 
@@ -321,7 +343,6 @@ const VerifyResult = () => {
     }
 
     try {
-      // Wait for all subject updates to finish
       await Promise.all(subjectUpdatePromises);
 
       // 3. Now mark as reviewed
@@ -882,7 +903,11 @@ const incompleteStudents = students
                               step="0.1"
                               className="border rounded px-2 py-1 w-full"
                               value={displayAverage}
-                              readOnly
+                              onChange={e =>
+                                handleResultChange(viewingStudent, 'average', e.target.value)
+                              }
+                              placeholder="Average"
+                              // readOnly  <-- REMOVE THIS
                             />
                           );
                         })()}
@@ -892,7 +917,7 @@ const incompleteStudents = students
                         <input
                           type="text"
                           className="border rounded px-2 py-1 w-full"
-                          value="18/10/2026"
+                          value="18/01/2026"
                           readOnly
                           disabled
                           placeholder="Next Term Begins"

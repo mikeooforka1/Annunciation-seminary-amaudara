@@ -204,7 +204,7 @@ const ResultPortal = () => {
     headTeacherRemark: "Average performance needs more improvement",
     teacherComment: "Good performance push harder",
     academicYear: "2025/2026",
-    nextTerm: "18/10/2026",
+    nextTerm: "18/01/2026",
     average: manualAverage !== undefined && manualAverage !== null && manualAverage !== ''
       ? manualAverage
       : autoAverage,
@@ -1532,7 +1532,7 @@ useEffect(() => {
                     <input
                       type="text"
                       className="border rounded px-2 py-1 w-full"
-                      value="18/10/2026"
+                      value="18/01/2026"
                       readOnly
                       disabled
                       placeholder="Next Term Begins"

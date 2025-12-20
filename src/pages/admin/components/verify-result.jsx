@@ -891,14 +891,14 @@ const incompleteStudents = students
                     {/* Meta Fields Section */}
                     <div className="meta-fields-section grid grid-cols-1 md:grid-cols-3 gap-4 mt-6">
                       <div>
-                        <label className="font-semibold">Academic Season:</label>
+                        <label className="font-semibold">Academic Session:</label>
                         <input
                           type="text"
                           className="border rounded px-2 py-1 w-full"
                           value="2025/2026"
                           readOnly
                           disabled
-                          placeholder="Academic Season"
+                          placeholder="Academic Session"
                         />
                       </div>
                       {/* Average (auto-calculate, read-only) */}

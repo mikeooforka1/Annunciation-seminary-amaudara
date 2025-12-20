@@ -1538,14 +1538,14 @@ useEffect(() => {
                 </div>
                 <div className="mb-6 grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4">
                   <div>
-                    <label className="font-semibold">Academic Season:</label>
+                    <label className="font-semibold">Academic Session:</label>
                     <input
                       type="text"
                       className="border rounded px-2 py-1 w-full"
                       value="2025/2026"
                       readOnly
                       disabled
-                      placeholder="Academic Season"
+                      placeholder="Academic Session"
                     />
                   </div>
                   <div>

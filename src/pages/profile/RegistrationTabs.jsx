@@ -5,10 +5,8 @@ console.log('API_BASE_URL:', API_BASE_URL);
 
 // Remove 'emergencyContact' and 'legal' from tabList
 const tabList = [
-  { key: 'parentGuardian', label: 'Parent/Guardian' },
-  // { key: 'emergencyContact', label: 'Emergency Contact' }, // Removed
-  { key: 'medical', label: 'Medical Info' },
-  // { key: 'legal', label: 'Legal & Account' }, // Removed
+  { key: 'parentGuardian', label: 'Parent/Guardian', note: 'Optional but recommended' },
+  { key: 'medical', label: 'Medical Info', note: 'Optional' },
 ];
 
 const RegistrationTabs = ({ userId, readOnly = false }) => {
@@ -114,13 +112,16 @@ const RegistrationTabs = ({ userId, readOnly = false }) => {
     <div className="mt-8">
       <div className="flex flex-wrap border-b mb-4 gap-2">
         {tabList.map(tab => (
-          <button
-            key={tab.key}
-            className={`px-4 py-2 font-medium whitespace-nowrap ${activeTab === tab.key ? 'border-b-2 border-primary text-primary' : 'text-muted-foreground'}`}
-            onClick={() => handleTabChange(tab.key)}
-          >
-            {tab.label}
-          </button>
+          <div key={tab.key} className="flex flex-col items-center">
+            {/* Professional label above the tab */}
+            <span className="text-xs text-gray-500 mb-1 font-medium">{tab.note}</span>
+            <button
+              className={`px-4 py-2 font-medium whitespace-nowrap ${activeTab === tab.key ? 'border-b-2 border-primary text-primary' : 'text-muted-foreground'}`}
+              onClick={() => handleTabChange(tab.key)}
+            >
+              {tab.label}
+            </button>
+          </div>
         ))}
       </div>
       <div className="bg-background p-4 rounded shadow">

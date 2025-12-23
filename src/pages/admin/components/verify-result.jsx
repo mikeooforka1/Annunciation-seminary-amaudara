@@ -36,6 +36,7 @@ const VerifyResult = () => {
   const [refreshKey, setRefreshKey] = useState(0);
   const [classVerificationLoading, setClassVerificationLoading] = useState(false);
   const [classList, setClassList] = useState(manualClassList);
+  const [confirmRemoveSubject, setConfirmRemoveSubject] = useState(null); // subject name to confirm
 
   useEffect(() => {
     // Get admin data from localStorage (adjust key as needed)
@@ -92,6 +93,80 @@ const VerifyResult = () => {
     }
   }, [selectedClass, selectedTerm]);
 
+  // --- Live position & average calculation for all students (exact teacher logic) ---
+useEffect(() => {
+  if (students.length > 0) {
+    // 1. Calculate each student's total C.A.T + Exam for all their subjects
+    const studentTotals = students.map(student => {
+      const studentId = student._id;
+      let totalScore = 0;
+      let subjectCount = 0;
+      const result = editResults[studentId];
+      if (result && Array.isArray(result.subjects)) {
+        result.subjects.forEach(subject => {
+          const cat = Number(result[subject]?.cat1 ?? 0);
+          const exam = Number(result[subject]?.exam ?? 0);
+          // Only count if at least one score is entered
+          if (cat !== 0 || exam !== 0) {
+            totalScore += cat + exam;
+            subjectCount += 1;
+          }
+        });
+      }
+      // If no subjects have scores, fallback to subjects.length
+      if (subjectCount === 0 && result && Array.isArray(result.subjects)) subjectCount = result.subjects.length;
+      let average = subjectCount > 0 ? totalScore / subjectCount : 0;
+      if (average > 100) average = 100;
+      return {
+        studentId,
+        totalScore,
+        average: Number(average.toFixed(1)),
+      };
+    });
+
+    // 2. Sort by average DESC for position
+    const sorted = [...studentTotals].sort((a, b) => b.average - a.average);
+
+    // 3. Assign positions (handle ties)
+    const positionMap = {};
+    let lastAverage = null;
+    let lastPosition = 0;
+    let actualPosition = 1;
+    sorted.forEach(item => {
+      if (lastAverage !== null && item.average === lastAverage) {
+        positionMap[item.studentId] = lastPosition;
+      } else {
+        positionMap[item.studentId] = actualPosition;
+        lastAverage = item.average;
+        lastPosition = actualPosition;
+      }
+      actualPosition++;
+    });
+
+    // 4. Update position and average for each student (unless manually set)
+    setEditResults(prev => {
+      const updated = { ...prev };
+      students.forEach(student => {
+        const studentId = student._id;
+        const autoAverage = studentTotals.find(s => s.studentId === studentId)?.average || 0;
+        const autoPosition = positionMap[studentId]
+          ? `${positionMap[studentId]}${positionMap[studentId] === 1 ? 'st' : positionMap[studentId] === 2 ? 'nd' : positionMap[studentId] === 3 ? 'rd' : 'th'}`
+          : '';
+        // Only update if not manually set
+        if (
+          !updated[studentId]?.manualPosition // You can set this flag when admin manually edits position
+        ) {
+          updated[studentId] = {
+            ...(updated[studentId] || {}),
+            average: autoAverage,
+            position: autoPosition,
+          };
+        }
+      });
+      return updated;
+    });
+  }
+}, [editResults, students]);
   // Fetch pushed results for each student (refactored)
   useEffect(() => {
     if (students.length > 0 && selectedTerm) {
@@ -226,7 +301,49 @@ const VerifyResult = () => {
       }
     });
   };
+  // Update handleRemoveSubject to accept subject only (no async in button)
+  const handleRemoveSubject = async (subject) => {
+    // 1. Collect all subject result IDs for all students before updating state
+    const subjectResultIds = [];
+    Object.keys(editResults).forEach(studentId => {
+      const subjObj = editResults[studentId]?.[subject];
+      if (subjObj && subjObj._id) {
+        subjectResultIds.push(subjObj._id);
+      }
+    });
 
+    // 2. Update local state for all students
+    setEditResults(prevResults => {
+      const updatedResults = { ...prevResults };
+      Object.keys(updatedResults).forEach(studentId => {
+        if (updatedResults[studentId]) {
+          // Remove all keys for this subject only
+          Object.keys(updatedResults[studentId]).forEach(key => {
+            if (key === subject || key.startsWith(`${subject}_`)) {
+              delete updatedResults[studentId][key];
+            }
+          });
+          // Remove from subjects array if present
+          if (Array.isArray(updatedResults[studentId].subjects)) {
+            updatedResults[studentId].subjects = updatedResults[studentId].subjects.filter(s => s !== subject);
+          }
+        }
+      });
+      return updatedResults;
+    });
+
+    // 3. Delete subject result from backend for all students
+    for (const resultId of subjectResultIds) {
+      try {
+        await fetch(`${API_BASE_URL}/api/results/delete/${resultId}`, {
+          method: 'DELETE'
+        });
+      } catch (err) {
+        // Optionally handle error
+      }
+    }
+    setConfirmRemoveSubject(null); // close modal after removal
+  };
   // Save modified result
   const handleSaveResult = (studentId, subject) => {
     const result = editResults[studentId][subject];
@@ -296,11 +413,12 @@ const VerifyResult = () => {
     const normalizedClassName = selectedClass ? selectedClass.toLowerCase() : '';
     const normalizedTerm = selectedTerm ? selectedTerm.toLowerCase() : '';
 
-    // 1. Update all subject results with all fields
-    const subjectUpdatePromises = (editResults[studentId]?.subjects || []).map(subject => {
+    // 1. Update only subjects currently in the tray
+    const currentSubjects = editResults[studentId]?.subjects || [];
+    const subjectUpdatePromises = currentSubjects.map(subject => {
       const subj = editResults[studentId][subject];
       if (subj && subj._id) {
-        // Use backend field names and always send latest values as numbers
+        // Only send fields for subjects currently in the tray
         const subjectPayload = {
           firstCatScore: Number(subj.cat1 ?? 0),
           examScore: Number(subj.exam ?? 0),
@@ -328,7 +446,6 @@ const VerifyResult = () => {
         'attentiveness', 'respect', 'attitude', 'creativity'
       ].forEach(field => {
         if (editResults[studentId][field] !== undefined) {
-          // Always send average as a number
           overallFields[field] = field === 'average'
             ? (
                 editResults[studentId][field] !== undefined &&
@@ -337,7 +454,7 @@ const VerifyResult = () => {
                   ? Number(editResults[studentId][field])
                   : (() => {
                       // Auto-calculate average if manual is empty
-                      const subjectTotals = (editResults[studentId]?.subjects || []).map(subject => {
+                      const subjectTotals = currentSubjects.map(subject => {
                         const subjObj = editResults[studentId]?.[subject];
                         const cat1 = Number(subjObj?.cat1 ?? 0);
                         const exam = Number(subjObj?.exam ?? 0);
@@ -692,9 +809,24 @@ const incompleteStudents = students
                     <span><b>Class:</b> {classList.find(c => c.id === selectedClass)?.name || 'N/A'}</span>
                     <span><b>Term:</b> {selectedTerm ? selectedTerm.charAt(0).toUpperCase() + selectedTerm.slice(1) + ' Term' : 'N/A'}</span>
                     {/* --- Position Field --- */}
-                    <span>
+                    <span> 
                       <b>Position:</b>{" "}
-                      {editResults[viewingStudent]?.position || 'N/A'}
+                      <input
+                        type="text"
+                        className="border rounded px-2 py-1 w-24 ml-2"
+                        value={editResults[viewingStudent]?.position ?? ''}
+                        onChange={e =>
+                          setEditResults(prev => ({
+                            ...prev,
+                            [viewingStudent]: {
+                              ...(prev[viewingStudent] || {}),
+                              position: e.target.value
+                            }
+                          }))
+                        }
+                        placeholder="Position"
+                        title="This is the position as pushed by the teacher. You can override it by typing."
+                      />
                     </span>
                   </div>
                 </div>
@@ -793,8 +925,21 @@ const incompleteStudents = students
                       <h3 className="font-bold text-md mb-2">Subjects</h3>
                       <div className="flex flex-wrap gap-2">
                         {editResults[viewingStudent].subjects?.map(subj => (
-                          <span key={subj} className="px-2 py-1 bg-primary/10 border border-primary rounded text-primary text-xs font-semibold">
+                          <span key={subj} className="px-2 py-1 bg-primary/10 border border-primary rounded text-primary text-xs font-semibold flex items-center">
                             {subj}
+                            <button
+                              type="button"
+                              className="ml-2 text-red-500 hover:text-red-700 disabled:opacity-50 disabled:cursor-not-allowed"
+                              title={
+                                verifiedStudents[viewingStudent] === 'verified'
+                                  ? "Cannot remove subject after verification"
+                                  : "Remove subject for all students"
+                              }
+                              onClick={() => setConfirmRemoveSubject(subj)}
+                              disabled={verifiedStudents[viewingStudent] === 'verified'}
+                            >
+                              &times;
+                            </button>
                           </span>
                         ))}
                       </div>
@@ -1008,6 +1153,34 @@ const incompleteStudents = students
           >
             Back to Class List
           </button>
+        </div>
+      )}
+
+      {/* Confirmation Modal for Subject Removal */}
+      {confirmRemoveSubject && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40">
+          <div className="bg-white rounded-lg shadow-lg p-6 w-full max-w-sm text-center">
+            <h3 className="font-bold text-lg mb-4">Remove Subject</h3>
+            <p className="mb-4">
+              Are you sure you want to <span className="font-semibold text-red-600">remove</span> the subject <br />
+              <span className="font-bold text-primary">{confirmRemoveSubject}</span> <br />
+              for <span className="font-bold">all students</span> in this class?
+            </p>
+            <div className="flex justify-center gap-4 mt-6">
+              <button
+                className="px-4 py-2 bg-danger text-white rounded hover:bg-danger/80 transition"
+                onClick={() => handleRemoveSubject(confirmRemoveSubject)}
+              >
+                Yes, Remove
+              </button>
+              <button
+                className="px-4 py-2 bg-muted text-foreground rounded hover:bg-muted/80 transition"
+                onClick={() => setConfirmRemoveSubject(null)}
+              >
+                Cancel
+              </button>
+            </div>
+          </div>
         </div>
       )}
     </div>

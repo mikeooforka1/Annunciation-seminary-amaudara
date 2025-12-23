@@ -172,15 +172,32 @@ const ResultPortal = () => {
 
 
     function buildSaveAllPayload(studentId, isPush = false) {
-  // Calculate average if not set
   const studentResults = results[studentId] || {};
   const studentSubjects = subjects || [];
-  let manualAverage = studentResults.average;
+
+  // Only include fields for current subjects
+  const filteredResults = {};
+  Object.keys(studentResults).forEach(key => {
+    // If key is for a subject, only include if subject is in tray
+    const match = key.match(/^(.+?)_/);
+    if (match) {
+      const subj = match[1];
+      if (studentSubjects.includes(subj)) {
+        filteredResults[key] = studentResults[key];
+      }
+    } else if (studentSubjects.includes(key) || !key.includes('_')) {
+      // For keys like 'Maths', 'average', etc.
+      filteredResults[key] = studentResults[key];
+    }
+  });
+
+  // Calculate average if not set
+  let manualAverage = filteredResults.average;
   let autoAverage = '';
   if (!manualAverage) {
     const subjectTotals = studentSubjects.map(subject => {
-      const cat1 = Number(studentResults[`${subject}_cat1`] || 0);
-      const exam = Number(studentResults[`${subject}_exam`] || 0);
+      const cat1 = Number(filteredResults[`${subject}_cat1`] || 0);
+      const exam = Number(filteredResults[`${subject}_exam`] || 0);
       return cat1 + exam;
     });
     autoAverage =
@@ -196,11 +213,10 @@ const ResultPortal = () => {
     teacherId: teacherData?._id,
     className: teacherData?.className,
     term: selectedTerm,
-    subjects,
+    subjects: studentSubjects,
     caScores: caScores[studentId] || {},
-    ...results[studentId],
+    ...filteredResults,
     ...overall[studentId],
-    // --- Always set these permanent fields ---
     headTeacherRemark: "Average performance needs more improvement",
     teacherComment: "Good performance push harder",
     academicYear: "2025/2026",
@@ -597,66 +613,86 @@ useEffect(() => {
 
     // Automatically update overall score and position when subject scores change, unless manually edited
     useEffect(() => {
-        if (students.length && subjects.length) {
-            const newOverall = { ...overall };
-            // Calculate overall scores for all students
-            const scoresArr = students.map(student => {
-                const studentId = student._id;
-                // Sum C/A and Exam for each subject
-                const subjectScores = subjects.map(subject => {
-                    const ca = Number(caScores?.[studentId]?.[subject] || 0);
-                    const exam = Number(results?.[studentId]?.[subject] || 0);
-                    let total = ca + exam;
-                    if (total < 0) total = 0;
-                    if (total > 100) total = 100;
-                    return total;
-                });
-                const autoScore = subjectScores.length
-                    ? Math.round(subjectScores.reduce((a, b) => a + b, 0) / subjectScores.length)
-                    : 0;
-                return {
-                    studentId,
-                    autoScore,
-                };
-            });
-            // Sort by overall score descending for position
-            const sorted = [...scoresArr].sort((a, b) => b.autoScore - a.autoScore);
-            // Assign positions (1st, 2nd, 3rd, 4th, ...)
-            const positionMap = {};
-            let lastScore = null;
-            let lastPosition = 0;
-            let actualPosition = 1;
-            sorted.forEach((item, idx) => {
-                if (lastScore !== null && item.autoScore === lastScore) {
-                    positionMap[item.studentId] = lastPosition; // Same score, same position
-                } else {
-                    positionMap[item.studentId] = actualPosition;
-                    lastScore = item.autoScore;
-                    lastPosition = actualPosition;
-                }
-                actualPosition++;
-            });
-            // Update overall state
-            students.forEach(student => {
-                const studentId = student._id;
-                const autoScore = scoresArr.find(s => s.studentId === studentId)?.autoScore || 0;
-                const autoPosition = positionMap[studentId];
-                // Only update if not manually edited
-                if (!manualOverall[studentId]) {
-                    newOverall[studentId] = {
-                        ...(newOverall[studentId] || {}),
-                        overallScore: autoScore,
-                        position: autoPosition ? `${autoPosition}${autoPosition === 1 ? 'st' : autoPosition === 2 ? 'nd' : autoPosition === 3 ? 'rd' : 'th'}` : ''
-                    };
-                }
-            });
-            setOverall(newOverall);
+  if (students.length && subjects.length) {
+    // 1. Calculate each student's total C.A.T + Exam for all their subjects
+    const studentTotals = students.map(student => {
+      const studentId = student._id;
+      let totalScore = 0;
+      let subjectCount = 0;
+      subjects.forEach(subject => {
+        const cat = Number(results?.[studentId]?.[`${subject}_cat1`] || 0);
+        const exam = Number(results?.[studentId]?.[`${subject}_exam`] || 0);
+        // Only count if at least one score is entered (prevents division by zero)
+        if (cat !== 0 || exam !== 0) {
+          totalScore += cat + exam;
+          subjectCount += 1;
         }
-        // eslint-disable-next-line
-    }, [results, caScores, students, subjects]);
+      });
+      // If no subjects have scores, subjectCount fallback to subjects.length
+      if (subjectCount === 0) subjectCount = subjects.length;
+      // Calculate average, clamp to 100
+      let average = subjectCount > 0 ? totalScore / subjectCount : 0;
+      if (average > 100) average = 100;
+      return {
+        studentId,
+        totalScore,
+        average: Number(average.toFixed(1)),
+      };
+    });
+
+    // 2. Sort by average DESC for position
+    const sorted = [...studentTotals].sort((a, b) => b.average - a.average);
+
+    // 3. Assign positions (handle ties)
+    const positionMap = {};
+    let lastAverage = null;
+    let lastPosition = 0;
+    let actualPosition = 1;
+    sorted.forEach(item => {
+      if (lastAverage !== null && item.average === lastAverage) {
+        positionMap[item.studentId] = lastPosition;
+      } else {
+        positionMap[item.studentId] = actualPosition;
+        lastAverage = item.average;
+        lastPosition = actualPosition;
+      }
+      actualPosition++;
+    });
+
+    // 4. Update overall state for each student
+    const newOverall = { ...overall };
+    students.forEach(student => {
+      const studentId = student._id;
+      const studentData = studentTotals.find(s => s.studentId === studentId);
+      const autoAverage = studentData?.average || 0;
+      const autoPosition = positionMap[studentId];
+      // Only update if not manually edited
+      if (!manualOverall[studentId]) {
+        newOverall[studentId] = {
+          ...(newOverall[studentId] || {}),
+          overallScore: autoAverage,
+          position: autoPosition
+            ? `${autoPosition}${autoPosition === 1 ? 'st' : autoPosition === 2 ? 'nd' : autoPosition === 3 ? 'rd' : 'th'}`
+            : '',
+        };
+      }
+      // Always update the average field in results for UI binding
+      setResults(prev => ({
+        ...prev,
+        [studentId]: {
+          ...(prev[studentId] || {}),
+          average: autoAverage,
+        },
+      }));
+    });
+    setOverall(newOverall);
+  }
+  // eslint-disable-next-line
+}, [results, caScores, students, subjects]);
 
     // Add new subject to tray
-    const handleAddSubject = () => {
+    // Add new subject to tray
+const handleAddSubject = () => {
   const subject = newSubject.trim();
   if (subject && !subjects.includes(subject)) {
     setSubjects(prevSubjects => [...prevSubjects, subject]);
@@ -666,7 +702,7 @@ useEffect(() => {
       const updatedResults = { ...prevResults };
       students.forEach(student => {
         updatedResults[student._id] = { ...(prevResults[student._id] || {}) };
-        // Initialize all expected fields for the new subject
+        // Only add fields for the new subject, don't touch others
         [
           `${subject}_project`,
           `${subject}_cat1`,
@@ -699,10 +735,35 @@ useEffect(() => {
   }
 };
 
-    // Remove subject from tray
-    const handleRemoveSubject = (subject) => {
-        setSubjects(subjects.filter(s => s !== subject));
-    };
+// Remove subject from tray
+const handleRemoveSubject = (subject) => {
+  setSubjects(subjects.filter(s => s !== subject));
+  setResults(prevResults => {
+    const updatedResults = { ...prevResults };
+    students.forEach(student => {
+      if (updatedResults[student._id]) {
+        // Remove all keys for this subject only
+        Object.keys(updatedResults[student._id]).forEach(key => {
+          if (key.startsWith(`${subject}_`)) {
+            delete updatedResults[student._id][key];
+          }
+        });
+      }
+    });
+    return updatedResults;
+  });
+  setCaScores(prevCaScores => {
+    const updatedCaScores = { ...prevCaScores };
+    students.forEach(student => {
+      if (updatedCaScores[student._id]) {
+        delete updatedCaScores[student._id][subject];
+      }
+    });
+    return updatedCaScores;
+  });
+};
+
+
 
     const keyRatingFields = [
       'handwriting', 'punctuality', 'initiative', 'obedience', 'honesty',
@@ -974,7 +1035,7 @@ useEffect(() => {
               body: JSON.stringify(payload),
             });
           }
-        }, 17000); // 17 seconds debounce
+        }, 10000); // 10 seconds debounce
 
         return () => clearTimeout(timeout);
       }
@@ -1009,122 +1070,124 @@ useEffect(() => {
         setSubjects(prev => {
           // Only add backend subjects that are not already present
           const merged = Array.from(new Set([...prev, ...backendSubjects]));
-          // Optionally, you can persist a "removedSubjects" list in localStorage to never re-add them
           return merged;
         });
 
         // Prepare new state objects, always merge with previous state
-        const prevResults = results[selectedStudent._id] || {};
-        const prevOverall = overall[selectedStudent._id] || {};
-        const prevCaScores = caScores[selectedStudent._id] || {};
-
-        const newResults = { ...prevResults };
-        const newOverall = { ...prevOverall };
-        const newCaScores = { ...prevCaScores };
-
-        backendData.forEach(item => {
-          // Subject fields
-          if (item.subject && item.subject !== 'Overall') {
-            [
-              '_project',
-              '_cat1',
-              '_cat2',
-              '_exam',
-              '_maxScore',
-              '_minScore',
-              '_grade',
-              '_remark',
-              '_overallScore'
-            ].forEach(suffix => {
-              const key = `${item.subject}${suffix}`;
-              if (item[suffix.replace('_', '')] !== undefined) {
-                newResults[key] = item[suffix.replace('_', '')];
+        setResults(prevResults => {
+          const prev = prevResults[selectedStudent._id] || {};
+          const newResults = { ...prev };
+          backendData.forEach(item => {
+            if (item.subject && item.subject !== 'Overall') {
+              [
+                '_project',
+                '_cat1',
+                '_cat2',
+                '_exam',
+                '_maxScore',
+                '_minScore',
+                '_grade',
+                '_remark',
+                '_overallScore'
+              ].forEach(suffix => {
+                const key = `${item.subject}${suffix}`;
+                if (item[suffix.replace('_', '')] !== undefined) {
+                  newResults[key] = item[suffix.replace('_', '')];
+                }
+              });
+              if (item.score !== undefined) {
+                newResults[item.subject] = item.score;
               }
-            });
-            // Also map the main subject score (total)
-            if (item.score !== undefined) {
-              newResults[item.subject] = item.score;
+              if (item.subject.endsWith('C/A') && item.score !== undefined) {
+                // handled in caScores below
+              }
             }
-            // CA scores
-            if (item.subject.endsWith('C/A') && item.score !== undefined) {
-              const caSubject = item.subject.replace(' C/A', '');
-              newCaScores[caSubject] = item.score;
-            }
-          }
-          // Key ratings and meta fields
-          [
-            'handwriting', 'punctuality', 'initiative', 'obedience', 'honesty',
-            'neatness', 'attentiveness', 'respect', 'attitude', 'creativity'
-          ].forEach(field => {
-            if (item[field] !== undefined) {
-              newResults[field] = item[field];
-            }
-          });
-          if (item.teacherComment !== undefined) newResults.teacherComment = item.teacherComment;
-          if (item.signatureDate !== undefined) newResults.signatureDate = item.signatureDate;
-          if (item.headTeacherRemark !== undefined) newResults.headTeacherRemark = item.headTeacherRemark;
-          if (item.academicYear !== undefined) newResults.academicYear = item.academicYear;
-          if (item.schoolOpened !== undefined) newResults.schoolOpened = item.schoolOpened;
-          if (item.present !== undefined) newResults.present = item.present;
-          if (item.absent !== undefined) newResults.absent = item.absent;
-          if (item.totalScore !== undefined) newResults.totalScore = item.totalScore;
-          if (item.projectDefence !== undefined) newResults.projectDefence = item.projectDefence;
-          if (item.average !== undefined) newResults.average = item.average;
-          if (item.nextTerm !== undefined) newResults.nextTerm = item.nextTerm;
-          // Overall
-          if (item.subject === 'Overall') {
-            if (item.score !== undefined) {
-              newOverall.overallScore = item.score;
-              newResults.overallScore = item.score;
-            }
-            if (item.remarks && item.remarks.includes('Position:')) {
-              newOverall.position = item.remarks.replace('Position:', '').trim();
-            }
-            // --- Tie all meta fields to "Overall" ---
             [
               'handwriting', 'punctuality', 'initiative', 'obedience', 'honesty',
-              'neatness', 'attentiveness', 'respect', 'attitude', 'creativity',
-              'teacherComment', 'signatureDate', 'headTeacherRemark', 'academicYear',
-              'schoolOpened', 'present', 'absent', 'totalScore', 'projectDefence',
-              'average', 'nextTerm'
+              'neatness', 'attentiveness', 'respect', 'attitude', 'creativity'
             ].forEach(field => {
               if (item[field] !== undefined) {
-                newOverall[field] = item[field];
                 newResults[field] = item[field];
               }
             });
-          }
-        });
-
-        // --- Filter out removed subjects from results ---
-        const validSubjects = new Set(subjects);
-        const filteredResults = {};
-        Object.entries(newResults).forEach(([key, value]) => {
-          const match = key.match(/^(.+?)_/);
-          if (match) {
-            const subj = match[1];
-            if (validSubjects.has(subj)) {
+            if (item.teacherComment !== undefined) newResults.teacherComment = item.teacherComment;
+            if (item.signatureDate !== undefined) newResults.signatureDate = item.signatureDate;
+            if (item.headTeacherRemark !== undefined) newResults.headTeacherRemark = item.headTeacherRemark;
+            if (item.academicYear !== undefined) newResults.academicYear = item.academicYear;
+            if (item.schoolOpened !== undefined) newResults.schoolOpened = item.schoolOpened;
+            if (item.present !== undefined) newResults.present = item.present;
+            if (item.absent !== undefined) newResults.absent = item.absent;
+            if (item.totalScore !== undefined) newResults.totalScore = item.totalScore;
+            if (item.projectDefence !== undefined) newResults.projectDefence = item.projectDefence;
+            if (item.average !== undefined) newResults.average = item.average;
+            if (item.nextTerm !== undefined) newResults.nextTerm = item.nextTerm;
+            if (item.subject === 'Overall') {
+              if (item.score !== undefined) {
+                newResults.overallScore = item.score;
+              }
+              if (item.remarks && item.remarks.includes('Position:')) {
+                newResults.position = item.remarks.replace('Position:', '').trim();
+              }
+            }
+          });
+          // Filter out removed subjects
+          const validSubjects = new Set(subjects);
+          const filteredResults = {};
+          Object.entries(newResults).forEach(([key, value]) => {
+            const match = key.match(/^(.+?)_/);
+            if (match) {
+              const subj = match[1];
+              if (validSubjects.has(subj)) {
+                filteredResults[key] = value;
+              }
+            } else if (validSubjects.has(key) || !key.includes('_')) {
               filteredResults[key] = value;
             }
-          } else if (validSubjects.has(key) || !key.includes('_')) {
-            filteredResults[key] = value;
-          }
+          });
+          return { ...prevResults, [selectedStudent._id]: filteredResults };
         });
 
-        // Only update if we have at least one result for this student
-        if (Object.keys(filteredResults).length > 0) {
-          setResults(prev => ({ ...prev, [selectedStudent._id]: filteredResults }));
-        }
-        if (Object.keys(newOverall).length > 0) {
-          setOverall(prev => ({ ...prev, [selectedStudent._id]: newOverall }));
-        }
-        if (Object.keys(newCaScores).length > 0) {
-          setCaScores(prev => ({ ...prev, [selectedStudent._id]: newCaScores }));
-        }
+        setOverall(prevOverall => {
+          const prev = prevOverall[selectedStudent._id] || {};
+          const newOverall = { ...prev };
+          backendData.forEach(item => {
+            if (item.subject === 'Overall') {
+              if (item.score !== undefined) {
+                newOverall.overallScore = item.score;
+              }
+              if (item.remarks && item.remarks.includes('Position:')) {
+                newOverall.position = item.remarks.replace('Position:', '').trim();
+              }
+              [
+                'handwriting', 'punctuality', 'initiative', 'obedience', 'honesty',
+                'neatness', 'attentiveness', 'respect', 'attitude', 'creativity',
+                'teacherComment', 'signatureDate', 'headTeacherRemark', 'academicYear',
+                'schoolOpened', 'present', 'absent', 'totalScore', 'projectDefence',
+                'average', 'nextTerm'
+              ].forEach(field => {
+                if (item[field] !== undefined) {
+                  newOverall[field] = item[field];
+                }
+              });
+            }
+          });
+          return { ...prevOverall, [selectedStudent._id]: newOverall };
+        });
+
+        setCaScores(prevCaScores => {
+          const prev = prevCaScores[selectedStudent._id] || {};
+          const newCaScores = { ...prev };
+          backendData.forEach(item => {
+            if (item.subject && item.subject.endsWith('C/A') && item.score !== undefined) {
+              const caSubject = item.subject.replace(' C/A', '');
+              newCaScores[caSubject] = item.score;
+            }
+          });
+          return { ...prevCaScores, [selectedStudent._id]: newCaScores };
+        });
       })
       .catch(err => {
         console.error('[ERROR] Error fetching backend data for student:', err);
-        // Do not overwrite state on error
       });
   }
 }, [selectedStudent, teacherData, selectedTerm, subjects]);

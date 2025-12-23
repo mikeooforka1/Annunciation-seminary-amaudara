@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom'; // <-- Add this import
 import RegistrationTabs from './RegistrationTabs';
 
 const API_BASE_URL = process.env.REACT_APP_API_BASE_URL || "";
@@ -34,6 +35,7 @@ const ProfilePage = () => {
   const [showPhotoModal, setShowPhotoModal] = useState(false);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState(""); // Add to state
+  const navigate = useNavigate(); // <-- Add this line
 
   useEffect(() => {
     if (!userId) return;
@@ -131,6 +133,19 @@ const ProfilePage = () => {
 
   return (
     <div className="max-w-2xl mx-auto bg-white rounded-lg shadow p-4 sm:p-6 mt-6 sm:mt-10">
+      {/* Back to Dashboard button */}
+      <div className="mb-2 flex justify-end">
+        <button
+          className="bg-secondary text-white px-4 py-2 rounded font-semibold hover:bg-secondary/90 transition"
+          onClick={() => navigate('/student-dashboard')}
+        >
+          Back to Dashboard
+        </button>
+      </div>
+      {/* Compulsory label */}
+      <div className="mb-2">
+        <span className="text-xs text-red-600 font-semibold uppercase tracking-wide">Compulsory</span>
+      </div>
       <div className="flex flex-col sm:flex-row items-center mb-6 gap-4 sm:gap-6">
         <div className="flex flex-col items-center w-full sm:w-auto">
           <div className="relative flex justify-center">

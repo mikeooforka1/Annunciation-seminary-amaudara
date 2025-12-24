@@ -341,9 +341,9 @@ useEffect(() => {
     });
     overallFields.academicYear = "2025/2026";
     overallFields.nextTerm = "18/01/2026";
-    overallFields.teacherComment = "Good performance push harder";
-    // --- Set rectors remark dynamically based on average ---
+    // --- Set deans and rectors remark dynamically based on average ---
     const avg = Number(result.average ?? 0);
+    overallFields.teacherComment = getDeansRemark(avg);
     overallFields.headTeacherRemark = getRectorsRemark(avg);
     await fetch(`${API_BASE_URL}/api/results/update/${result._overallId}`, {
       method: 'PUT',
@@ -551,9 +551,9 @@ useEffect(() => {
       });
       overallFields.academicYear = "2025/2026";
       overallFields.nextTerm = "18/01/2026";
-      overallFields.teacherComment = "Good performance push harder";
-      // --- Set rectors remark dynamically based on average ---
+      // --- Set deans and rectors remark dynamically based on average ---
       const avg = Number(overallFields.average ?? 0);
+      overallFields.teacherComment = getDeansRemark(avg);
       overallFields.headTeacherRemark = getRectorsRemark(avg);
 
       await fetch(`${API_BASE_URL}/api/results/update/${overallId}`, {
@@ -674,6 +674,14 @@ useEffect(() => {
     if (average >= 60) return "Good performance";
     if (average >= 50) return "Average result, work harder";
     return "Below average";
+  }
+  // Add this helper function at the top (outside the component)
+  function getDeansRemark(average) {
+    if (average >= 70) return "Exceptional result, sustain this excellence";
+    if (average >= 65) return "High quality performance";
+    if (average >= 60) return "Competent work";
+    if (average >= 50) return "Middle-of-the road, strive for more";
+    return "Not meeting the required benchmark";
   }
 
   // New function to handle reviewing all students
@@ -1125,7 +1133,12 @@ const incompleteStudents = students
                         <textarea
                           className="border rounded px-2 py-1 w-full"
                           rows={2}
-                          value="Good performance push harder"
+                          value={
+                            (() => {
+                              const avg = Number(editResults[viewingStudent]?.average ?? 0);
+                              return getDeansRemark(avg);
+                            })()
+                          }
                           readOnly
                           disabled
                           placeholder="Deans Remark"

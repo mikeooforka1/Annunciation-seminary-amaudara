@@ -301,45 +301,124 @@ useEffect(() => {
       }
     });
   };
-  // Update handleRemoveSubject to accept subject only (no async in button)
-  const handleRemoveSubject = async (subject) => {
-    // 1. Collect all subject result IDs for all students before updating state
-    const subjectResultIds = [];
-    Object.keys(editResults).forEach(studentId => {
-      const subjObj = editResults[studentId]?.[subject];
-      if (subjObj && subjObj._id) {
-        subjectResultIds.push(subjObj._id);
+  const handleSaveChanges = async (studentId) => {
+  const result = editResults[studentId];
+  if (!result || !result.subjects || result.subjects.length === 0) {
+    alert('No changes to save.');
+    return;
+  }
+  // Save all subject results (but do NOT set reviewed/verified)
+  for (const subject of result.subjects) {
+    const subj = result[subject];
+    if (subj && subj._id) {
+      const updateUrl = `${API_BASE_URL}/api/results/update/${subj._id}`;
+      const subjectPayload = {
+        firstCatScore: Number(subj.cat1 ?? 0),
+        examScore: Number(subj.exam ?? 0),
+        maxScore: subj.maxScore ?? '',
+        minScore: subj.minScore ?? '',
+        grade: subj.grade ?? '',
+        remark: subj.remark ?? '',
+      };
+      await fetch(updateUrl, {
+        method: 'PUT',
+        body: JSON.stringify(subjectPayload),
+        headers: { 'Content-Type': 'application/json' }
+      });
+    }
+  }
+  // Save "Overall" result (if present)
+  if (result._overallId) {
+    const overallFields = {};
+    [
+      'position', 'average',
+      'handwriting', 'punctuality', 'initiative', 'obedience', 'honesty', 'neatness',
+      'attentiveness', 'respect', 'attitude', 'creativity'
+    ].forEach(field => {
+      if (result[field] !== undefined) {
+        overallFields[field] = result[field];
       }
     });
+    overallFields.academicYear = "2025/2026";
+    overallFields.nextTerm = "18/01/2026";
+    overallFields.teacherComment = "Good performance push harder";
+    // --- Set rectors remark dynamically based on average ---
+    const avg = Number(result.average ?? 0);
+    overallFields.headTeacherRemark = getRectorsRemark(avg);
+    await fetch(`${API_BASE_URL}/api/results/update/${result._overallId}`, {
+      method: 'PUT',
+      body: JSON.stringify(overallFields),
+      headers: { 'Content-Type': 'application/json' }
+    });
+  }
+  alert('Changes saved!');
+};
+  // Update handleRemoveSubject to support both individual and all-students removal
+  const handleRemoveSubject = async (subject, forAll = true) => {
+    if (forAll) {
+      // --- REMOVE FOR ALL STUDENTS (existing logic, unchanged) ---
+      const subjectResultIds = [];
+      Object.keys(editResults).forEach(studentId => {
+        const subjObj = editResults[studentId]?.[subject];
+        if (subjObj && subjObj._id) {
+          subjectResultIds.push(subjObj._id);
+        }
+      });
 
-    // 2. Update local state for all students
-    setEditResults(prevResults => {
-      const updatedResults = { ...prevResults };
-      Object.keys(updatedResults).forEach(studentId => {
+      setEditResults(prevResults => {
+        const updatedResults = { ...prevResults };
+        Object.keys(updatedResults).forEach(studentId => {
+          if (updatedResults[studentId]) {
+            Object.keys(updatedResults[studentId]).forEach(key => {
+              if (key === subject || key.startsWith(`${subject}_`)) {
+                delete updatedResults[studentId][key];
+              }
+            });
+            if (Array.isArray(updatedResults[studentId].subjects)) {
+              updatedResults[studentId].subjects = updatedResults[studentId].subjects.filter(s => s !== subject);
+            }
+          }
+        });
+        return updatedResults;
+      });
+
+      for (const resultId of subjectResultIds) {
+        try {
+          await fetch(`${API_BASE_URL}/api/results/delete/${resultId}`, {
+            method: 'DELETE'
+          });
+        } catch (err) {
+          // Optionally handle error
+        }
+      }
+    } else {
+      // --- REMOVE FOR INDIVIDUAL ONLY ---
+      const studentId = viewingStudent;
+      const subjObj = editResults[studentId]?.[subject];
+      // 1. Update local state for just this student
+      setEditResults(prevResults => {
+        const updatedResults = { ...prevResults };
         if (updatedResults[studentId]) {
-          // Remove all keys for this subject only
           Object.keys(updatedResults[studentId]).forEach(key => {
             if (key === subject || key.startsWith(`${subject}_`)) {
               delete updatedResults[studentId][key];
             }
           });
-          // Remove from subjects array if present
           if (Array.isArray(updatedResults[studentId].subjects)) {
             updatedResults[studentId].subjects = updatedResults[studentId].subjects.filter(s => s !== subject);
           }
         }
+        return updatedResults;
       });
-      return updatedResults;
-    });
-
-    // 3. Delete subject result from backend for all students
-    for (const resultId of subjectResultIds) {
-      try {
-        await fetch(`${API_BASE_URL}/api/results/delete/${resultId}`, {
-          method: 'DELETE'
-        });
-      } catch (err) {
-        // Optionally handle error
+      // 2. Delete from backend for just this student
+      if (subjObj && subjObj._id) {
+        try {
+          await fetch(`${API_BASE_URL}/api/results/delete/${subjObj._id}`, {
+            method: 'DELETE'
+          });
+        } catch (err) {
+          // Optionally handle error
+        }
       }
     }
     setConfirmRemoveSubject(null); // close modal after removal
@@ -453,7 +532,6 @@ useEffect(() => {
                 editResults[studentId][field] !== ''
                   ? Number(editResults[studentId][field])
                   : (() => {
-                      // Auto-calculate average if manual is empty
                       const subjectTotals = currentSubjects.map(subject => {
                         const subjObj = editResults[studentId]?.[subject];
                         const cat1 = Number(subjObj?.cat1 ?? 0);
@@ -471,11 +549,12 @@ useEffect(() => {
           : editResults[studentId][field];
         }
       });
-      // --- Always set these permanent fields ---
       overallFields.academicYear = "2025/2026";
       overallFields.nextTerm = "18/01/2026";
       overallFields.teacherComment = "Good performance push harder";
-      overallFields.headTeacherRemark = "Average performance needs more improvement";
+      // --- Set rectors remark dynamically based on average ---
+      const avg = Number(overallFields.average ?? 0);
+      overallFields.headTeacherRemark = getRectorsRemark(avg);
 
       await fetch(`${API_BASE_URL}/api/results/update/${overallId}`, {
         method: 'PUT',
@@ -587,6 +666,14 @@ useEffect(() => {
     if (grade === "D7" || grade === "E8") return "Pass";
     if (grade === "F9") return "Fail";
     return "";
+  }
+  // Add this helper function at the top (outside the component)
+  function getRectorsRemark(average) {
+    if (average >= 70) return "Excellent result, keep it up";
+    if (average >= 65) return "Very good result";
+    if (average >= 60) return "Good performance";
+    if (average >= 50) return "Average result, work harder";
+    return "Below average";
   }
 
   // New function to handle reviewing all students
@@ -804,12 +891,12 @@ const incompleteStudents = students
                 {/* Header Section */}
                 <div className="mb-4">
                   <h4 className="font-bold text-lg mb-1">Preview & Modify Result</h4>
-                  <div className="flex flex-wrap gap-4 text-sm text-muted-foreground">
+                  <div className="flex flex-wrap gap-4 text-sm text-muted-foreground items-center">
                     <span><b>Name:</b> {students.find(s => s._id === viewingStudent)?.name || 'N/A'}</span>
                     <span><b>Class:</b> {classList.find(c => c.id === selectedClass)?.name || 'N/A'}</span>
                     <span><b>Term:</b> {selectedTerm ? selectedTerm.charAt(0).toUpperCase() + selectedTerm.slice(1) + ' Term' : 'N/A'}</span>
                     {/* --- Position Field --- */}
-                    <span> 
+                    <span>
                       <b>Position:</b>{" "}
                       <input
                         type="text"
@@ -827,6 +914,41 @@ const incompleteStudents = students
                         placeholder="Position"
                         title="This is the position as pushed by the teacher. You can override it by typing."
                       />
+                    </span>
+                    {/* --- Average Field (moved here) --- */}
+                    <span>
+                      <b>Average:</b>{" "}
+                      {(() => {
+                        const manualAverage = editResults[viewingStudent]?.average;
+                        const subjectTotals = editResults[viewingStudent]?.subjects?.map(subject => {
+                          const subjObj = editResults[viewingStudent]?.[subject];
+                          const cat1 = Number(subjObj?.cat1 || subjObj?.[`${subject}_cat1`] || 0);
+                          const exam = Number(subjObj?.exam || subjObj?.[`${subject}_exam`] || 0);
+                          return cat1 + exam;
+                        }) || [];
+                        let autoAverage =
+                          subjectTotals.length > 0
+                            ? (subjectTotals.reduce((a, b) => a + b, 0) / subjectTotals.length)
+                            : '';
+                        if (autoAverage !== '' && autoAverage > 100) autoAverage = 100;
+                        autoAverage = autoAverage !== '' ? Number(autoAverage).toFixed(1) : '';
+                        const displayAverage =
+                          manualAverage !== undefined && manualAverage !== null && manualAverage !== ''
+                            ? manualAverage
+                            : autoAverage;
+                        return (
+                          <input
+                            type="number"
+                            step="0.1"
+                            className="border rounded px-2 py-1 w-24 ml-2"
+                            value={displayAverage}
+                            onChange={e =>
+                              handleResultChange(viewingStudent, 'average', e.target.value)
+                            }
+                            placeholder="Average"
+                          />
+                        );
+                      })()}
                     </span>
                   </div>
                 </div>
@@ -1025,7 +1147,12 @@ const incompleteStudents = students
                         <textarea
                           className="border rounded px-2 py-1 w-full"
                           rows={2}
-                          value="Average performance needs more improvement"
+                          value={
+                            (() => {
+                              const avg = Number(editResults[viewingStudent]?.average ?? 0);
+                              return getRectorsRemark(avg);
+                            })()
+                          }
                           readOnly
                           disabled
                           placeholder="Rectors Remark"
@@ -1046,42 +1173,7 @@ const incompleteStudents = students
                           placeholder="Academic Session"
                         />
                       </div>
-                      {/* Average (auto-calculate, read-only) */}
-                      <div>
-                        <label className="font-semibold">Average:</label>
-                        {(() => {
-                          const manualAverage = editResults[viewingStudent]?.average;
-                          const subjectTotals = editResults[viewingStudent]?.subjects?.map(subject => {
-                            const subjObj = editResults[viewingStudent]?.[subject];
-                            const cat1 = Number(subjObj?.cat1 || subjObj?.[`${subject}_cat1`] || 0);
-                            const exam = Number(subjObj?.exam || subjObj?.[`${subject}_exam`] || 0);
-                            return cat1 + exam;
-                          }) || [];
-                          let autoAverage =
-                            subjectTotals.length > 0
-                              ? (subjectTotals.reduce((a, b) => a + b, 0) / subjectTotals.length)
-                              : '';
-                          if (autoAverage !== '' && autoAverage > 100) autoAverage = 100;
-                          autoAverage = autoAverage !== '' ? Number(autoAverage).toFixed(1) : '';
-                          const displayAverage =
-                            manualAverage !== undefined && manualAverage !== null && manualAverage !== ''
-                              ? manualAverage
-                              : autoAverage;
-                          return (
-                            <input
-                              type="number"
-                              step="0.1"
-                              className="border rounded px-2 py-1 w-full"
-                              value={displayAverage}
-                              onChange={e =>
-                                handleResultChange(viewingStudent, 'average', e.target.value)
-                              }
-                              placeholder="Average"
-                              // readOnly  <-- REMOVE THIS
-                            />
-                          );
-                        })()}
-                      </div>
+                      {/* --- REMOVED AVERAGE FIELD FROM HERE --- */}
                       <div>
                         <label className="font-semibold">Next Term Begins:</label>
                         <input
@@ -1096,7 +1188,14 @@ const incompleteStudents = students
                     </div>
 
                     {/* Review Button for Individual Student */}
-                    <div className="flex justify-end mt-6">
+                    <div className="flex justify-end mt-6 gap-2">
+                      <button
+                        className="px-4 py-2 bg-primary text-white rounded hover:bg-primary/80 transition"
+                        onClick={() => handleSaveChanges(viewingStudent)}
+                        disabled={verifiedStudents[viewingStudent] === 'verified'}
+                      >
+                        Save Changes
+                      </button>
                       <button
                         className="px-4 py-2 bg-success text-white rounded hover:bg-success/80 transition"
                         onClick={() => handleReviewStudent(viewingStudent)}
@@ -1164,14 +1263,20 @@ const incompleteStudents = students
             <p className="mb-4">
               Are you sure you want to <span className="font-semibold text-red-600">remove</span> the subject <br />
               <span className="font-bold text-primary">{confirmRemoveSubject}</span> <br />
-              for <span className="font-bold">all students</span> in this class?
+              <span className="font-bold">?</span>
             </p>
-            <div className="flex justify-center gap-4 mt-6">
+            <div className="flex flex-col gap-2 mt-6">
               <button
                 className="px-4 py-2 bg-danger text-white rounded hover:bg-danger/80 transition"
-                onClick={() => handleRemoveSubject(confirmRemoveSubject)}
+                onClick={() => handleRemoveSubject(confirmRemoveSubject, false)}
               >
-                Yes, Remove
+                Remove for This Student Only
+              </button>
+              <button
+                className="px-4 py-2 bg-warning text-white rounded hover:bg-warning/80 transition"
+                onClick={() => handleRemoveSubject(confirmRemoveSubject, true)}
+              >
+                Remove for All Students
               </button>
               <button
                 className="px-4 py-2 bg-muted text-foreground rounded hover:bg-muted/80 transition"

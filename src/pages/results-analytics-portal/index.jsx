@@ -28,7 +28,8 @@ const ResultsAnalyticsPortal = () => {
   const [selectedClass, setSelectedClass] = useState('');
   const [subjects, setSubjects] = useState([]);
   const [examTypes, setExamTypes] = useState([]);
-
+  const [totalStudentsInClass, setTotalStudentsInClass] = useState(null);
+  
   useEffect(() => {
     const storedData = localStorage.getItem('studentData');
     if (storedData) {
@@ -405,6 +406,16 @@ const ResultsAnalyticsPortal = () => {
     }
   }, [selectedClass, selectedTerm, hasSelected]);
 
+  // Fetch total students in class
+  useEffect(() => {
+    if (selectedClass && selectedTerm && hasSelected) {
+      fetch(`${API_BASE_URL}/api/results/class/${selectedClass}/${selectedTerm}/total-students`)
+        .then(res => res.json())
+        .then(data => setTotalStudentsInClass(data.total || 0))
+        .catch(() => setTotalStudentsInClass(null));
+    }
+  }, [selectedClass, selectedTerm, hasSelected, API_BASE_URL]);
+
   // Render selection screen if not selected
   if (!hasSelected) {
     return (
@@ -559,7 +570,10 @@ const ResultsAnalyticsPortal = () => {
                   </span>
                 </div>
                 <div>
-                  Position: <span className="font-bold">{overallResult?.position || 'N/A'}</span>
+                  Position: <span className="font-bold">
+                    {overallResult?.position || 'N/A'}
+                    {totalStudentsInClass ? ` out of ${totalStudentsInClass}` : ''}
+                  </span>
                 </div>
                 <div>Class: <span className="font-bold">{selectedClass || 'N/A'}</span></div>
                 <div>Term: <span className="font-bold">{selectedTerm || 'N/A'}</span></div>

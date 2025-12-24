@@ -11,6 +11,8 @@ const TeachersList = () => {
   const [showAdd, setShowAdd] = useState(false);
   const [loading, setLoading] = useState(true);
   const [errorMsg, setErrorMsg] = useState("");
+  const [page, setPage] = useState(1);
+  const [hasMore, setHasMore] = useState(true);
 
   // Fetch teachers from backend
   useEffect(() => {
@@ -18,17 +20,22 @@ const TeachersList = () => {
       setLoading(true);
       setErrorMsg("");
       try {
-        const res = await fetch(`${API_BASE_URL}/api/teacher`);
+        const res = await fetch(`${API_BASE_URL}/api/teacher?page=${page}&limit=20`);
         if (!res.ok) throw new Error("Failed to fetch teachers");
         const data = await res.json();
-        setTeachers(data);
+        if (page === 1) {
+          setTeachers(data.teachers);
+        } else {
+          setTeachers((prev) => [...prev, ...data.teachers]);
+        }
+        setHasMore(data.teachers.length === 20);
       } catch (err) {
         setErrorMsg("Could not load teachers.");
       }
       setLoading(false);
     };
     fetchTeachers();
-  }, []);
+  }, [page]);
 
   // Handler for deleting a teacher (calls backend API)
   const handleDelete = async (idx) => {
@@ -163,6 +170,17 @@ const TeachersList = () => {
           )}
           {deleteMode && teachers.length === 0 && (
             <div className="text-center text-muted-foreground mt-8">No teachers left.</div>
+          )}
+          {hasMore && (
+            <div className="text-center mt-4">
+              <button
+                className="px-4 py-2 bg-primary text-white rounded"
+                onClick={() => setPage((p) => p + 1)}
+                disabled={loading}
+              >
+                Load More
+              </button>
+            </div>
           )}
         </>
       )}

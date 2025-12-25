@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { useNavigate } from 'react-router-dom'; // <-- Add this import
+import { useNavigate } from 'react-router-dom';
 import RegistrationTabs from './RegistrationTabs';
 
 const API_BASE_URL = process.env.REACT_APP_API_BASE_URL || "";
@@ -25,7 +25,6 @@ const defaultRegistrationData = {
 const MAX_IMAGE_SIZE_MB = 200;
 
 const ProfilePage = () => {
-  // Move this line to the top of the component
   const studentData = JSON.parse(localStorage.getItem("studentData") || "{}");
   const userId = studentData._id;
 
@@ -35,6 +34,7 @@ const ProfilePage = () => {
   const [showPhotoModal, setShowPhotoModal] = useState(false);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState(""); // Add to state
+  const [profileLoading, setProfileLoading] = useState(true); // Add loading state
   const navigate = useNavigate(); // <-- Add this line
 
   useEffect(() => {
@@ -42,6 +42,7 @@ const ProfilePage = () => {
 
     // Fetch profile from backend
     const fetchProfile = async () => {
+      setProfileLoading(true); // Start loading
       try {
         const res = await fetch(`${API_BASE_URL}/api/profile/${userId}`);
         let profileData = {};
@@ -65,6 +66,8 @@ const ProfilePage = () => {
         }));
       } catch (err) {
         // fallback: use localStorage or previous state
+      } finally {
+        setProfileLoading(false); // End loading
       }
     };
 
@@ -130,6 +133,15 @@ const ProfilePage = () => {
       setSaving(false);
     }
   };
+
+  if (profileLoading) {
+    return (
+      <div className="max-w-2xl mx-auto bg-white rounded-lg shadow p-4 sm:p-6 mt-6 sm:mt-10 flex flex-col items-center justify-center min-h-[300px]">
+        <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-primary mb-4"></div>
+        <div className="text-primary font-semibold text-lg">Loading profile details...</div>
+      </div>
+    );
+  }
 
   return (
     <div className="max-w-2xl mx-auto bg-white rounded-lg shadow p-4 sm:p-6 mt-6 sm:mt-10">

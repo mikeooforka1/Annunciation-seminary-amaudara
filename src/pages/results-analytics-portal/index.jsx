@@ -29,7 +29,7 @@ const ResultsAnalyticsPortal = () => {
   const [subjects, setSubjects] = useState([]);
   const [examTypes, setExamTypes] = useState([]);
   const [totalStudentsInClass, setTotalStudentsInClass] = useState(null);
-  
+
   useEffect(() => {
     const storedData = localStorage.getItem('studentData');
     if (storedData) {
@@ -415,6 +415,11 @@ const ResultsAnalyticsPortal = () => {
         .catch(() => setTotalStudentsInClass(null));
     }
   }, [selectedClass, selectedTerm, hasSelected, API_BASE_URL]);
+const [showMobilePrintWarning, setShowMobilePrintWarning] = useState(false);
+  useEffect(() => {
+    const isMobile = /android|iphone|ipad|ipod|opera mini|iemobile|mobile/i.test(navigator.userAgent);
+    if (isMobile) setShowMobilePrintWarning(true);
+  }, []);
 
   // Render selection screen if not selected
   if (!hasSelected) {
@@ -478,6 +483,27 @@ const ResultsAnalyticsPortal = () => {
 
   return (
     <>
+      {/* Mobile Print Warning */}
+      {showMobilePrintWarning && (
+        <div
+          className="fixed left-0 w-full flex items-center justify-center bg-yellow-100 border-b border-yellow-400 py-2 px-4"
+          style={{
+            top: '4rem', // adjust to your header's height
+            zIndex: 1050
+          }}
+        >
+          <span className="text-yellow-800 font-semibold text-sm">
+            For best results, please print or save your result PDF from a desktop browser.
+          </span>
+          <button
+            className="ml-4 px-2 py-1 text-yellow-700 hover:text-yellow-900 text-xs border border-yellow-400 rounded"
+            onClick={() => setShowMobilePrintWarning(false)}
+          >
+            Dismiss
+          </button>
+        </div>
+      )}
+
       <RoleBasedHeader
         userRole={userRole}
         userName={userName}

@@ -157,6 +157,26 @@ const StudentDashboard = () => {
             <p className="mb-4 text-muted-foreground">
               Please fill in your profile details before using the dashboard.
             </p>
+            {/* List missing sections */}
+            <div className="mb-4 text-left">
+              <span className="block font-semibold text-red-600 mb-1">Missing Information:</span>
+              <ul className="list-disc list-inside text-sm text-red-700">
+                {[
+                  { key: "gender", label: "Gender" },
+                  { key: "dob", label: "Date of Birth" },
+                  { key: "address", label: "Address" },
+                  { key: "currentFunction", label: "Current Function" },
+                  { key: "gradeLevel", label: "Grade/Class" },
+                  { key: "photo", label: "Profile Photo" }
+                ]
+                  .filter(field =>
+                    !profile || !profile[field.key] || profile[field.key] === ""
+                  )
+                  .map(field => (
+                    <li key={field.key}>{field.label}</li>
+                  ))}
+              </ul>
+            </div>
             <button
               className="px-6 py-2 bg-primary text-white rounded font-semibold hover:bg-primary/90"
               onClick={() => navigate('/profile')}

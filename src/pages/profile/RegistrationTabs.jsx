@@ -139,7 +139,7 @@ const RegistrationTabs = ({ userId, readOnly = false }) => {
                 <input type="text" name="address" value={form.address || ""} onChange={handleChange} placeholder="Address" className="mb-2 w-full border rounded px-2 py-1" />
                 <input type="text" name="city" value={form.city || ""} onChange={handleChange} placeholder="City" className="mb-2 w-full border rounded px-2 py-1" />
                 <input type="text" name="state" value={form.state || ""} onChange={handleChange} placeholder="State" className="mb-2 w-full border rounded px-2 py-1" />
-                <input type="text" name="zip" value={form.zip || ""} onChange={handleChange} placeholder="ZIP" className="mb-2 w-full border rounded px-2 py-1" />
+                {/* ZIP code field removed */}
               </>
             ) : (
               <>
@@ -147,7 +147,8 @@ const RegistrationTabs = ({ userId, readOnly = false }) => {
                 <p>Relationship: {form.relationship}</p>
                 <p>Email: {form.email}</p>
                 <p>Phone: {form.phone}</p>
-                <p>Address: {form.address}, {form.city}, {form.state}, {form.zip}</p>
+                <p>Address: {form.address}, {form.city}, {form.state}</p>
+                {/* ZIP code display removed */}
               </>
             )}
           </div>

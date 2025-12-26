@@ -187,11 +187,11 @@ const ProfilePage = () => {
               type="button"
               className="mt-2 bg-primary text-white rounded-full w-10 h-10 flex items-center justify-center shadow-lg border-2 border-white focus:outline-none focus:ring-2 focus:ring-primary transition"
               onClick={() => document.getElementById('profile-photo-input').click()}
-              title="Add/Change Photo"
+              title="Add Profile Picture"
               tabIndex={0}
               style={{ zIndex: 2 }}
             >
-              <span className="text-2xl leading-none">+</span>
+              <span className="text-xs leading-none font-semibold px-2 text-center">Add<br />Profile<br />Picture</span>
             </button>
           )}
         </div>
@@ -231,13 +231,17 @@ const ProfilePage = () => {
                 placeholder="Address"
                 className="w-full border rounded px-2 py-1 mb-2"
               />
-              <input
-                type="date"
-                name="dob"
-                value={profile.dob}
-                onChange={handleChange}
-                className="w-full border rounded px-2 py-1 mb-2"
-              />
+              <div className="mb-2 w-full">
+                <label className="block text-xs font-semibold text-gray-600 mb-1 sm:hidden">Date of Birth (DOB)</label>
+                <input
+                  type="date"
+                  name="dob"
+                  value={profile.dob}
+                  onChange={handleChange}
+                  className="w-full border rounded px-2 py-1"
+                  placeholder="Date of Birth"
+                />
+              </div>
               <select
                 name="gender"
                 value={profile.gender}

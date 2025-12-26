@@ -37,6 +37,11 @@ const VerifyResult = () => {
   const [classVerificationLoading, setClassVerificationLoading] = useState(false);
   const [classList, setClassList] = useState(manualClassList);
   const [confirmRemoveSubject, setConfirmRemoveSubject] = useState(null); // subject name to confirm
+  const [studentTokenInput, setStudentTokenInput] = useState('');
+  const [studentVerificationLoading, setStudentVerificationLoading] = useState(false);
+  const [showEditConfirmModal, setShowEditConfirmModal] = useState(false);
+  const [pendingEditAction, setPendingEditAction] = useState(null);
+  const [showDeleteConfirmModal, setShowDeleteConfirmModal] = useState(null);
 
   useEffect(() => {
     // Get admin data from localStorage (adjust key as needed)
@@ -94,79 +99,81 @@ const VerifyResult = () => {
   }, [selectedClass, selectedTerm]);
 
   // --- Live position & average calculation for all students (exact teacher logic) ---
-useEffect(() => {
-  if (students.length > 0) {
-    // 1. Calculate each student's total C.A.T + Exam for all their subjects
-    const studentTotals = students.map(student => {
-      const studentId = student._id;
-      let totalScore = 0;
-      let subjectCount = 0;
-      const result = editResults[studentId];
-      if (result && Array.isArray(result.subjects)) {
-        result.subjects.forEach(subject => {
-          const cat = Number(result[subject]?.cat1 ?? 0);
-          const exam = Number(result[subject]?.exam ?? 0);
-          // Only count if at least one score is entered
-          if (cat !== 0 || exam !== 0) {
-            totalScore += cat + exam;
-            subjectCount += 1;
+  useEffect(() => {
+    if (students.length > 0) {
+      // 1. Calculate each student's total C.A.T + Exam for all their subjects
+      const studentTotals = students.map(student => {
+        const studentId = student._id;
+        let totalScore = 0;
+        let subjectCount = 0;
+        const result = editResults[studentId];
+        if (result && Array.isArray(result.subjects)) {
+          result.subjects.forEach(subject => {
+            const cat = Number(result[subject]?.cat1 ?? 0);
+            const exam = Number(result[subject]?.exam ?? 0);
+            // Only count if at least one score is entered
+            if (cat !== 0 || exam !== 0) {
+              totalScore += cat + exam;
+              subjectCount += 1;
+            }
+          });
+        }
+        // If no subjects have scores, fallback to subjects.length
+        if (subjectCount === 0 && result && Array.isArray(result.subjects)) subjectCount = result.subjects.length;
+        let average = subjectCount > 0 ? totalScore / subjectCount : 0;
+        if (average > 100) average = 100;
+        return {
+          studentId,
+          totalScore,
+          average: Number(average.toFixed(1)),
+        };
+      });
+
+      // 2. Sort by average DESC for position
+      const sorted = [...studentTotals].sort((a, b) => b.average - a.average);
+
+      // 3. Assign positions (handle ties)
+      const positionMap = {};
+      let lastAverage = null;
+      let lastPosition = 0;
+      let actualPosition = 1;
+      sorted.forEach(item => {
+        if (lastAverage !== null && item.average === lastAverage) {
+          positionMap[item.studentId] = lastPosition;
+        } else {
+          positionMap[item.studentId] = actualPosition;
+          lastAverage = item.average;
+          lastPosition = actualPosition;
+        }
+        actualPosition++;
+      });
+
+      // 4. Update position and average for each student (unless manually set)
+      setEditResults(prev => {
+        // Only update if values actually changed
+        let changed = false;
+        const updated = { ...prev };
+        students.forEach(student => {
+          const studentId = student._id;
+          const autoAverage = studentTotals.find(s => s.studentId === studentId)?.average || 0;
+          const autoPosition = positionMap[studentId]
+            ? `${positionMap[studentId]}${positionMap[studentId] === 1 ? 'st' : positionMap[studentId] === 2 ? 'nd' : positionMap[studentId] === 3 ? 'rd' : 'th'}`
+            : '';
+          // Only update if not manually set
+          if (
+            !updated[studentId]?.manualPosition // You can set this flag when admin manually edits position
+          ) {
+            updated[studentId] = {
+              ...(updated[studentId] || {}),
+              average: autoAverage,
+              position: autoPosition,
+            };
           }
         });
-      }
-      // If no subjects have scores, fallback to subjects.length
-      if (subjectCount === 0 && result && Array.isArray(result.subjects)) subjectCount = result.subjects.length;
-      let average = subjectCount > 0 ? totalScore / subjectCount : 0;
-      if (average > 100) average = 100;
-      return {
-        studentId,
-        totalScore,
-        average: Number(average.toFixed(1)),
-      };
-    });
-
-    // 2. Sort by average DESC for position
-    const sorted = [...studentTotals].sort((a, b) => b.average - a.average);
-
-    // 3. Assign positions (handle ties)
-    const positionMap = {};
-    let lastAverage = null;
-    let lastPosition = 0;
-    let actualPosition = 1;
-    sorted.forEach(item => {
-      if (lastAverage !== null && item.average === lastAverage) {
-        positionMap[item.studentId] = lastPosition;
-      } else {
-        positionMap[item.studentId] = actualPosition;
-        lastAverage = item.average;
-        lastPosition = actualPosition;
-      }
-      actualPosition++;
-    });
-
-    // 4. Update position and average for each student (unless manually set)
-    setEditResults(prev => {
-      const updated = { ...prev };
-      students.forEach(student => {
-        const studentId = student._id;
-        const autoAverage = studentTotals.find(s => s.studentId === studentId)?.average || 0;
-        const autoPosition = positionMap[studentId]
-          ? `${positionMap[studentId]}${positionMap[studentId] === 1 ? 'st' : positionMap[studentId] === 2 ? 'nd' : positionMap[studentId] === 3 ? 'rd' : 'th'}`
-          : '';
-        // Only update if not manually set
-        if (
-          !updated[studentId]?.manualPosition // You can set this flag when admin manually edits position
-        ) {
-          updated[studentId] = {
-            ...(updated[studentId] || {}),
-            average: autoAverage,
-            position: autoPosition,
-          };
-        }
+        return changed ? updated : prev;
       });
-      return updated;
-    });
-  }
-}, [editResults, students]);
+    }
+  }, [students]); // Remove editResults from dependencies!
   // Fetch pushed results for each student (refactored)
   useEffect(() => {
     if (students.length > 0 && selectedTerm) {
@@ -300,59 +307,63 @@ useEffect(() => {
         };
       }
     });
+    setVerifiedStudents(prev => ({
+      ...prev,
+      [studentId]: 'pending'
+    }));
   };
   const handleSaveChanges = async (studentId) => {
-  const result = editResults[studentId];
-  if (!result || !result.subjects || result.subjects.length === 0) {
-    alert('No changes to save.');
-    return;
-  }
-  // Save all subject results (but do NOT set reviewed/verified)
-  for (const subject of result.subjects) {
-    const subj = result[subject];
-    if (subj && subj._id) {
-      const updateUrl = `${API_BASE_URL}/api/results/update/${subj._id}`;
-      const subjectPayload = {
-        firstCatScore: Number(subj.cat1 ?? 0),
-        examScore: Number(subj.exam ?? 0),
-        maxScore: subj.maxScore ?? '',
-        minScore: subj.minScore ?? '',
-        grade: subj.grade ?? '',
-        remark: subj.remark ?? '',
-      };
-      await fetch(updateUrl, {
+    const result = editResults[studentId];
+    if (!result || !result.subjects || result.subjects.length === 0) {
+      alert('No changes to save.');
+      return;
+    }
+    // Save all subject results (but do NOT set reviewed/verified)
+    for (const subject of result.subjects) {
+      const subj = result[subject];
+      if (subj && subj._id) {
+        const updateUrl = `${API_BASE_URL}/api/results/update/${subj._id}`;
+        const subjectPayload = {
+          firstCatScore: Number(subj.cat1 ?? 0),
+          examScore: Number(subj.exam ?? 0),
+          maxScore: subj.maxScore ?? '',
+          minScore: subj.minScore ?? '',
+          grade: subj.grade ?? '',
+          remark: subj.remark ?? '',
+        };
+        await fetch(updateUrl, {
+          method: 'PUT',
+          body: JSON.stringify(subjectPayload),
+          headers: { 'Content-Type': 'application/json' }
+        });
+      }
+    }
+    // Save "Overall" result (if present)
+    if (result._overallId) {
+      const overallFields = {};
+      [
+        'position', 'average',
+        'handwriting', 'punctuality', 'initiative', 'obedience', 'honesty', 'neatness',
+        'attentiveness', 'respect', 'attitude', 'creativity'
+      ].forEach(field => {
+        if (result[field] !== undefined) {
+          overallFields[field] = result[field];
+        }
+      });
+      overallFields.academicYear = "2025/2026";
+      overallFields.nextTerm = "18/01/2026";
+      // --- Set deans and rectors remark dynamically based on average ---
+      const avg = Number(result.average ?? 0);
+      overallFields.teacherComment = getDeansRemark(avg);
+      overallFields.headTeacherRemark = getRectorsRemark(avg);
+      await fetch(`${API_BASE_URL}/api/results/update/${result._overallId}`, {
         method: 'PUT',
-        body: JSON.stringify(subjectPayload),
+        body: JSON.stringify(overallFields),
         headers: { 'Content-Type': 'application/json' }
       });
     }
-  }
-  // Save "Overall" result (if present)
-  if (result._overallId) {
-    const overallFields = {};
-    [
-      'position', 'average',
-      'handwriting', 'punctuality', 'initiative', 'obedience', 'honesty', 'neatness',
-      'attentiveness', 'respect', 'attitude', 'creativity'
-    ].forEach(field => {
-      if (result[field] !== undefined) {
-        overallFields[field] = result[field];
-      }
-    });
-    overallFields.academicYear = "2025/2026";
-    overallFields.nextTerm = "18/01/2026";
-    // --- Set deans and rectors remark dynamically based on average ---
-    const avg = Number(result.average ?? 0);
-    overallFields.teacherComment = getDeansRemark(avg);
-    overallFields.headTeacherRemark = getRectorsRemark(avg);
-    await fetch(`${API_BASE_URL}/api/results/update/${result._overallId}`, {
-      method: 'PUT',
-      body: JSON.stringify(overallFields),
-      headers: { 'Content-Type': 'application/json' }
-    });
-  }
-  alert('Changes saved!');
-};
+    alert('Changes saved!');
+  };
   // Update handleRemoveSubject to support both individual and all-students removal
   const handleRemoveSubject = async (subject, forAll = true) => {
     if (forAll) {
@@ -579,6 +590,10 @@ useEffect(() => {
       });
       const data = await res.json();
       if (res.ok && data.success) {
+        setVerifiedStudents(prev => ({
+          ...prev,
+          [studentId]: 'reviewed'
+        }));
         setMessage('Result updated and marked as reviewed!');
         setTimeout(() => setMessage(''), 1500);
         setTimeout(() => {
@@ -643,7 +658,20 @@ useEffect(() => {
         setClassVerificationLoading(false);
       });
   };
+// Helper to wrap edit actions with confirmation if verified
+const confirmOrProceedEdit = (editAction) => {
+  if (verifiedStudents[viewingStudent] === 'verified') {
+    setPendingEditAction(() => editAction);
+    setShowEditConfirmModal(true);
+  } else {
+    editAction();
+  }
+};
 
+// Wrap handleResultChange for table and meta fields
+const safeHandleResultChange = (studentId, field, value) => {
+  confirmOrProceedEdit(() => handleResultChange(studentId, field, value));
+};
   // Utility function for ObjectId validation
   const isValidObjectId = id => typeof id === 'string' && /^[a-fA-F0-9]{24}$/.test(id);
 
@@ -758,18 +786,18 @@ useEffect(() => {
         (subj.exam !== '' && subj.exam !== undefined && subj.exam !== null);
     });
   });
-const incompleteStudents = students
-  .filter(student => {
-    const result = editResults[student._id];
-    if (!result || !result.subjects || result.subjects.length === 0) return true;
-    return result.subjects.some(subject => {
-      const subj = result[subject];
-      return !subj ||
-        subj.cat1 === '' || subj.cat1 === undefined || subj.cat1 === null ||
-        subj.exam === '' || subj.exam === undefined || subj.exam === null;
-    });
-  })
-  .map(student => student.name);
+  const incompleteStudents = students
+    .filter(student => {
+      const result = editResults[student._id];
+      if (!result || !result.subjects || result.subjects.length === 0) return true;
+      return result.subjects.some(subject => {
+        const subj = result[subject];
+        return !subj ||
+          subj.cat1 === '' || subj.cat1 === undefined || subj.cat1 === null ||
+          subj.exam === '' || subj.exam === undefined || subj.exam === null;
+      });
+    })
+    .map(student => student.name);
   return (
     <div>
       <h2 className="text-xl font-bold mb-4">Verify Results</h2>
@@ -816,35 +844,35 @@ const incompleteStudents = students
         <p className="text-center text-muted-foreground mt-4">No students were found for that term.</p>
       )}
 
-{selectedClass && selectedTerm && students.length > 0 && (
-  <div className="flex flex-col items-end mb-4">
-    {incompleteStudents.length > 0 && (
-      <div className="mb-2 text-warning font-semibold text-right">
-        Incomplete results for: {incompleteStudents.join(', ')}
-      </div>
-    )}
-    <button
-      className="px-4 py-2 bg-info text-white rounded hover:bg-info/80 transition"
-      onClick={handleReviewAllStudents}
-      disabled={
-        reviewLoading ||
-        !allResultsPushedAndComplete ||
-        (students.length > 0 &&
-          students.every(s => verifiedStudents[s._id] === 'reviewed' || verifiedStudents[s._id] === 'verified'))
-      }
-    >
-      {!allResultsPushedAndComplete
-        ? 'All results must be pushed and complete'
-        : reviewLoading
-        ? 'Reviewing All...'
-        : students.length > 0 && students.every(s => verifiedStudents[s._id] === 'verified')
-        ? 'Verified'
-        : students.length > 0 && students.every(s => verifiedStudents[s._id] === 'reviewed' || verifiedStudents[s._id] === 'verified')
-        ? 'Reviewed'
-        : 'Review for All'}
-    </button>
-  </div>
-)}
+      {selectedClass && selectedTerm && students.length > 0 && (
+        <div className="flex flex-col items-end mb-4">
+          {incompleteStudents.length > 0 && (
+            <div className="mb-2 text-warning font-semibold text-right">
+              Incomplete results for: {incompleteStudents.join(', ')}
+            </div>
+          )}
+          <button
+            className="px-4 py-2 bg-info text-white rounded hover:bg-info/80 transition"
+            onClick={handleReviewAllStudents}
+            disabled={
+              reviewLoading ||
+              !allResultsPushedAndComplete ||
+              (students.length > 0 &&
+                students.every(s => verifiedStudents[s._id] === 'reviewed' || verifiedStudents[s._id] === 'verified'))
+            }
+          >
+            {!allResultsPushedAndComplete
+              ? 'All results must be pushed and complete'
+              : reviewLoading
+              ? 'Reviewing All...'
+              : students.length > 0 && students.every(s => verifiedStudents[s._id] === 'verified')
+              ? 'Verified'
+              : students.length > 0 && students.every(s => verifiedStudents[s._id] === 'reviewed' || verifiedStudents[s._id] === 'verified')
+              ? 'Reviewed'
+              : 'Review for All'}
+          </button>
+        </div>
+      )}
       {selectedClass && selectedTerm && students.length > 0 && (
         <div>
           <h3 className="text-lg font-semibold mb-2">
@@ -999,7 +1027,7 @@ const incompleteStudents = students
                                   min="0"
                                   max="30"
                                   value={editResults[viewingStudent]?.[subject]?.cat1 ?? ''}
-                                  onChange={e => handleResultChange(viewingStudent, subject, { ...editResults[viewingStudent][subject], cat1: e.target.value })}
+                                  onChange={e => safeHandleResultChange(viewingStudent, subject, { ...editResults[viewingStudent][subject], cat1: e.target.value })}
                                   className="border rounded px-2 py-1 w-16 text-center"
                                 />
                               </td>
@@ -1009,7 +1037,7 @@ const incompleteStudents = students
                                   min="0"
                                   max="70"
                                   value={editResults[viewingStudent]?.[subject]?.exam ?? ''}
-                                  onChange={e => handleResultChange(viewingStudent, subject, { ...editResults[viewingStudent][subject], exam: e.target.value })}
+                                  onChange={e => safeHandleResultChange(viewingStudent, subject, { ...editResults[viewingStudent][subject], exam: e.target.value })}
                                   className="border rounded px-2 py-1 w-16 text-center"
                                 />
                               </td>
@@ -1024,7 +1052,7 @@ const incompleteStudents = students
                                       ? editResults[viewingStudent]?.[subject]?.grade
                                       : getGrade(Number(editResults[viewingStudent]?.[subject]?.cat1 ?? 0) + Number(editResults[viewingStudent]?.[subject]?.exam ?? 0))
                                   }
-                                  onChange={e => handleResultChange(viewingStudent, subject, { ...editResults[viewingStudent][subject], grade: e.target.value })}
+                                  onChange={e => safeHandleResultChange(viewingStudent, subject, { ...editResults[viewingStudent][subject], grade: e.target.value })}
                                   className="border rounded px-2 py-1 w-16 text-center"
                                 />
                               </td>
@@ -1040,7 +1068,7 @@ const incompleteStudents = students
                                             : getGrade(Number(editResults[viewingStudent]?.[subject]?.cat1 ?? 0) + Number(editResults[viewingStudent]?.[subject]?.exam ?? 0))
                                       )
                                   }
-                                  onChange={e => handleResultChange(viewingStudent, subject, { ...editResults[viewingStudent][subject], remark: e.target.value })}
+                                  onChange={e => safeHandleResultChange(viewingStudent, subject, { ...editResults[viewingStudent][subject], remark: e.target.value })}
                                   className="border rounded px-2 py-1 w-24 text-center"
                                 />
                               </td>
@@ -1102,9 +1130,7 @@ const incompleteStudents = students
                                     min="1"
                                     max="5"
                                     value={editResults[viewingStudent]?.[key] || ''}
-                                    onChange={e =>
-                                      handleResultChange(viewingStudent, key, e.target.value)
-                                    }
+                                    onChange={e => safeHandleResultChange(viewingStudent, key, e.target.value)}
                                     className="border rounded px-2 py-1 w-16"
                                   />
                                   <div className="text-xs text-muted-foreground mt-1">
@@ -1223,6 +1249,50 @@ const incompleteStudents = students
                           : 'Mark as Reviewed'}
                       </button>
                     </div>
+
+                    {/* Verification Token Input for Individual Student */}
+                    {verifiedStudents[viewingStudent] === 'reviewed' && (
+                      <div className="flex flex-col sm:flex-row gap-2 items-center mt-6">
+                        <input
+                          type="text"
+                          placeholder="Enter verification token"
+                          value={studentTokenInput}
+                          onChange={e => setStudentTokenInput(e.target.value)}
+                          className="border border-border rounded px-2 py-1"
+                        />
+                        <button
+                          className="px-4 py-2 bg-success text-white rounded hover:bg-success/80 transition"
+                          onClick={async () => {
+                            setStudentVerificationLoading(true);
+                            // Call backend to verify this student's result
+                            const overallId = editResults[viewingStudent]?._overallId;
+                            const res = await fetch(`${API_BASE_URL}/api/results/verify-student`, {
+                              method: 'POST',
+                              headers: { 'Content-Type': 'application/json' },
+                              body: JSON.stringify({
+                                resultId: overallId,
+                                adminId,
+                                token: studentTokenInput
+                              })
+                            });
+                            const data = await res.json();
+                            if (res.ok && data.success) {
+                              setVerifiedStudents(prev => ({
+                                ...prev,
+                                [viewingStudent]: 'verified'
+                              }));
+                              setStudentTokenInput('');
+                            } else {
+                              alert(data.error || 'Verification failed.');
+                            }
+                            setStudentVerificationLoading(false);
+                          }}
+                          disabled={!studentTokenInput || studentVerificationLoading}
+                        >
+                          {studentVerificationLoading ? 'Verifying...' : 'Verify Result'}
+                        </button>
+                      </div>
+                    )}
                   </>
                 )}
               </div>
@@ -1281,19 +1351,97 @@ const incompleteStudents = students
             <div className="flex flex-col gap-2 mt-6">
               <button
                 className="px-4 py-2 bg-danger text-white rounded hover:bg-danger/80 transition"
-                onClick={() => handleRemoveSubject(confirmRemoveSubject, false)}
+                onClick={() => setShowDeleteConfirmModal({ type: 'individual', subject: confirmRemoveSubject })}
               >
                 Remove for This Student Only
               </button>
               <button
                 className="px-4 py-2 bg-warning text-white rounded hover:bg-warning/80 transition"
-                onClick={() => handleRemoveSubject(confirmRemoveSubject, true)}
+                onClick={() => setShowDeleteConfirmModal({ type: 'all', subject: confirmRemoveSubject })}
               >
                 Remove for All Students
               </button>
               <button
                 className="px-4 py-2 bg-muted text-foreground rounded hover:bg-muted/80 transition"
                 onClick={() => setConfirmRemoveSubject(null)}
+              >
+                Cancel
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Additional Confirmation Modal for Individual or General Delete */}
+      {showDeleteConfirmModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40">
+          <div className="bg-white rounded-lg shadow-lg p-6 w-full max-w-sm text-center">
+            <h3 className="font-bold text-lg mb-4">
+              {showDeleteConfirmModal.type === 'individual'
+                ? 'Confirm Individual Subject Removal'
+                : 'Confirm General Subject Removal'}
+            </h3>
+            <p className="mb-4">
+              Are you <span className="font-semibold text-red-600">sure</span> you want to{" "}
+              <span className="font-bold">
+                remove the subject <span className="text-primary">{showDeleteConfirmModal.subject}</span>
+              </span>{" "}
+              {showDeleteConfirmModal.type === 'individual'
+                ? 'for this student only'
+                : 'for all students'}
+              ?
+            </p>
+            <div className="flex justify-center gap-4 mt-6">
+              <button
+                className={`px-4 py-2 ${showDeleteConfirmModal.type === 'individual' ? 'bg-danger' : 'bg-warning'} text-white rounded hover:opacity-90 transition`}
+                onClick={async () => {
+                  await handleRemoveSubject(
+                    showDeleteConfirmModal.subject,
+                    showDeleteConfirmModal.type === 'all'
+                  );
+                  setShowDeleteConfirmModal(null);
+                  setConfirmRemoveSubject(null);
+                }}
+              >
+                Yes, Remove
+              </button>
+              <button
+                className="px-4 py-2 bg-muted text-foreground rounded hover:bg-muted/80 transition"
+                onClick={() => setShowDeleteConfirmModal(null)}
+              >
+                Cancel
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Confirmation Modal for Editing Verified Result */}
+      {showEditConfirmModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40">
+          <div className="bg-white rounded-lg shadow-lg p-6 w-full max-w-sm text-center">
+            <h3 className="font-bold text-lg mb-4">Modify Verified Result?</h3>
+            <p className="mb-4">
+              This student's result is already <span className="text-success font-semibold">verified</span>.<br />
+              Are you sure you want to modify it? This will set the result back to <span className="text-warning font-semibold">pending</span>.
+            </p>
+            <div className="flex justify-center gap-4 mt-6">
+              <button
+                className="px-4 py-2 bg-danger text-white rounded hover:bg-danger/80 transition"
+                onClick={() => {
+                  setShowEditConfirmModal(false);
+                  if (pendingEditAction) pendingEditAction();
+                  setPendingEditAction(null);
+                }}
+              >
+                Yes, Modify
+              </button>
+              <button
+                className="px-4 py-2 bg-muted text-foreground rounded hover:bg-muted/80 transition"
+                onClick={() => {
+                  setShowEditConfirmModal(false);
+                  setPendingEditAction(null);
+                }}
               >
                 Cancel
               </button>

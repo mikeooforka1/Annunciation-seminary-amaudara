@@ -35,6 +35,7 @@ const ProfilePage = () => {
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState(""); // Add to state
   const [profileLoading, setProfileLoading] = useState(true); // Add loading state
+  const [showProfileInstructionModal, setShowProfileInstructionModal] = useState(true); // Add this state
   const navigate = useNavigate(); // <-- Add this line
 
   useEffect(() => {
@@ -133,6 +134,16 @@ const ProfilePage = () => {
       setSaving(false);
     }
   };
+
+  const requiredFields = [
+    { key: "gender", label: "Gender" },
+    { key: "dob", label: "Date of Birth" },
+    { key: "address", label: "Address" },
+    { key: "currentFunction", label: "Current Function" },
+    { key: "gradeLevel", label: "Grade/Class" },
+    { key: "photo", label: "Profile Photo" }
+  ];
+  const missingFields = requiredFields.filter(field => !profile[field.key] || profile[field.key] === "");
 
   if (profileLoading) {
     return (
@@ -320,6 +331,39 @@ const ProfilePage = () => {
           </button>
         )}
       </div>
+      {missingFields.length > 0 && showProfileInstructionModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40">
+          <div className="bg-white rounded-lg shadow-lg p-6 w-full max-w-sm text-center">
+            <h3 className="font-bold text-lg mb-4 text-primary">Complete Your Profile</h3>
+            <p className="mb-4 text-muted-foreground">
+              To access all features, please fill in the following required profile sections:
+            </p>
+            <ul className="list-disc list-inside text-sm text-red-700 mb-4 text-left">
+              {missingFields.map(field => (
+                <li key={field.key}>{field.label}</li>
+              ))}
+            </ul>
+            <p className="mb-4 text-sm text-gray-700">
+              Click <span className="font-semibold text-primary">Edit Profile</span> to update your details.
+            </p>
+            <button
+              className="px-6 py-2 bg-primary text-white rounded font-semibold hover:bg-primary/90"
+              onClick={() => {
+                setEditing(true);
+                setShowProfileInstructionModal(false);
+              }}
+            >
+              Edit Profile
+            </button>
+            <button
+              className="ml-2 px-4 py-2 bg-muted text-foreground rounded hover:bg-muted/80 font-semibold"
+              onClick={() => setShowProfileInstructionModal(false)}
+            >
+              Dismiss
+            </button>
+          </div>
+        </div>
+      )}
       <div className="w-full">
         <RegistrationTabs userId={userId} registrationData={registrationData} />
       </div>

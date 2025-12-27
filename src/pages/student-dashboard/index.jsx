@@ -12,10 +12,10 @@ const VOCATION_REPORT_URL = "/assets/docs/vacation_report.pdf"; // Ensure this p
 
 const StudentDashboard = () => {
   const [studentData, setStudentData] = useState(null);
-  const [showProfileModal, setShowProfileModal] = useState(false);
   const [profile, setProfile] = useState(null);
   const [profileLoading, setProfileLoading] = useState(true);
   const [showXmasModal, setShowXmasModal] = useState(false); // New state for xmas modal
+  const [showProfileArrow, setShowProfileArrow] = useState(false); // New state for arrow
   const navigate = useNavigate();
 
   // Map backend fields to dashboard fields (move this above useEffect)
@@ -112,26 +112,21 @@ const StudentDashboard = () => {
 
   useEffect(() => {
     if (profileLoading) return; // Don't check until profile is loaded
-    // If profile is not loaded, show modal
-    if (!profile) {
-      setShowProfileModal(true);
-      return;
-    }
     // List required fields (except name, which is read-only)
     const requiredFields = [
-      { key: "gender", value: profile.gender },
-      { key: "dob", value: profile.dob },
-      { key: "address", value: profile.address },
-      { key: "currentFunction", value: profile.currentFunction },
-      { key: "gradeLevel", value: profile.gradeLevel },
-      { key: "photo", value: profile.photo }
+      { key: "gender", value: profile?.gender },
+      { key: "dob", value: profile?.dob },
+      { key: "address", value: profile?.address },
+      { key: "currentFunction", value: profile?.currentFunction },
+      { key: "gradeLevel", value: profile?.gradeLevel },
+      { key: "photo", value: profile?.photo }
     ];
     // Find missing fields
     const missingFields = requiredFields.filter(field => !field.value || field.value === "").map(field => field.key);
-    // Show modal if any field is missing or profile is empty
-    const isProfileEmpty = Object.values(profile).every(val => !val || val === "");
+    // Show arrow if any field is missing or profile is empty
+    const isProfileEmpty = profile && Object.values(profile).every(val => !val || val === "");
     const isIncomplete = missingFields.length > 0 || isProfileEmpty;
-    setShowProfileModal(isIncomplete);
+    setShowProfileArrow(isIncomplete);
 
     // Show xmas modal only if profile is complete and not loading
     if (!isIncomplete && !profileLoading) {
@@ -149,44 +144,6 @@ const StudentDashboard = () => {
 
   return (
     <div className="min-h-screen bg-background">
-      {/* Modal for incomplete profile */}
-      {showProfileModal && (
-        <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50">
-          <div className="bg-white rounded-lg p-8 shadow-lg max-w-sm w-full text-center">
-            <h2 className="text-xl font-bold mb-2 text-primary">Complete Your Profile</h2>
-            <p className="mb-4 text-muted-foreground">
-              Please fill in your profile details before using the dashboard.
-            </p>
-            {/* List missing sections */}
-            <div className="mb-4 text-left">
-              <span className="block font-semibold text-red-600 mb-1">Missing Information:</span>
-              <ul className="list-disc list-inside text-sm text-red-700">
-                {[
-                  { key: "gender", label: "Gender" },
-                  { key: "dob", label: "Date of Birth" },
-                  { key: "address", label: "Address" },
-                  { key: "currentFunction", label: "Current Function" },
-                  { key: "gradeLevel", label: "Grade/Class" },
-                  { key: "photo", label: "Profile Photo" }
-                ]
-                  .filter(field =>
-                    !profile || !profile[field.key] || profile[field.key] === ""
-                  )
-                  .map(field => (
-                    <li key={field.key}>{field.label}</li>
-                  ))}
-              </ul>
-            </div>
-            <button
-              className="px-6 py-2 bg-primary text-white rounded font-semibold hover:bg-primary/90"
-              onClick={() => navigate('/profile')}
-            >
-              Go to Profile
-            </button>
-          </div>
-        </div>
-      )}
-
       {/* Merry Christmas Modal (same as login page) */}
       {showXmasModal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60">
@@ -222,8 +179,37 @@ const StudentDashboard = () => {
         userRole="student"
         userName={data.name}
         notifications={data.notifications}
-        lockHeader={showProfileModal}
+        lockHeader={false}
       />
+
+      {/* Profile completion arrow/tooltip */}
+      {showProfileArrow && (
+        <div
+          className="fixed z-50 flex flex-col items-end animate-bounce"
+          style={{
+            top: '4.5rem', // slightly lower for mobile header
+            right: '1rem',
+            maxWidth: '90vw',
+            pointerEvents: 'none'
+          }}
+        >
+          <div
+            className="bg-yellow-100 border border-yellow-400 text-yellow-800 px-3 py-2 rounded shadow text-sm font-semibold mb-1"
+            style={{
+              fontSize: '1rem',
+              maxWidth: '80vw',
+              textAlign: 'center',
+              pointerEvents: 'auto'
+            }}
+          >
+            Complete your profile
+          </div>
+          <svg width="36" height="36" viewBox="0 0 24 24" fill="none" style={{ minWidth: 36, minHeight: 36 }}>
+            <path d="M12 2v20m0 0l-6-6m6 6l6-6" stroke="#f59e42" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+          </svg>
+        </div>
+      )}
+
       {/* Main Content */}
       <main className="pt-16 pb-20 lg:pb-8 transition-all duration-300">
         <div className="max-w-7xl mx-auto px-2 sm:px-4 lg:px-8 py-6">

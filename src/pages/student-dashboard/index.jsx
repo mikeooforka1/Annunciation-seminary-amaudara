@@ -14,7 +14,8 @@ const StudentDashboard = () => {
   const [studentData, setStudentData] = useState(null);
   const [profile, setProfile] = useState(null);
   const [profileLoading, setProfileLoading] = useState(true);
-  const [showXmasModal, setShowXmasModal] = useState(false); // New state for xmas modal
+  const [showXmasModal, setShowXmasModal] = useState(false);
+  const [showAssignmentModal, setShowAssignmentModal] = useState(false); // Add this state
   const [showProfileArrow, setShowProfileArrow] = useState(false); // New state for arrow
   const navigate = useNavigate();
 
@@ -134,6 +135,12 @@ const StudentDashboard = () => {
     }
   }, [profile, profileLoading]);
 
+  useEffect(() => {
+    if (!profileLoading) {
+      setShowXmasModal(true);
+    }
+  }, [profileLoading]);
+
   if (profileLoading) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-background">
@@ -150,7 +157,10 @@ const StudentDashboard = () => {
           <div className="bg-white rounded-xl shadow-lg max-w-md w-full p-6 text-center relative">
             <button
               className="absolute top-2 right-2 text-gray-400 hover:text-gray-700 text-xl"
-              onClick={() => setShowXmasModal(false)}
+              onClick={() => {
+                setShowXmasModal(false);
+                setShowAssignmentModal(true); // Show assignment modal after closing xmas modal
+              }}
               aria-label="Close"
             >
               &times;
@@ -170,6 +180,32 @@ const StudentDashboard = () => {
             >
               Download Vacation Report
             </a>
+          </div>
+        </div>
+      )}
+
+      {/* Assignment Reminder Modal */}
+      {showAssignmentModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40">
+          <div className="bg-white rounded-lg shadow-lg p-6 w-full max-w-sm text-center relative">
+            <button
+              className="absolute top-2 right-2 text-gray-400 hover:text-gray-700 text-xl"
+              onClick={() => setShowAssignmentModal(false)}
+              aria-label="Close"
+            >
+              &times;
+            </button>
+            <h3 className="font-bold text-lg mb-4 text-primary">Assignment Reminder</h3>
+            <p className="mb-4 text-muted-foreground">
+              Please check and do your assignments.<br />
+              Click the <span className="font-semibold text-warning">Assignments</span> button on this page to view your assignments.
+            </p>
+            <button
+              className="bg-primary text-white px-4 py-2 rounded font-semibold hover:bg-primary/90 mt-2"
+              onClick={() => setShowAssignmentModal(false)}
+            >
+              OK
+            </button>
           </div>
         </div>
       )}

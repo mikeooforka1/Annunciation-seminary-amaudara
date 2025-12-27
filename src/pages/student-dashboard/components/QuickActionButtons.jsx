@@ -1,8 +1,12 @@
-import React from 'react';
+import React, { useRef, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
 import Icon from '../../../components/AppIcon';
 import Button from '../../../components/ui/Button';
 
 const QuickActionButtons = ({ className = '' }) => {
+  const navigate = useNavigate();
+  const assignmentBtnRef = useRef(null);
+
   const quickActions = [
     {
       id: 'take-exam',
@@ -30,24 +34,31 @@ const QuickActionButtons = ({ className = '' }) => {
       color: 'bg-secondary text-secondary-foreground',
       path: '#resources',
       badge: 5
+    },
+    {
+      id: 'assignments',
+      title: 'Assignments',
+      description: 'View and submit your assignments',
+      icon: 'ClipboardList',
+      color: 'bg-warning text-warning-foreground',
+      path: '/assignments',
+      badge: null
     }
   ];
 
   const handleActionClick = (action) => {
     if (action?.path?.startsWith('#')) {
-      // Scroll to section on same page
       const element = document.getElementById(action?.path?.substring(1));
       if (element) {
         element?.scrollIntoView({ behavior: 'smooth' });
       }
-    } else {
-      // Navigate to different page
-      window.location.href = action?.path;
+    } else if (action?.path) {
+      navigate(action.path);
     }
   };
 
   return (
-    <div className={`bg-card border border-border rounded-lg p-6 ${className}`}>
+    <div className={`bg-card border border-border rounded-lg p-6 ${className} relative`}>
       <div className="flex items-center space-x-3 mb-6">
         <div className="w-10 h-10 bg-accent rounded-full flex items-center justify-center">
           <Icon name="Zap" size={20} color="white" />
@@ -63,6 +74,7 @@ const QuickActionButtons = ({ className = '' }) => {
             key={action?.id}
             className="relative group cursor-pointer"
             onClick={() => handleActionClick(action)}
+            ref={action.id === 'assignments' ? assignmentBtnRef : null}
           >
             <div className="border border-border rounded-lg p-4 hover:shadow-md transition-all duration-200 hover:border-primary/20 bg-background">
               <div className="flex items-start space-x-3">
@@ -93,10 +105,23 @@ const QuickActionButtons = ({ className = '' }) => {
                 </div>
               </div>
             </div>
+            {/* Arrow and label for assignments button */}
+            {action.id === 'assignments' && (
+              <div
+                className="absolute -top-16 left-1/2 -translate-x-1/2 flex flex-col items-center z-50 pointer-events-none"
+                style={{ width: 'max-content' }}
+              >
+                <div className="bg-yellow-100 border border-yellow-400 text-yellow-800 px-3 py-2 rounded shadow text-sm font-semibold mb-1 text-center">
+                  Check and do your assignments here
+                </div>
+                <svg width="36" height="36" viewBox="0 0 24 24" fill="none">
+                  <path d="M12 2v20m0 0l-6-6m6 6l6-6" stroke="#f59e42" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+                </svg>
+              </div>
+            )}
           </div>
         ))}
       </div>
-      {/* Removed Additional Actions buttons */}
     </div>
   );
 };

@@ -22,6 +22,7 @@ import ResultPortal from './pages/exam-creation-management/components/ResultPort
 import PostAnnouncement from './pages/teacher-portal/components/post-announcement';
 import AdminDashboard from './pages/admin'; // Add this import
 import StudentProfilePage from './pages/admin/components/student-profile'; // Import your student profile page
+import Assignments from './pages/student-dashboard/components/assignments.jsx'; // Add this import
 
 const AppWrapper = ({ children }) => {
   const navigate = useNavigate();
@@ -168,6 +169,7 @@ const Routes = () => {
                   <Route path="/exam-creation-management/result-portal" element={<ResultPortal />} />
                   <Route path="/computer-based-testing-cbt-platform" element={<ComputerBasedTestingPlatform />} />
                   <Route path="/student-dashboard" element={<StudentDashboard />} />
+                  <Route path="/assignments" element={<Assignments />} /> {/* Add this line */}
                   <Route path="/results-analytics-portal" element={<ResultsAnalyticsPortal />} />
                   <Route path="/profile" element={<ProfilePage />} />
                   <Route path="/account-settings" element={<AccountSettingsPage />} />

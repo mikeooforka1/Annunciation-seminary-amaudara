@@ -70,9 +70,15 @@ const LoginAuthentication = () => {
       }
 
       if (result.user.role === 'student') {
+        // Save all relevant student info including gradeLevel for assignments
         localStorage.setItem('studentData', JSON.stringify({
           ...result.user,
-          _id: result.user._id
+          _id: result.user._id,
+          gradeLevel: result.user.gradeLevel || result.user.className || "", // Ensure gradeLevel is present
+          personal: result.user.personal || {},
+          academic: result.user.academic || {},
+          className: result.user.className || "",
+          term: result.user.term || ""
         }));
         window.location.replace('/student-dashboard');
         setIsLoading(false);

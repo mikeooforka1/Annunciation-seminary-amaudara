@@ -20,6 +20,15 @@ const manualClassList = [
 
 const API_BASE_URL = process.env.REACT_APP_API_BASE_URL || 'http://localhost:5001';
 
+// Add this helper function:
+async function updateAllPositions(className, term, positionsMap) {
+  await fetch(`${API_BASE_URL}/api/results/update-positions`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ className, term, positions: positionsMap })
+  });
+}
+
 const VerifyResult = () => {
   const [selectedClass, setSelectedClass] = useState(null);
   const [students, setStudents] = useState([]);
@@ -168,12 +177,13 @@ const VerifyResult = () => {
               average: autoAverage,
               position: autoPosition,
             };
+            changed = true;
           }
         });
         return changed ? updated : prev;
       });
     }
-  }, [students]); // Remove editResults from dependencies!
+  }, [students, editResults]); // <-- add editResults here!
   // Fetch pushed results for each student (refactored)
   useEffect(() => {
     if (students.length > 0 && selectedTerm) {
@@ -1277,6 +1287,15 @@ const safeHandleResultChange = (studentId, field, value) => {
                             });
                             const data = await res.json();
                             if (res.ok && data.success) {
+                              // --- Recalculate and update all positions for the class ---
+                              // 1. Build positionsArray [{ studentId, position }]
+                              const positionsArray = students.map(student => ({
+                                studentId: student._id,
+                                position: editResults[student._id]?.position || ''
+                              }));
+                              // 2. Update all positions in backend
+                              await updateAllPositions(selectedClass, selectedTerm, positionsArray);
+
                               setVerifiedStudents(prev => ({
                                 ...prev,
                                 [viewingStudent]: 'verified'

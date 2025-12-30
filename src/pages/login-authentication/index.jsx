@@ -4,7 +4,7 @@ import AuthHeader from './components/AuthHeader';
 import LoginForm from './components/LoginForm';
 import SecurityBadges from './components/SecurityBadges';
 
-const VOCATION_REPORT_URL = "/assets/docs/vacation_report.pdf"; // Place your PDF in public/assets/docs/
+const VOCATION_REPORT_URL = "/assets/docs/vacation_report.png";
 
 const LoginAuthentication = () => {
   const navigate = useNavigate();

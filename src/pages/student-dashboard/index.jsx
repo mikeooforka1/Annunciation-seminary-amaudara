@@ -8,7 +8,7 @@ import QuickActionButtons from './components/QuickActionButtons';
 import AcademicCalendarWidget from './components/AcademicCalendarWidget';
 import ResourceLibrarySection from './components/ResourceLibrarySection';
 
-const VOCATION_REPORT_URL = "/assets/docs/vacation_report.pdf"; // Ensure this path is correct
+const VOCATION_REPORT_URL = "/assets/docs/vacation_report.png"; // Ensure this path is correct
 
 const StudentDashboard = () => {
   const [studentData, setStudentData] = useState(null);

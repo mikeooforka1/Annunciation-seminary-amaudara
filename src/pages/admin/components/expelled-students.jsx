@@ -3,12 +3,8 @@ import { FaPlus, FaCheckCircle } from "react-icons/fa";
 
 const API_BASE_URL = process.env.REACT_APP_API_BASE_URL || "";
 
-const classList = [
-  "JSS1", "JSS2", "JSS3",
-  "SS1", "SS2", "SS3"
-];
-
 const ExpelledStudents = () => {
+  const [classList, setClassList] = useState([]);
   const [students, setStudents] = useState([]);
   const [expelled, setExpelled] = useState([]);
   const [search, setSearch] = useState("");
@@ -17,20 +13,36 @@ const ExpelledStudents = () => {
   const [addingId, setAddingId] = useState(null);
   const [showAddBar, setShowAddBar] = useState(false);
 
+  // Fetch class names from backend
   useEffect(() => {
-    const fetchStudents = async () => {
-      setLoading(true);
-      try {
-        const res = await fetch(`${API_BASE_URL}/api/user?role=student`);
-        const data = await res.json();
-        setStudents(data);
-      } catch (err) {
-        setStudents([]);
-      }
-      setLoading(false);
-    };
-    fetchStudents();
+    fetch(`${API_BASE_URL}/api/user/class-list`)
+      .then(res => res.json())
+      .then(data => {
+        if (Array.isArray(data) && data.length && data[0].className) {
+          setClassList(data.map(cls => cls.className));
+        } else if (Array.isArray(data)) {
+          setClassList(data);
+        }
+      })
+      .catch(() => setClassList([]));
   }, []);
+
+  // Fetch students for selected class from backend
+  useEffect(() => {
+    if (selectedClass) {
+      setLoading(true);
+      fetch(`${API_BASE_URL}/api/user/class/${selectedClass}/students`)
+        .then(res => res.json())
+        .then(data => {
+          setStudents(data);
+          setLoading(false);
+        })
+        .catch(() => {
+          setStudents([]);
+          setLoading(false);
+        });
+    }
+  }, [selectedClass]);
 
   // Fetch expelled students for selected class
   useEffect(() => {

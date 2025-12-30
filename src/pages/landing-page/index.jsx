@@ -5,7 +5,7 @@ import Icon from '../../components/AppIcon';
 import Button from '../../components/ui/Button';
 import { MdMenu } from "react-icons/md"; // <-- Import the menu icon
 
-const VOCATION_REPORT_URL = "/assets/docs/vacation_report.pdf"; // Ensure this path is correct
+const VOCATION_REPORT_URL = "/assets/docs/vacation_report.png"; // Ensure this path is correct
 
 const LandingPage = () => {
   const [isMenuOpen, setIsMenuOpen] = useState(false);

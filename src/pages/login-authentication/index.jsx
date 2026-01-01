@@ -105,7 +105,7 @@ const LoginAuthentication = () => {
 
   return (
     <div className="min-h-screen bg-background">
-      {/* Merry Christmas Modal */}
+      {/* Happy New Year Modal */}
       {showModal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60">
           <div className="bg-white rounded-xl shadow-lg max-w-md w-full p-6 text-center relative">
@@ -116,13 +116,12 @@ const LoginAuthentication = () => {
             >
               &times;
             </button>
-            <h2 className="text-2xl font-bold text-green-700 mb-2">🎄 Merry Christmas!</h2>
+            <h2 className="text-2xl font-bold text-blue-700 mb-2">🎉 Happy New Year 2026!</h2>
             <p className="mb-3 text-base font-semibold text-gray-700">
-              Wishing you a joyful Christmas and a successful academic year ahead!
+              Wishing you a prosperous and successful new year from all of us at Annunciation Seminary Amaudara!
             </p>
             <p className="mb-4 text-sm text-gray-600">
-              <span className="font-bold text-red-600">Important:</span> All students are required to download and print their <span className="font-bold">Vacation Report</span> before returning to school. <br />
-              <span className="text-red-600 font-semibold">Strict Warning:</span> <span className="font-semibold">You must print and fill the vacation report. Failure to do so may affect your resumption process.</span>
+              <span className="font-bold text-primary">Welcome back!</span> We look forward to another year of excellence, growth, and achievement together.
             </p>
             <a
               href={VOCATION_REPORT_URL}

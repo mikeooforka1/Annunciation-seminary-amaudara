@@ -929,7 +929,7 @@ const AboutPage = () => {
                   <Icon name="Leaf" size={20} className="text-primary" />
                 </div>
                 <h3 className="text-lg font-heading font-semibold text-foreground">
-                  AMDMIN BLOCK
+                  MAIN AVENUE
                 </h3>
               </div>
               <p className="text-muted-foreground font-body text-sm text-center">

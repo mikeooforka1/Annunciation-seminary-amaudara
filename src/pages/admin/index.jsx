@@ -4,10 +4,9 @@ import Icon from "../../components/AppIcon";
 import Button from "../../components/ui/Button";
 import TeachersList from "./components/teachers";
 import FormatorsList from "./components/formators";
-import ExpelledStudents from "./components/expelled-students";
 import NonAcademicStaffList from "./components/non-academic staffs"; // <-- Add this import
 import VerifyResult from "./components/verify-result"; // <-- Add this import
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useLocation } from "react-router-dom";
 
 const API_BASE_URL = process.env.REACT_APP_API_BASE_URL;
 
@@ -37,12 +36,6 @@ const adminCards = [
     desc: "All non-academic staff",
   },
   {
-    key: "expelled",
-    icon: <Icon name="UserX" size={36} className="text-red-500 mb-2" />,
-    title: "Expelled/Suspended",
-    desc: "View expelled or suspended students",
-  },
-  {
     key: "verify",
     icon: <Icon name="CheckCircle" size={36} className="text-green-500 mb-2" />,
     title: "Verify Results",
@@ -57,18 +50,25 @@ const AdminDashboard = () => {
   const [teachers, setTeachers] = useState([]);
   const [formators, setFormators] = useState([]);
   const [nonAcademic, setNonAcademic] = useState([]);
-  const [expelled, setExpelled] = useState([]);
   const [showSection, setShowSection] = useState(null);
   const [search, setSearch] = useState("");
   const [loading, setLoading] = useState(false);
   const [errorMsg, setErrorMsg] = useState("");
   const navigate = useNavigate();
+  const location = useLocation();
 
   useEffect(() => {
     fetchClasses();
     fetchTeachers();
     fetchFormators();
     fetchNonAcademic();
+  }, []);
+
+  // Handle navigation from spreadsheet back to verify page with class/term
+  useEffect(() => {
+    if (location.state?.showSection === "verify") {
+      setShowSection("verify");
+    }
   }, []);
 
   const fetchClasses = async () => {
@@ -119,18 +119,6 @@ const AdminDashboard = () => {
     setLoading(false);
   };
 
-  const fetchExpelled = async () => {
-    setLoading(true);
-    setErrorMsg("");
-    try {
-      const res = await axios.get(`${API_BASE_URL}/api/expelled-students`);
-      setExpelled(res.data || []);
-    } catch (err) {
-      setErrorMsg("Failed to fetch expelled/suspended students.");
-    }
-    setLoading(false);
-  };
-
   const handleClassSelect = async (className) => {
     setSelectedClass(className);
     setLoading(true);
@@ -168,7 +156,6 @@ const AdminDashboard = () => {
     if (section === "teachers") fetchTeachers();
     if (section === "formators") fetchFormators();
     if (section === "nonAcademic") fetchNonAcademic();
-    if (section === "expelled") fetchExpelled();
   };
 
   return (
@@ -185,7 +172,7 @@ const AdminDashboard = () => {
 
       {/* Horizontal Cards Section (Only on main dashboard) */}
       {!showSection && (
-        <div className="w-full bg-white shadow-sm border-b border-border py-4 px-2 flex overflow-x-auto gap-4">
+        <div className="w-full bg-white shadow-sm border-b border-border py-4 px-2 flex flex-wrap justify-center gap-4 max-w-5xl mx-auto">
           {adminCards.map((card) => (
             <div
               key={card.key}
@@ -387,19 +374,6 @@ const AdminDashboard = () => {
           </>
         )}
 
-        {/* Expelled/Suspended Students Section */}
-        {showSection === "expelled" && (
-          <>
-            <Button
-              variant="outline"
-              className="mb-4"
-              onClick={() => setShowSection(null)}
-            >
-              &larr; Back to Dashboard
-            </Button>
-            <ExpelledStudents />
-          </>
-        )}
 
         {/* Verify Results Section */}
         {showSection === "verify" && (
@@ -411,7 +385,10 @@ const AdminDashboard = () => {
             >
               &larr; Back to Dashboard
             </Button>
-            <VerifyResult /> {/* <-- Render the verify result page */}
+            <VerifyResult
+              initialClass={location.state?.selectedClass}
+              initialTerm={location.state?.selectedTerm}
+            />
           </>
         )}
       </main>

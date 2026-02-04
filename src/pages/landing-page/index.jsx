@@ -9,7 +9,6 @@ const VOCATION_REPORT_URL = "/assets/docs/vacation_report.png"; // Ensure this p
 
 const LandingPage = () => {
   const [isMenuOpen, setIsMenuOpen] = useState(false);
-  const [showXmasModal, setShowXmasModal] = useState(true); // Modal state
 
   const achievements = [
     {
@@ -105,35 +104,6 @@ const LandingPage = () => {
 
   return (
     <div className="min-h-screen bg-background">
-      {/* Happy New Year Modal */}
-      {showXmasModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60">
-          <div className="bg-white rounded-xl shadow-lg max-w-md w-full p-6 text-center relative">
-            <button
-              className="absolute top-2 right-2 text-gray-400 hover:text-gray-700 text-xl"
-              onClick={() => setShowXmasModal(false)}
-              aria-label="Close"
-            >
-              &times;
-            </button>
-            <h2 className="text-2xl font-bold text-blue-700 mb-2">🎉 Happy New Year 2026!</h2>
-            <p className="mb-3 text-base font-semibold text-gray-700">
-              Wishing you a prosperous and successful new year from all of us at Annunciation Seminary Amaudara!
-            </p>
-            <p className="mb-4 text-sm text-gray-600">
-              <span className="font-bold text-primary">Welcome back!</span> We look forward to another year of excellence, growth, and achievement together.
-            </p>
-            <a
-              href={VOCATION_REPORT_URL}
-              download
-              className="inline-block bg-primary text-white font-bold px-6 py-3 rounded-lg shadow hover:bg-primary/90 transition"
-            >
-              Download Vacation Report
-            </a>
-          </div>
-        </div>
-      )}
-
       {/* Navigation Header */}
       <header className="fixed top-0 left-0 right-0 bg-card/95 backdrop-blur-md border-b border-border z-50">
         <div className="container mx-auto px-4 lg:px-6">

@@ -4,13 +4,10 @@ import AuthHeader from './components/AuthHeader';
 import LoginForm from './components/LoginForm';
 import SecurityBadges from './components/SecurityBadges';
 
-const VOCATION_REPORT_URL = "/assets/docs/vacation_report.png";
-
 const LoginAuthentication = () => {
   const navigate = useNavigate();
   const [isLoading, setIsLoading] = useState(false);
   const [errorMsg, setErrorMsg] = useState('');
-  const [showModal, setShowModal] = useState(true);
 
   const API_BASE_URL = process.env.REACT_APP_API_BASE_URL;
 
@@ -105,8 +102,8 @@ const LoginAuthentication = () => {
 
   return (
     <div className="min-h-screen bg-background">
-      {/* Happy New Year Modal */}
-      {showModal && (
+      {/* Merry Christmas Modal */}
+      {/* {showModal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60">
           <div className="bg-white rounded-xl shadow-lg max-w-md w-full p-6 text-center relative">
             <button
@@ -116,12 +113,13 @@ const LoginAuthentication = () => {
             >
               &times;
             </button>
-            <h2 className="text-2xl font-bold text-blue-700 mb-2">🎉 Happy New Year 2026!</h2>
+            <h2 className="text-2xl font-bold text-green-700 mb-2">🎄 Merry Christmas!</h2>
             <p className="mb-3 text-base font-semibold text-gray-700">
-              Wishing you a prosperous and successful new year from all of us at Annunciation Seminary Amaudara!
+              Wishing you a joyful Christmas and a successful academic year ahead!
             </p>
             <p className="mb-4 text-sm text-gray-600">
-              <span className="font-bold text-primary">Welcome back!</span> We look forward to another year of excellence, growth, and achievement together.
+              <span className="font-bold text-red-600">Important:</span> All students are required to download and print their <span className="font-bold">Vacation Report</span> before returning to school. <br />
+              <span className="text-red-600 font-semibold">Strict Warning:</span> <span className="font-semibold">You must print and fill the vacation report. Failure to do so may affect your resumption process.</span>
             </p>
             <a
               href={VOCATION_REPORT_URL}
@@ -132,7 +130,7 @@ const LoginAuthentication = () => {
             </a>
           </div>
         </div>
-      )}
+      )} */}
 
       {/* Background Pattern */}
       <div className="absolute inset-0 bg-gradient-to-br from-primary/5 via-background to-secondary/5"></div>

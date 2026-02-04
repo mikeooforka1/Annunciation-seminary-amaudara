@@ -1,4 +1,5 @@
 import React, { useEffect, useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import ResultsTable from '../../results-analytics-portal/components/ResultsTable';
 
 // Add ss1c to the manual class list
@@ -30,6 +31,7 @@ async function updateAllPositions(className, term, positionsMap) {
 }
 
 const VerifyResult = () => {
+  const navigate = useNavigate();
   const [selectedClass, setSelectedClass] = useState(null);
   const [students, setStudents] = useState([]);
   const [editResults, setEditResults] = useState({});
@@ -51,6 +53,7 @@ const VerifyResult = () => {
   const [showEditConfirmModal, setShowEditConfirmModal] = useState(false);
   const [pendingEditAction, setPendingEditAction] = useState(null);
   const [showDeleteConfirmModal, setShowDeleteConfirmModal] = useState(null);
+  const [saveLoading, setSaveLoading] = useState(false);
 
   useEffect(() => {
     // Get admin data from localStorage (adjust key as needed)
@@ -323,9 +326,11 @@ const VerifyResult = () => {
     }));
   };
   const handleSaveChanges = async (studentId) => {
+    setSaveLoading(true);
     const result = editResults[studentId];
     if (!result || !result.subjects || result.subjects.length === 0) {
       alert('No changes to save.');
+      setSaveLoading(false);
       return;
     }
     // Save all subject results (but do NOT set reviewed/verified)
@@ -373,6 +378,7 @@ const VerifyResult = () => {
       });
     }
     alert('Changes saved!');
+    setSaveLoading(false);
   };
   // Update handleRemoveSubject to support both individual and all-students removal
   const handleRemoveSubject = async (subject, forAll = true) => {
@@ -477,7 +483,7 @@ const VerifyResult = () => {
     // Only consider subject results (not 'Overall')
     const subjectResults = results.filter(r => r.subject && r.subject !== 'Overall');
     // Student is reviewed only if all subject results are reviewed
-    return subjectResults.length > 0 && subjectResults.every(r => r.reviewed === true);
+    return subjectResults.length > 0 && subjectResults.every(r => r.reviewed === true && r.pending === false);
   };
 
   // Helper to check if all subjects for a student are verified (after token verification)
@@ -836,6 +842,20 @@ const safeHandleResultChange = (studentId, field, value) => {
 
       {selectedClass && (
         <div className="mb-4">
+          <button
+            className="mb-4 px-4 py-2 bg-muted text-foreground rounded hover:bg-muted/80 transition"
+            onClick={() => {
+              setSelectedClass(null);
+              setStudents([]);
+              setVerifiedStudents({});
+              setTokenInput('');
+              setEditResults({});
+              setViewingStudent(null);
+            }}
+          >
+            Back to Class List
+          </button>
+
           <label className="font-semibold mr-2">Select Term:</label>
           <select
             value={selectedTerm}
@@ -885,9 +905,17 @@ const safeHandleResultChange = (studentId, field, value) => {
       )}
       {selectedClass && selectedTerm && students.length > 0 && (
         <div>
-          <h3 className="text-lg font-semibold mb-2">
-            Students in {classList.find(c => c.id === selectedClass)?.name}
-          </h3>
+          <div className="flex items-center justify-between mb-2">
+            <h3 className="text-lg font-semibold">
+              Students in {classList.find(c => c.id === selectedClass)?.name}
+            </h3>
+            <button
+              className="px-4 py-2 bg-primary text-white rounded hover:bg-primary/80 transition"
+              onClick={() => navigate('/admin/spreadsheet', { state: { selectedClass, selectedTerm } })}
+            >
+              View Result as Spreadsheet
+            </button>
+          </div>
           <table className="w-full border border-border rounded mb-4">
             <thead>
               <tr>
@@ -1241,9 +1269,9 @@ const safeHandleResultChange = (studentId, field, value) => {
                       <button
                         className="px-4 py-2 bg-primary text-white rounded hover:bg-primary/80 transition"
                         onClick={() => handleSaveChanges(viewingStudent)}
-                        disabled={verifiedStudents[viewingStudent] === 'verified'}
+                        disabled={verifiedStudents[viewingStudent] === 'verified' || saveLoading}
                       >
-                        Save Changes
+                        {saveLoading ? 'Saving...' : 'Save Changes'}
                       </button>
                       <button
                         className="px-4 py-2 bg-success text-white rounded hover:bg-success/80 transition"
@@ -1340,20 +1368,6 @@ const safeHandleResultChange = (studentId, field, value) => {
               </button>
             </div>
           )}
-
-          <button
-            className="mt-4 px-4 py-2 bg-muted text-foreground rounded hover:bg-muted/80 transition"
-            onClick={() => {
-              setSelectedClass(null);
-              setStudents([]);
-              setVerifiedStudents({});
-              setTokenInput('');
-              setEditResults({});
-              setViewingStudent(null);
-            }}
-          >
-            Back to Class List
-          </button>
         </div>
       )}
 

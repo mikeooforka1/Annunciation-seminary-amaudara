@@ -37,11 +37,11 @@ const Spreadsheet = () => {
           const map = {};
           const editMap = {};
 
-          // First, collect all subjects offered by any student
+          // First, collect all subjects offered by any student (use exact backend string)
           resultsArr.forEach(({ results }) => {
             results.forEach(r => {
               if (r.subject && r.subject !== "Overall") {
-                subjectSet.add(r.subject);
+                subjectSet.add(r.subject); // Use backend string as-is
               }
             });
           });
@@ -55,6 +55,9 @@ const Spreadsheet = () => {
 
             // Map subjects this student actually offers
             const studentSubjects = {};
+            // Build a normalized map for robust lookup
+            const normalize = s => (s || '').toLowerCase().trim();
+            const normalizedSubjectMap = {};
             results.forEach(r => {
               if (r.subject && r.subject !== "Overall") {
                 map[studentId][r.subject] = r;
@@ -67,6 +70,7 @@ const Spreadsheet = () => {
                   notOffering: false
                 };
                 studentSubjects[r.subject] = true;
+                normalizedSubjectMap[normalize(r.subject)] = r.subject; // Map normalized to original
               } else if (r.subject === "Overall") {
                 map[studentId]._overall = r;
                 editMap[studentId]._overall = {
@@ -85,9 +89,9 @@ const Spreadsheet = () => {
               }
             });
 
-            // For any subject in allSubjects that this student does NOT offer, mark as notOffering
+            // For each subject in allSubjects, check if student offers it (normalized)
             allSubjects.forEach(subject => {
-              if (!studentSubjects[subject]) {
+              if (!normalizedSubjectMap[normalize(subject)]) {
                 editMap[studentId][subject] = { notOffering: true };
               }
             });
@@ -409,138 +413,149 @@ const Spreadsheet = () => {
         </div>
       )}
       {!loading && selectedClass && (
-        <div style={{ overflowX: "auto" }}>
-          <table className="min-w-max border border-gray-300">
-            <thead>
-              <tr>
-                <th className="border px-2 py-1 bg-gray-100">Student Name</th>
-                {subjects.map(subject => (
-                  <React.Fragment key={subject}>
-                    <th className="border px-2 py-1 bg-gray-100">{subject} CAT</th>
-                    <th className="border px-2 py-1 bg-gray-100">{subject} Exam</th>
-                    <th className="border px-2 py-1 bg-gray-100">{subject} Total</th>
-                    <th className="border px-2 py-1 bg-gray-100">{subject} Grade</th>
-                    <th className="border px-2 py-1 bg-gray-100">{subject} Remark</th>
-                  </React.Fragment>
-                ))}
-                <th className="border px-2 py-1 bg-gray-100">Average</th>
-                <th className="border px-2 py-1 bg-gray-100">Position</th>
-                <th>Handwriting</th>
-                <th>Punctuality</th>
-                <th>Initiative</th>
-                <th>Obedience</th>
-                <th>Honesty</th>
-                <th>Neatness</th>
-                <th>Attentiveness</th>
-                <th>Respect</th>
-                <th>Attitude</th>
-                <th>Creativity</th>
-                <th className="border px-2 py-1 bg-gray-100">Deans Remark</th>
-                <th className="border px-2 py-1 bg-gray-100">Rectors Remark</th>
-                <th className="border px-2 py-1 bg-gray-100">Academic Session</th>
-                <th className="border px-2 py-1 bg-gray-100">Next Term Begins</th>
-                <th className="border px-2 py-1 bg-gray-100">Rector's Signature</th>
-              </tr>
-            </thead>
-            <tbody>
-              {students.map(student => {
-                const studentResults = resultsMap[student._id] || {};
-                const overall = studentResults._overall || {};
-                // Helper to get label for key rating
-                const getKeyRatingLabel = val => {
-                  val = Number(val);
-                  if (val === 5) return 'EXCELLENT';
-                  if (val === 4) return 'VERY GOOD';
-                  if (val === 3) return 'SATISFACTORY';
-                  if (val === 2) return 'POOR';
-                  if (val === 1) return 'VERY POOR';
-                  return '';
-                };
-                return (
-                  <tr key={student._id}>
-                    <td className="border px-2 py-1">{student.name || student.fullName || student.username}</td>
-                    {subjects.map(subject => {
-                      const subjEdit = editResults[student._id]?.[subject];
-                      if (subjEdit?.notOffering) {
-                        // Show a single cell with "Not Offering" spanning 5 columns now
+        <div
+          style={{
+            width: "100%",
+            minHeight: 300,
+            maxHeight: "70vh",
+            overflowX: "auto",
+            overflowY: "auto",
+            position: "relative"
+          }}
+        >
+          <div style={{ minWidth: "1200px" }}>
+            <table className="min-w-max border border-gray-300">
+              <thead>
+                <tr>
+                  <th className="border px-2 py-1 bg-gray-100">Student Name</th>
+                  {subjects.map(subject => (
+                    <React.Fragment key={subject}>
+                      <th className="border px-2 py-1 bg-gray-100">{subject} CAT</th>
+                      <th className="border px-2 py-1 bg-gray-100">{subject} Exam</th>
+                      <th className="border px-2 py-1 bg-gray-100">{subject} Total</th>
+                      <th className="border px-2 py-1 bg-gray-100">{subject} Grade</th>
+                      <th className="border px-2 py-1 bg-gray-100">{subject} Remark</th>
+                    </React.Fragment>
+                  ))}
+                  <th className="border px-2 py-1 bg-gray-100">Average</th>
+                  <th className="border px-2 py-1 bg-gray-100">Position</th>
+                  <th>Handwriting</th>
+                  <th>Punctuality</th>
+                  <th>Initiative</th>
+                  <th>Obedience</th>
+                  <th>Honesty</th>
+                  <th>Neatness</th>
+                  <th>Attentiveness</th>
+                  <th>Respect</th>
+                  <th>Attitude</th>
+                  <th>Creativity</th>
+                  <th className="border px-2 py-1 bg-gray-100">Deans Remark</th>
+                  <th className="border px-2 py-1 bg-gray-100">Rectors Remark</th>
+                  <th className="border px-2 py-1 bg-gray-100">Academic Session</th>
+                  <th className="border px-2 py-1 bg-gray-100">Next Term Begins</th>
+                  <th className="border px-2 py-1 bg-gray-100">Rector's Signature</th>
+                </tr>
+              </thead>
+              <tbody>
+                {students.map(student => {
+                  const studentResults = resultsMap[student._id] || {};
+                  const overall = studentResults._overall || {};
+                  // Helper to get label for key rating
+                  const getKeyRatingLabel = val => {
+                    val = Number(val);
+                    if (val === 5) return 'EXCELLENT';
+                    if (val === 4) return 'VERY GOOD';
+                    if (val === 3) return 'SATISFACTORY';
+                    if (val === 2) return 'POOR';
+                    if (val === 1) return 'VERY POOR';
+                    return '';
+                  };
+                  return (
+                    <tr key={student._id}>
+                      <td className="border px-2 py-1">{student.name || student.fullName || student.username}</td>
+                      {subjects.map(subject => {
+                        const subjEdit = editResults[student._id]?.[subject];
+                        if (subjEdit?.notOffering) {
+                          // Show a single cell with "Not Offering" spanning 5 columns now
+                          return (
+                            <td
+                              key={subject}
+                              colSpan={5}
+                              className="text-center bg-gray-50 font-bold"
+                              style={{ color: "#111", fontWeight: 700 }}
+                            >
+                              Not Offering
+                            </td>
+                          );
+                        }
                         return (
-                          <td
-                            key={subject}
-                            colSpan={5}
-                            className="text-center bg-gray-50 font-bold"
-                            style={{ color: "#111", fontWeight: 700 }}
-                          >
-                            Not Offering
-                          </td>
+                          <React.Fragment key={subject}>
+                            <td>
+                              <input
+                                type="number"
+                                value={subjEdit?.cat ?? ""}
+                                onChange={e => handleInputChange(student._id, subject, "cat", e.target.value)}
+                                className="w-16 border rounded px-1"
+                              />
+                            </td>
+                            <td>
+                              <input
+                                type="number"
+                                value={subjEdit?.exam ?? ""}
+                                onChange={e => handleInputChange(student._id, subject, "exam", e.target.value)}
+                                className="w-16 border rounded px-1"
+                              />
+                            </td>
+                            <td>{Number(subjEdit?.cat ?? 0) + Number(subjEdit?.exam ?? 0)}</td>
+                            <td>{subjEdit?.grade ?? ""}</td>
+                            <td>{subjEdit?.remark ?? ""}</td>
+                          </React.Fragment>
                         );
-                      }
-                      return (
-                        <React.Fragment key={subject}>
-                          <td>
+                      })}
+                      <td className="border px-2 py-1">{editResults[student._id]?._overall?.average ?? ""}</td>
+                      <td className="border px-2 py-1">{editResults[student._id]?._overall?.position ?? ""}</td>
+                      {/* --- Key Rating fields with boxes --- */}
+                      {[
+                        "handwriting", "punctuality", "initiative", "obedience", "honesty",
+                        "neatness", "attentiveness", "respect", "attitude", "creativity"
+                      ].map(key => (
+                        <td key={key} className="border px-2 py-1">
+                          <div className="flex flex-col items-center">
                             <input
                               type="number"
-                              value={subjEdit?.cat ?? ""}
-                              onChange={e => handleInputChange(student._id, subject, "cat", e.target.value)}
-                              className="w-16 border rounded px-1"
+                              min="1"
+                              max="5"
+                              value={editResults[student._id]?._overall?.[key] ?? ""}
+                              onChange={e => handleKeyRatingChange(student._id, key, e.target.value)}
+                              className="w-12 border rounded px-1"
                             />
-                          </td>
-                          <td>
-                            <input
-                              type="number"
-                              value={subjEdit?.exam ?? ""}
-                              onChange={e => handleInputChange(student._id, subject, "exam", e.target.value)}
-                              className="w-16 border rounded px-1"
-                            />
-                          </td>
-                          <td>{Number(subjEdit?.cat ?? 0) + Number(subjEdit?.exam ?? 0)}</td>
-                          <td>{subjEdit?.grade ?? ""}</td>
-                          <td>{subjEdit?.remark ?? ""}</td>
-                        </React.Fragment>
-                      );
-                    })}
-                    <td className="border px-2 py-1">{editResults[student._id]?._overall?.average ?? ""}</td>
-                    <td className="border px-2 py-1">{editResults[student._id]?._overall?.position ?? ""}</td>
-                    {/* --- Key Rating fields with boxes --- */}
-                    {[
-                      "handwriting", "punctuality", "initiative", "obedience", "honesty",
-                      "neatness", "attentiveness", "respect", "attitude", "creativity"
-                    ].map(key => (
-                      <td key={key} className="border px-2 py-1">
-                        <div className="flex flex-col items-center">
-                          <input
-                            type="number"
-                            min="1"
-                            max="5"
-                            value={editResults[student._id]?._overall?.[key] ?? ""}
-                            onChange={e => handleKeyRatingChange(student._id, key, e.target.value)}
-                            className="w-12 border rounded px-1"
-                          />
-                          <span className="text-xs text-muted-foreground mt-1">
-                            {getKeyRatingLabel(overall[key])}
-                          </span>
-                        </div>
+                            <span className="text-xs text-muted-foreground mt-1">
+                              {getKeyRatingLabel(overall[key])}
+                            </span>
+                          </div>
+                        </td>
+                      ))}
+                      <td className="border px-2 py-1">
+                        {editResults[student._id]?._overall?.teacherComment ?? ""}
                       </td>
-                    ))}
-                    <td className="border px-2 py-1">
-                      {editResults[student._id]?._overall?.teacherComment ?? ""}
-                    </td>
-                    <td className="border px-2 py-1">
-                      {editResults[student._id]?._overall?.headTeacherRemark ?? ""}
-                    </td>
-                    <td className="border px-2 py-1">{overall.academicYear ?? "2025/2026"}</td>
-                    <td className="border px-2 py-1">{overall.nextTerm ?? "18/01/2026"}</td>
-                    <td className="border px-2 py-1">
-                      <img
-                        src="/assets/images/rector-signature.jpg"
-                        alt="Rector's Signature"
-                        style={{ height: 32, background: "#fff", borderRadius: 4, border: "1px solid #eee", padding: 2 }}
-                      />
-                    </td>
-                  </tr>
-                );
-              })}
-            </tbody>
-          </table>
+                      <td className="border px-2 py-1">
+                        {editResults[student._id]?._overall?.headTeacherRemark ?? ""}
+                      </td>
+                      <td className="border px-2 py-1">{overall.academicYear ?? "2025/2026"}</td>
+                      <td className="border px-2 py-1">{overall.nextTerm ?? "18/01/2026"}</td>
+                      <td className="border px-2 py-1">
+                        <img
+                          src="/assets/images/rector-signature.jpg"
+                          alt="Rector's Signature"
+                          style={{ height: 32, background: "#fff", borderRadius: 4, border: "1px solid #eee", padding: 2 }}
+                        />
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
         </div>
       )}
     </div>

@@ -634,7 +634,7 @@ const Spreadsheet = () => {
 </thead>
               <tbody>
                 {students.map(student => {
-                  const studentResults = resultsMap[student._id] || {};
+                  const studentResults = editResults[student._id] || {};
                   const overall = studentResults._overall || {};
                   // Helper to get label for key rating
                   const getKeyRatingLabel = val => {
@@ -646,13 +646,14 @@ const Spreadsheet = () => {
                     if (val === 1) return 'VERY POOR';
                     return '';
                   };
+                  // Get this student's subject list for fast lookup
+                  const studentSubjects = Array.isArray(studentResults.subjects) ? studentResults.subjects : [];
                   return (
                     <tr key={student._id}>
                       <td className="border px-2 py-1">{student.name || student.fullName || student.username}</td>
                       {subjects.map(subject => {
-                        const subjEdit = editResults[student._id]?.[subject];
-                        if (subjEdit?.notOffering) {
-                          // Show a single cell with "Not Offering" spanning 5 columns now
+                        // If the subject is not in this student's subjects, show Not Offering
+                        if (!studentSubjects.includes(subject)) {
                           return (
                             <td
                               key={subject}
@@ -664,6 +665,7 @@ const Spreadsheet = () => {
                             </td>
                           );
                         }
+                        const subjEdit = editResults[student._id]?.[subject];
                         return (
                           <React.Fragment key={subject}>
                             <td>

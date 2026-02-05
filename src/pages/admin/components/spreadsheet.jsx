@@ -21,11 +21,13 @@ const Spreadsheet = () => {
     if (!selectedClass || !selectedTerm) return;
     setLoading(true);
 
+    // 1. Fetch students
     fetch(`${API_BASE_URL}/api/user/class/${selectedClass}/all/students?term=${selectedTerm}`)
       .then(res => res.json())
       .then(studentData => {
         setStudents(studentData);
 
+        // 2. Fetch pushed results for each student (like verify page)
         const fetches = studentData.map(student =>
           fetch(`${API_BASE_URL}/api/results/student/${student._id}/pushed?className=${selectedClass}&term=${selectedTerm}`)
             .then(res => res.json())
@@ -33,29 +35,20 @@ const Spreadsheet = () => {
         );
 
         Promise.all(fetches).then(resultsArr => {
-          // 1. Find the first student who has a non-empty subjects array
-          let classSubjects = [];
-          for (const { results } of resultsArr) {
-            const subjects = results
-              .filter(r => r.subject && r.subject !== "Overall")
-              .map(r => r.subject);
-            if (subjects.length > 0) {
-              classSubjects = subjects;
-              break;
-            }
-          }
-          // Remove duplicates, keep order
-          classSubjects = Array.from(new Set(classSubjects));
-
+          // Build per-student subject arrays and a unique, ordered subject list for the spreadsheet
+          const allSubjectsSet = new Set();
+          const allSubjectsOrdered = [];
           const map = {};
           const editMap = {};
 
           resultsArr.forEach(({ studentId, results }) => {
             map[studentId] = {};
             editMap[studentId] = {};
+            const subjects = [];
 
             results.forEach(r => {
               if (r.subject && r.subject !== "Overall") {
+                subjects.push(r.subject);
                 map[studentId][r.subject] = r;
                 editMap[studentId][r.subject] = {
                   cat: r.firstCatScore ?? "",
@@ -65,6 +58,11 @@ const Spreadsheet = () => {
                   _id: r._id,
                   notOffering: false
                 };
+                // Add to global subject list in order of first appearance
+                if (!allSubjectsSet.has(r.subject)) {
+                  allSubjectsSet.add(r.subject);
+                  allSubjectsOrdered.push(r.subject);
+                }
               } else if (r.subject === "Overall") {
                 map[studentId]._overall = r;
                 editMap[studentId]._overall = {
@@ -83,15 +81,28 @@ const Spreadsheet = () => {
               }
             });
 
-            // Mark as notOffering only if subject is in classSubjects but not in student's results
-            classSubjects.forEach(subject => {
-              if (!editMap[studentId][subject]) {
+            // For this student, mark as notOffering any subject in allSubjectsOrdered not in their subjects
+            allSubjectsOrdered.forEach(subject => {
+              if (!subjects.includes(subject)) {
+                editMap[studentId][subject] = { notOffering: true };
+              }
+            });
+
+            // If new subjects were added after this student's loop, check again
+            // (for students processed before all subjects were discovered)
+          });
+
+          // After all students, ensure every student has notOffering for any subject not in their list
+          Object.keys(editMap).forEach(studentId => {
+            const studentSubjects = Object.keys(editMap[studentId]).filter(s => s !== "_overall" && !editMap[studentId][s].notOffering);
+            allSubjectsOrdered.forEach(subject => {
+              if (!studentSubjects.includes(subject)) {
                 editMap[studentId][subject] = { notOffering: true };
               }
             });
           });
 
-          setSubjects(classSubjects);
+          setSubjects(allSubjectsOrdered);
           setResultsMap(map);
           setEditResults(editMap);
           setLoading(false);

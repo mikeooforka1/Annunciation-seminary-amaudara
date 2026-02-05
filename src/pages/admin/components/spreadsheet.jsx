@@ -33,31 +33,30 @@ const Spreadsheet = () => {
         );
 
         Promise.all(fetches).then(resultsArr => {
-          const subjectSet = new Set();
+          // Collect subjects exactly as in verify-result.jsx
+          const subjectsFromAllStudents = [];
+          resultsArr.forEach(({ results }) => {
+            const subjects = [];
+            results.forEach(r => {
+              if (r.subject && r.subject !== "Overall") {
+                subjects.push(r.subject);
+              }
+            });
+            subjectsFromAllStudents.push(subjects);
+          });
+
+          // Flatten and deduplicate, but keep order as in verify-result.jsx
+          const allSubjects = Array.from(
+            new Set(subjectsFromAllStudents.flat())
+          );
+
           const map = {};
           const editMap = {};
 
-          // First, collect all subjects offered by any student (use exact backend string)
-          resultsArr.forEach(({ results }) => {
-            results.forEach(r => {
-              if (r.subject && r.subject !== "Overall") {
-                subjectSet.add(r.subject); // Use backend string as-is
-              }
-            });
-          });
-
-          const allSubjects = Array.from(subjectSet);
-
-          // Now, build map and editMap for each student
           resultsArr.forEach(({ studentId, results }) => {
             map[studentId] = {};
             editMap[studentId] = {};
 
-            // Map subjects this student actually offers
-            const studentSubjects = {};
-            // Build a normalized map for robust lookup
-            const normalize = s => (s || '').toLowerCase().trim();
-            const normalizedSubjectMap = {};
             results.forEach(r => {
               if (r.subject && r.subject !== "Overall") {
                 map[studentId][r.subject] = r;
@@ -69,8 +68,6 @@ const Spreadsheet = () => {
                   _id: r._id,
                   notOffering: false
                 };
-                studentSubjects[r.subject] = true;
-                normalizedSubjectMap[normalize(r.subject)] = r.subject; // Map normalized to original
               } else if (r.subject === "Overall") {
                 map[studentId]._overall = r;
                 editMap[studentId]._overall = {
@@ -89,9 +86,9 @@ const Spreadsheet = () => {
               }
             });
 
-            // For each subject in allSubjects, check if student offers it (normalized)
+            // Only mark as notOffering if subject is truly missing for this student
             allSubjects.forEach(subject => {
-              if (!normalizedSubjectMap[normalize(subject)]) {
+              if (!editMap[studentId][subject]) {
                 editMap[studentId][subject] = { notOffering: true };
               }
             });

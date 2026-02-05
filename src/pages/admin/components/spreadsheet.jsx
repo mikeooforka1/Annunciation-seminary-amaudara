@@ -33,22 +33,19 @@ const Spreadsheet = () => {
         );
 
         Promise.all(fetches).then(resultsArr => {
-          // Collect subjects exactly as in verify-result.jsx
-          const subjectsFromAllStudents = [];
-          resultsArr.forEach(({ results }) => {
-            const subjects = [];
-            results.forEach(r => {
-              if (r.subject && r.subject !== "Overall") {
-                subjects.push(r.subject);
-              }
-            });
-            subjectsFromAllStudents.push(subjects);
-          });
-
-          // Flatten and deduplicate, but keep order as in verify-result.jsx
-          const allSubjects = Array.from(
-            new Set(subjectsFromAllStudents.flat())
-          );
+          // 1. Find the first student who has a non-empty subjects array
+          let classSubjects = [];
+          for (const { results } of resultsArr) {
+            const subjects = results
+              .filter(r => r.subject && r.subject !== "Overall")
+              .map(r => r.subject);
+            if (subjects.length > 0) {
+              classSubjects = subjects;
+              break;
+            }
+          }
+          // Remove duplicates, keep order
+          classSubjects = Array.from(new Set(classSubjects));
 
           const map = {};
           const editMap = {};
@@ -86,15 +83,15 @@ const Spreadsheet = () => {
               }
             });
 
-            // Only mark as notOffering if subject is truly missing for this student
-            allSubjects.forEach(subject => {
+            // Mark as notOffering only if subject is in classSubjects but not in student's results
+            classSubjects.forEach(subject => {
               if (!editMap[studentId][subject]) {
                 editMap[studentId][subject] = { notOffering: true };
               }
             });
           });
 
-          setSubjects(allSubjects);
+          setSubjects(classSubjects);
           setResultsMap(map);
           setEditResults(editMap);
           setLoading(false);

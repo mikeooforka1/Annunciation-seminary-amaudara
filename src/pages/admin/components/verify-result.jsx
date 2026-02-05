@@ -909,12 +909,20 @@ const safeHandleResultChange = (studentId, field, value) => {
             <h3 className="text-lg font-semibold">
               Students in {classList.find(c => c.id === selectedClass)?.name}
             </h3>
-            <button
-              className="px-4 py-2 bg-primary text-white rounded hover:bg-primary/80 transition"
-              onClick={() => navigate('/admin/spreadsheet', { state: { selectedClass, selectedTerm } })}
-            >
-              View Result as Spreadsheet
-            </button>
+         
+<button
+  className="px-4 py-2 bg-primary text-white rounded hover:bg-primary/80 transition"
+  onClick={() => navigate('/admin/spreadsheet', {
+    state: {
+      selectedClass,
+      selectedTerm,
+      students,
+      editResults // pass the processed results object
+    }
+  })}
+>
+  View Result as Spreadsheet
+</button>
           </div>
           <table className="w-full border border-border rounded mb-4">
             <thead>

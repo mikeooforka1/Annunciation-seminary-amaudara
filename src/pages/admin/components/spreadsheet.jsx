@@ -10,14 +10,36 @@ const Spreadsheet = () => {
   const navigate = useNavigate();
   const selectedClass = location.state?.selectedClass || "";
   const selectedTerm = location.state?.selectedTerm || "";
-  const [students, setStudents] = useState([]);
+  const [students, setStudents] = useState(location.state?.students || []);
+  const [editResults, setEditResults] = useState(location.state?.editResults || {});
   const [subjects, setSubjects] = useState([]);
   const [resultsMap, setResultsMap] = useState({});
-  const [editResults, setEditResults] = useState({}); // For local edits
   const [loading, setLoading] = useState(false);
   const [saving, setSaving] = useState(false); // Add this line
 
   useEffect(() => {
+    // If students and editResults are passed from verify page, use them directly
+    if (location.state?.students && location.state?.editResults) {
+      setStudents(location.state.students);
+      setEditResults(location.state.editResults);
+
+      // Build global subject list from all students' subjects (in order, no duplicates)
+      const allSubjectsOrdered = [];
+      const allSubjectsSet = new Set();
+      location.state.students.forEach(student => {
+        const studentSubjects = location.state.editResults[student._id]?.subjects || [];
+        studentSubjects.forEach(subject => {
+          if (!allSubjectsSet.has(subject)) {
+            allSubjectsSet.add(subject);
+            allSubjectsOrdered.push(subject);
+          }
+        });
+      });
+      setSubjects(allSubjectsOrdered);
+      return;
+    }
+
+    // ...fallback: fetch as before if not passed from verify page...
     if (!selectedClass || !selectedTerm) return;
     setLoading(true);
 
@@ -115,7 +137,7 @@ const Spreadsheet = () => {
         setEditResults({});
         setLoading(false);
       });
-  }, [selectedClass, selectedTerm]);
+  }, [selectedClass, selectedTerm, location.state]);
 
   // Handle input change for scores and key ratings
   const handleInputChange = (studentId, subject, field, value) => {

@@ -16,14 +16,15 @@ const Spreadsheet = () => {
   const [resultsMap, setResultsMap] = useState({});
   const [loading, setLoading] = useState(false);
   const [saving, setSaving] = useState(false); // Add this line
+  const [confirmRemoveSubject, setConfirmRemoveSubject] = useState(null); // subject name to confirm
+  const [showDeleteConfirmModal, setShowDeleteConfirmModal] = useState(null); // { type, subject }
 
   useEffect(() => {
     // If students and editResults are passed from verify page, use them directly
     if (location.state?.students && location.state?.editResults) {
       setStudents(location.state.students);
-      setEditResults(location.state.editResults);
 
-      // Build global subject list from all students' subjects (in order, no duplicates)
+      // Build subject list from all students' subjects (in order, no duplicates)
       const allSubjectsOrdered = [];
       const allSubjectsSet = new Set();
       location.state.students.forEach(student => {
@@ -36,6 +37,55 @@ const Spreadsheet = () => {
         });
       });
       setSubjects(allSubjectsOrdered);
+
+      // Map all fields for each student exactly as in verify page
+      const fixedEditResults = {};
+      location.state.students.forEach(student => {
+        const result = location.state.editResults[student._id] || {};
+        fixedEditResults[student._id] = {};
+
+        // Copy all subject results
+        if (Array.isArray(result.subjects)) {
+          fixedEditResults[student._id].subjects = [...result.subjects];
+          result.subjects.forEach(subject => {
+            fixedEditResults[student._id][subject] = { ...result[subject] };
+          });
+        }
+
+        // Copy all meta/key fields (including key ratings, position, average, etc.)
+        [
+          "_overallId", "position", "average", "schoolOpened", "present", "absent",
+          "teacherComment", "headTeacherRemark", "academicYear", "nextTerm",
+          "handwriting", "punctuality", "initiative", "obedience", "honesty",
+          "neatness", "attentiveness", "respect", "attitude", "creativity"
+        ].forEach(field => {
+          if (result[field] !== undefined) {
+            fixedEditResults[student._id][field] = result[field];
+          }
+        });
+
+        // For spreadsheet compatibility, also nest key ratings/meta under _overall
+        fixedEditResults[student._id]._overall = {
+          handwriting: result.handwriting ?? "",
+          punctuality: result.punctuality ?? "",
+          initiative: result.initiative ?? "",
+          obedience: result.obedience ?? "",
+          honesty: result.honesty ?? "",
+          neatness: result.neatness ?? "",
+          attentiveness: result.attentiveness ?? "",
+          respect: result.respect ?? "",
+          attitude: result.attitude ?? "",
+          creativity: result.creativity ?? "",
+          average: result.average ?? "",
+          position: result.position ?? "",
+          teacherComment: result.teacherComment ?? "",
+          headTeacherRemark: result.headTeacherRemark ?? "",
+          academicYear: result.academicYear ?? "",
+          nextTerm: result.nextTerm ?? "",
+          _id: result._overallId ?? ""
+        };
+      });
+      setEditResults(fixedEditResults);
       return;
     }
 
@@ -146,10 +196,11 @@ const Spreadsheet = () => {
       if (!updated[studentId]) updated[studentId] = {};
       if (!updated[studentId][subject]) updated[studentId][subject] = {};
       updated[studentId][subject][field] = value;
+      if (field === "cat") updated[studentId][subject]["cat1"] = value; // keep both in sync
 
       // Auto-calculate grade and remark if cat or exam changes
       if (field === "cat" || field === "exam") {
-        const cat = Number(updated[studentId][subject].cat ?? 0);
+        const cat = Number(updated[studentId][subject].cat ?? updated[studentId][subject].cat1 ?? 0);
         const exam = Number(updated[studentId][subject].exam ?? 0);
         const total = cat + exam;
         updated[studentId][subject].grade = getGrade(total);
@@ -171,15 +222,46 @@ const Spreadsheet = () => {
   };
 
   // Remove subject for all students
-  const handleRemoveSubjectAll = (subject) => {
-    setSubjects(prev => prev.filter(s => s !== subject));
-    setEditResults(prev => {
-      const updated = { ...prev };
-      Object.keys(updated).forEach(studentId => {
-        delete updated[studentId][subject];
-      });
-      return updated;
+  const handleRemoveSubjectAll = async (subject) => {
+    // 1. Collect all subject result IDs to delete
+    const subjectResultIds = [];
+    Object.keys(editResults).forEach(studentId => {
+      const subjObj = editResults[studentId]?.[subject];
+      if (subjObj && subjObj._id) {
+        subjectResultIds.push(subjObj._id);
+      }
     });
+
+    // 2. Update local state for all students (remove subject from subjects array and object)
+    setEditResults(prevResults => {
+      const updatedResults = { ...prevResults };
+      Object.keys(updatedResults).forEach(studentId => {
+        if (updatedResults[studentId]) {
+          Object.keys(updatedResults[studentId]).forEach(key => {
+            if (key === subject || key.startsWith(`${subject}_`)) {
+              delete updatedResults[studentId][key];
+            }
+          });
+          if (Array.isArray(updatedResults[studentId].subjects)) {
+            updatedResults[studentId].subjects = updatedResults[studentId].subjects.filter(s => s !== subject);
+          }
+        }
+      });
+      return updatedResults;
+    });
+
+    setSubjects(prev => prev.filter(s => s !== subject));
+
+    // 3. Call backend API to delete subject results for all students
+    for (const resultId of subjectResultIds) {
+      try {
+        await fetch(`${API_BASE_URL}/api/results/delete/${resultId}`, {
+          method: 'DELETE'
+        });
+      } catch (err) {
+        // Optionally handle error
+      }
+    }
   };
 
   // Remove subject for individual student
@@ -400,7 +482,40 @@ const Spreadsheet = () => {
                 <th className="border px-2 py-1 bg-gray-100">Student Name</th>
                 {subjects.map(subject => (
                   <React.Fragment key={subject}>
-                    <th className="border px-2 py-1 bg-gray-100">{subject} CAT</th>
+                    <th className="border px-2 py-1 bg-gray-100 relative" style={{ minWidth: 90 }}>
+                      <span style={{ display: "inline-flex", alignItems: "center", gap: 4 }}>
+                        {subject} CAT
+                        <button
+                          type="button"
+                          title="Remove subject for all students"
+                          onClick={() => setConfirmRemoveSubject(subject)}
+                          style={{
+                            fontWeight: "bold",
+                            background: "none",
+                            border: "none",
+                            cursor: "pointer",
+                            color: "#c41414", // black for visibility
+                            fontSize: "1.1em",
+                            marginLeft: 4,
+                            padding: 0,
+                            lineHeight: 1,
+                            position: "relative",
+                            top: 0,
+                            right: 0,
+                            width: 22,
+                            height: 22,
+                            display: "inline-flex",
+                            alignItems: "center",
+                            justifyContent: "center",
+                            borderRadius: "50%",
+                            transition: "background 0.2s"
+                          }}
+                          className="hover:bg-gray-200 focus:bg-gray-300 active:bg-gray-400"
+                        >
+                          &times;
+                        </button>
+                      </span>
+                    </th>
                     <th className="border px-2 py-1 bg-gray-100">{subject} Exam</th>
                     <th className="border px-2 py-1 bg-gray-100">{subject} Total</th>
                     <th className="border px-2 py-1 bg-gray-100">{subject} Grade</th>
@@ -452,37 +567,71 @@ const Spreadsheet = () => {
         >
           <div style={{ minWidth: "1200px" }}>
             <table className="min-w-max border border-gray-300">
-              <thead>
-                <tr>
-                  <th className="border px-2 py-1 bg-gray-100">Student Name</th>
-                  {subjects.map(subject => (
-                    <React.Fragment key={subject}>
-                      <th className="border px-2 py-1 bg-gray-100">{subject} CAT</th>
-                      <th className="border px-2 py-1 bg-gray-100">{subject} Exam</th>
-                      <th className="border px-2 py-1 bg-gray-100">{subject} Total</th>
-                      <th className="border px-2 py-1 bg-gray-100">{subject} Grade</th>
-                      <th className="border px-2 py-1 bg-gray-100">{subject} Remark</th>
-                    </React.Fragment>
-                  ))}
-                  <th className="border px-2 py-1 bg-gray-100">Average</th>
-                  <th className="border px-2 py-1 bg-gray-100">Position</th>
-                  <th>Handwriting</th>
-                  <th>Punctuality</th>
-                  <th>Initiative</th>
-                  <th>Obedience</th>
-                  <th>Honesty</th>
-                  <th>Neatness</th>
-                  <th>Attentiveness</th>
-                  <th>Respect</th>
-                  <th>Attitude</th>
-                  <th>Creativity</th>
-                  <th className="border px-2 py-1 bg-gray-100">Deans Remark</th>
-                  <th className="border px-2 py-1 bg-gray-100">Rectors Remark</th>
-                  <th className="border px-2 py-1 bg-gray-100">Academic Session</th>
-                  <th className="border px-2 py-1 bg-gray-100">Next Term Begins</th>
-                  <th className="border px-2 py-1 bg-gray-100">Rector's Signature</th>
-                </tr>
-              </thead>
+
+<thead>
+  <tr>
+    <th className="border px-2 py-1 bg-gray-100">Student Name</th>
+    {subjects.map(subject => (
+      <React.Fragment key={subject}>
+        <th className="border px-2 py-1 bg-gray-100 relative" style={{ minWidth: 90 }}>
+          <span style={{ display: "inline-flex", alignItems: "center", gap: 4 }}>
+            {subject} CAT
+            <button
+              type="button"
+              title="Remove subject for all students"
+              onClick={() => setConfirmRemoveSubject(subject)}
+              style={{
+                fontWeight: "bold",
+                background: "none",
+                border: "none",
+                cursor: "pointer",
+                color: "#a51818", // black for visibility
+                fontSize: "1.1em",
+                marginLeft: 4,
+                padding: 0,
+                lineHeight: 1,
+                position: "relative",
+                top: 0,
+                right: 0,
+                width: 22,
+                height: 22,
+                display: "inline-flex",
+                alignItems: "center",
+                justifyContent: "center",
+                borderRadius: "50%",
+                transition: "background 0.2s"
+              }}
+              className="hover:bg-gray-200 focus:bg-gray-300 active:bg-gray-400"
+            >
+              &times;
+            </button>
+          </span>
+        </th>
+        <th className="border px-2 py-1 bg-gray-100">{subject} Exam</th>
+        <th className="border px-2 py-1 bg-gray-100">{subject} Total</th>
+        <th className="border px-2 py-1 bg-gray-100">{subject} Grade</th>
+        <th className="border px-2 py-1 bg-gray-100">{subject} Remark</th>
+      </React.Fragment>
+    ))}
+    <th className="border px-2 py-1 bg-gray-100">Average</th>
+    <th className="border px-2 py-1 bg-gray-100">Position</th>
+    <th>Handwriting</th>
+    <th>Punctuality</th>
+    <th>Initiative</th>
+    <th>Obedience</th>
+    <th>Honesty</th>
+    <th>Neatness</th>
+    <th>Attentiveness</th>
+    <th>Respect</th>
+    <th>Attitude</th>
+    <th>Creativity</th>
+    <th className="border px-2 py-1 bg-gray-100">Deans Remark</th>
+    <th className="border px-2 py-1 bg-gray-100">Rectors Remark</th>
+    <th className="border px-2 py-1 bg-gray-100">Academic Session</th>
+    <th className="border px-2 py-1 bg-gray-100">Next Term Begins</th>
+    <th className="border px-2 py-1 bg-gray-100">Rector's Signature</th>
+  </tr>
+</thead>
               <tbody>
                 {students.map(student => {
                   const studentResults = resultsMap[student._id] || {};
@@ -520,7 +669,7 @@ const Spreadsheet = () => {
                             <td>
                               <input
                                 type="number"
-                                value={subjEdit?.cat ?? ""}
+                                value={subjEdit?.cat ?? subjEdit?.cat1 ?? ""}
                                 onChange={e => handleInputChange(student._id, subject, "cat", e.target.value)}
                                 className="w-16 border rounded px-1"
                               />
@@ -533,7 +682,7 @@ const Spreadsheet = () => {
                                 className="w-16 border rounded px-1"
                               />
                             </td>
-                            <td>{Number(subjEdit?.cat ?? 0) + Number(subjEdit?.exam ?? 0)}</td>
+                            <td>{Number(subjEdit?.cat ?? subjEdit?.cat1 ?? 0) + Number(subjEdit?.exam ?? 0)}</td>
                             <td>{subjEdit?.grade ?? ""}</td>
                             <td>{subjEdit?.remark ?? ""}</td>
                           </React.Fragment>
@@ -581,10 +730,73 @@ const Spreadsheet = () => {
                   );
                 })}
               </tbody>
-            </table>
-          </div>
-        </div>
-      )}
+      </table>
+    </div>
+  </div>
+)}
+
+{/* Confirmation Modals */}
+{confirmRemoveSubject && (
+  <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40">
+    <div className="bg-white rounded-lg shadow-lg p-6 w-full max-w-sm text-center">
+      <h3 className="font-bold text-lg mb-4">Remove Subject</h3>
+      <p className="mb-4">
+        Are you sure you want to <span className="font-semibold text-red-600">remove</span> the subject <br />
+        <span className="font-bold text-primary">{confirmRemoveSubject}</span> <br />
+        <span className="font-bold">?</span>
+      </p>
+      <div className="flex flex-col gap-2 mt-6">
+        <button
+          className="px-4 py-2 bg-warning text-white rounded hover:bg-warning/80 transition"
+          onClick={() => setShowDeleteConfirmModal({ type: 'all', subject: confirmRemoveSubject })}
+        >
+          Remove for All Students
+        </button>
+        <button
+          className="px-4 py-2 bg-muted text-foreground rounded hover:bg-muted/80 transition"
+          onClick={() => setConfirmRemoveSubject(null)}
+        >
+          Cancel
+        </button>
+      </div>
+    </div>
+  </div>
+)}
+{showDeleteConfirmModal && (
+  <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40">
+    <div className="bg-white rounded-lg shadow-lg p-6 w-full max-w-sm text-center">
+      <h3 className="font-bold text-lg mb-4">
+        Confirm General Subject Removal
+      </h3>
+      <p className="mb-4">
+        Are you <span className="font-semibold text-red-600">sure</span> you want to{" "}
+        <span className="font-bold">
+          remove the subject <span className="text-primary">{showDeleteConfirmModal.subject}</span>
+        </span>{" "}
+        for all students?
+      </p>
+      <div className="flex justify-center gap-4 mt-6">
+        <button
+          className="px-4 py-2 bg-warning text-white rounded hover:opacity-90 transition"
+          onClick={async () => {
+            await handleRemoveSubjectAll(showDeleteConfirmModal.subject);
+            setShowDeleteConfirmModal(null);
+            setConfirmRemoveSubject(null);
+          }}
+        >
+          Yes, Remove
+        </button>
+        <button
+          className="px-4 py-2 bg-muted text-foreground rounded hover:bg-muted/80 transition"
+          onClick={() => setShowDeleteConfirmModal(null)}
+        >
+          Cancel
+        </button>
+      </div>
+    </div>
+  </div>
+)}
+
     </div>
   );
 };

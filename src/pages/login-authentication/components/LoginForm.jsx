@@ -86,6 +86,29 @@ const LoginForm = ({ onLogin, isLoading }) => {
     onLogin({ name, term, className, role, token });
   };
 
+  // When teacher role is selected, auto-set name to class and prevent editing
+  // When admin role is selected, auto-set name to "admin" and prevent editing
+  React.useEffect(() => {
+    if (role === 'teacher' && className) {
+      setName(className);
+    } else if (role === 'admin') {
+      setName('admin');
+    } else {
+      setName('');
+    }
+  }, [role, className]);
+
+  const handleRoleChange = (e) => {
+    const selectedRole = e.target.value;
+    setRole(selectedRole);
+
+    // Only admin can ignore class selection
+    if (selectedRole !== 'admin' && (!className || !term)) {
+      alert('Please select both class and term before choosing a role.');
+      setRole('');
+    }
+  };
+
   return (
     <>
       <form onSubmit={handleSubmit} className="space-y-5">
@@ -122,7 +145,7 @@ const LoginForm = ({ onLogin, isLoading }) => {
           <select
             className="w-full border rounded-lg px-3 py-2 focus:outline-none focus:ring"
             value={role}
-            onChange={e => setRole(e.target.value)}
+            onChange={handleRoleChange}
             required
           >
             <option value="">Select Role</option>
@@ -140,6 +163,14 @@ const LoginForm = ({ onLogin, isLoading }) => {
               placeholder="Click to select your name"
               value={name}
               onClick={handleNameBoxClick}
+              readOnly
+              required
+            />
+          ) : role === 'teacher' || role === 'admin' ? (
+            <input
+              type="text"
+              className="w-full border rounded-lg px-3 py-2 focus:outline-none focus:ring bg-gray-100 cursor-not-allowed"
+              value={name}
               readOnly
               required
             />

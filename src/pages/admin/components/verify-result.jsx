@@ -100,7 +100,15 @@ const VerifyResult = () => {
       fetch(studentsUrl)
         .then(res => res.json())
         .then(data => {
-          setStudents(Array.isArray(data) ? data : []);
+          // Sort students alphabetically by name
+          const sorted = Array.isArray(data)
+            ? [...data].sort((a, b) =>
+                (a.name || a.fullName || a.username || '').localeCompare(
+                  b.name || b.fullName || b.username || ''
+                )
+              )
+            : [];
+          setStudents(sorted);
           setLoading(false);
         })
         .catch(() => {

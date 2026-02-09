@@ -109,7 +109,15 @@ const Spreadsheet = () => {
     const fetchData = async () => {
       try {
         const res = await fetch(`${API_BASE_URL}/api/user/class/${selectedClass}/all/students?term=${selectedTerm}`);
-        const studentData = await res.json();
+        let studentData = await res.json();
+        // Sort students alphabetically by name
+        studentData = Array.isArray(studentData)
+          ? [...studentData].sort((a, b) =>
+              (a.name || a.fullName || a.username || '').localeCompare(
+                b.name || b.fullName || b.username || ''
+              )
+            )
+          : [];
         setStudents(studentData);
 
         const fetches = studentData.map(student =>

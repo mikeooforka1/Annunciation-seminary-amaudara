@@ -18,10 +18,22 @@ const Spreadsheet = () => {
   const [saving, setSaving] = useState(false); // Add this line
   const [confirmRemoveSubject, setConfirmRemoveSubject] = useState(null); // subject name to confirm
   const [showDeleteConfirmModal, setShowDeleteConfirmModal] = useState(null); // { type, subject }
+  const [editedStudents, setEditedStudents] = useState(new Set());
+  const [showStudentSelectModal, setShowStudentSelectModal] = useState(null); // { subject }
+  const [selectedStudentForDelete, setSelectedStudentForDelete] = useState(null);
+  const [studentSearch, setStudentSearch] = useState(""); // For filtering students
+  const saveQueue = React.useRef({}); // { [studentId]: Promise } to serialize saves per student
+  const [subjectsOrder, setSubjectsOrder] = useState([]);
 
   useEffect(() => {
-    // If students and editResults are passed from verify page, use them directly
-    if (location.state?.students && location.state?.editResults) {
+    let didSetFromState = false;
+
+    // 1. If data is passed from verify page, use it for instant load
+    if (
+      location.state?.students &&
+      location.state?.editResults &&
+      location.state?.verifiedStudents
+    ) {
       setStudents(location.state.students);
 
       // Build subject list from all students' subjects (in order, no duplicates)
@@ -37,6 +49,7 @@ const Spreadsheet = () => {
         });
       });
       setSubjects(allSubjectsOrdered);
+      setSubjectsOrder(allSubjectsOrdered); // <-- Save the initial order
 
       // Map all fields for each student exactly as in verify page
       const fixedEditResults = {};
@@ -86,107 +99,104 @@ const Spreadsheet = () => {
         };
       });
       setEditResults(fixedEditResults);
-      return;
+      didSetFromState = true;
     }
 
-    // ...fallback: fetch as before if not passed from verify page...
+    // 2. Always fetch latest from backend for sustainability (on page load, refresh, or after save)
     if (!selectedClass || !selectedTerm) return;
     setLoading(true);
 
-    // 1. Fetch students
-    fetch(`${API_BASE_URL}/api/user/class/${selectedClass}/all/students?term=${selectedTerm}`)
-      .then(res => res.json())
-      .then(studentData => {
+    const fetchData = async () => {
+      try {
+        const res = await fetch(`${API_BASE_URL}/api/user/class/${selectedClass}/all/students?term=${selectedTerm}`);
+        const studentData = await res.json();
         setStudents(studentData);
 
-        // 2. Fetch pushed results for each student (like verify page)
         const fetches = studentData.map(student =>
           fetch(`${API_BASE_URL}/api/results/student/${student._id}/pushed?className=${selectedClass}&term=${selectedTerm}`)
             .then(res => res.json())
             .then(results => ({ studentId: student._id, results }))
         );
 
-        Promise.all(fetches).then(resultsArr => {
-          // Build per-student subject arrays and a unique, ordered subject list for the spreadsheet
-          const allSubjectsSet = new Set();
-          const allSubjectsOrdered = [];
-          const map = {};
-          const editMap = {};
+        const resultsArr = await Promise.all(fetches);
+        const allSubjectsSet = new Set();
+        const allSubjectsOrdered = [];
+        const map = {};
+        const editMap = {};
 
-          resultsArr.forEach(({ studentId, results }) => {
-            map[studentId] = {};
-            editMap[studentId] = {};
-            const subjects = [];
+        resultsArr.forEach(({ studentId, results }) => {
+          map[studentId] = {};
+          editMap[studentId] = {};
+          const subjects = [];
 
-            results.forEach(r => {
-              if (r.subject && r.subject !== "Overall") {
-                subjects.push(r.subject);
-                map[studentId][r.subject] = r;
-                editMap[studentId][r.subject] = {
-                  cat: r.firstCatScore ?? "",
-                  exam: r.examScore ?? "",
-                  grade: r.grade ?? "",
-                  remark: r.remark ?? "",
-                  _id: r._id,
-                  notOffering: false
-                };
-                // Add to global subject list in order of first appearance
-                if (!allSubjectsSet.has(r.subject)) {
-                  allSubjectsSet.add(r.subject);
-                  allSubjectsOrdered.push(r.subject);
-                }
-              } else if (r.subject === "Overall") {
-                map[studentId]._overall = r;
-                editMap[studentId]._overall = {
-                  ...r,
-                  handwriting: r.handwriting ?? "",
-                  punctuality: r.punctuality ?? "",
-                  initiative: r.initiative ?? "",
-                  obedience: r.obedience ?? "",
-                  honesty: r.honesty ?? "",
-                  neatness: r.neatness ?? "",
-                  attentiveness: r.attentiveness ?? "",
-                  respect: r.respect ?? "",
-                  attitude: r.attitude ?? "",
-                  creativity: r.creativity ?? ""
-                };
+          results.forEach(r => {
+            if (r.subject && r.subject !== "Overall") {
+              subjects.push(r.subject);
+              map[studentId][r.subject] = r;
+              editMap[studentId][r.subject] = {
+                cat: r.firstCatScore ?? "",
+                exam: r.examScore ?? "",
+                grade: r.grade ?? "",
+                remark: r.remark ?? "",
+                _id: r._id,
+                notOffering: false
+              };
+              if (!allSubjectsSet.has(r.subject)) {
+                allSubjectsSet.add(r.subject);
+                allSubjectsOrdered.push(r.subject);
               }
-            });
-
-            // For this student, mark as notOffering any subject in allSubjectsOrdered not in their subjects
-            allSubjectsOrdered.forEach(subject => {
-              if (!subjects.includes(subject)) {
-                editMap[studentId][subject] = { notOffering: true };
-              }
-            });
-
-            // If new subjects were added after this student's loop, check again
-            // (for students processed before all subjects were discovered)
+            } else if (r.subject === "Overall") {
+              map[studentId]._overall = r;
+              editMap[studentId]._overall = {
+                ...r,
+                handwriting: r.handwriting ?? "",
+                punctuality: r.punctuality ?? "",
+                initiative: r.initiative ?? "",
+                obedience: r.obedience ?? "",
+                honesty: r.honesty ?? "",
+                neatness: r.neatness ?? "",
+                attentiveness: r.attentiveness ?? "",
+                respect: r.respect ?? "",
+                attitude: r.attitude ?? "",
+                creativity: r.creativity ?? ""
+              };
+            }
           });
 
-          // After all students, ensure every student has notOffering for any subject not in their list
-          Object.keys(editMap).forEach(studentId => {
-            const studentSubjects = Object.keys(editMap[studentId]).filter(s => s !== "_overall" && !editMap[studentId][s].notOffering);
-            allSubjectsOrdered.forEach(subject => {
-              if (!studentSubjects.includes(subject)) {
-                editMap[studentId][subject] = { notOffering: true };
-              }
-            });
-          });
+          // **Add this line to set the subjects array for each student:**
+          editMap[studentId].subjects = subjects;
 
-          setSubjects(allSubjectsOrdered);
-          setResultsMap(map);
-          setEditResults(editMap);
-          setLoading(false);
+          allSubjectsOrdered.forEach(subject => {
+            if (!subjects.includes(subject)) {
+              editMap[studentId][subject] = { notOffering: true };
+            }
+          });
         });
-      })
-      .catch(() => {
+
+        Object.keys(editMap).forEach(studentId => {
+          const studentSubjects = Object.keys(editMap[studentId]).filter(s => s !== "_overall" && editMap[studentId][s] && !editMap[studentId][s].notOffering);
+          allSubjectsOrdered.forEach(subject => {
+            if (!studentSubjects.includes(subject)) {
+              editMap[studentId][subject] = { notOffering: true };
+            }
+          });
+        });
+
+        setSubjects(allSubjectsOrdered);
+        setResultsMap(map);
+        setEditResults(editMap);
+        setLoading(false);
+      } catch (err) {
         setStudents([]);
         setSubjects([]);
         setResultsMap({});
         setEditResults({});
         setLoading(false);
-      });
+      }
+    };
+
+    // Always fetch from backend for sustainability
+    fetchData();
   }, [selectedClass, selectedTerm, location.state]);
 
   // Handle input change for scores and key ratings
@@ -196,9 +206,8 @@ const Spreadsheet = () => {
       if (!updated[studentId]) updated[studentId] = {};
       if (!updated[studentId][subject]) updated[studentId][subject] = {};
       updated[studentId][subject][field] = value;
-      if (field === "cat") updated[studentId][subject]["cat1"] = value; // keep both in sync
+      if (field === "cat") updated[studentId][subject]["cat1"] = value;
 
-      // Auto-calculate grade and remark if cat or exam changes
       if (field === "cat" || field === "exam") {
         const cat = Number(updated[studentId][subject].cat ?? updated[studentId][subject].cat1 ?? 0);
         const exam = Number(updated[studentId][subject].exam ?? 0);
@@ -206,19 +215,24 @@ const Spreadsheet = () => {
         updated[studentId][subject].grade = getGrade(total);
         updated[studentId][subject].remark = getRemark(updated[studentId][subject].grade);
       }
+      // Save with the latest state
+      saveStudentResults(studentId, updated);
       return updated;
     });
+    setEditedStudents(prev => new Set(prev).add(studentId));
   };
 
-  // Handle key rating change
   const handleKeyRatingChange = (studentId, field, value) => {
     setEditResults(prev => {
       const updated = { ...prev };
       if (!updated[studentId]) updated[studentId] = {};
       if (!updated[studentId]._overall) updated[studentId]._overall = {};
       updated[studentId]._overall[field] = value;
+      // Save with the latest state
+      saveStudentResults(studentId, updated);
       return updated;
     });
+    setEditedStudents(prev => new Set(prev).add(studentId));
   };
 
   // Remove subject for all students
@@ -251,6 +265,7 @@ const Spreadsheet = () => {
     });
 
     setSubjects(prev => prev.filter(s => s !== subject));
+    setSubjectsOrder(prev => prev.filter(s => s !== subject));
 
     // 3. Call backend API to delete subject results for all students
     for (const resultId of subjectResultIds) {
@@ -265,20 +280,129 @@ const Spreadsheet = () => {
   };
 
   // Remove subject for individual student
-  const handleRemoveSubjectIndividual = (studentId, subject) => {
+  const handleRemoveSubjectIndividual = async (studentId, subject) => {
+    // 1. Mark notOffering in local state
     setEditResults(prev => {
       const updated = { ...prev };
       if (!updated[studentId]) updated[studentId] = {};
       if (!updated[studentId][subject]) updated[studentId][subject] = {};
       updated[studentId][subject].notOffering = true;
+      // Remove subject from subjects array if present
+      if (Array.isArray(updated[studentId].subjects)) {
+        updated[studentId].subjects = updated[studentId].subjects.filter(s => s !== subject);
+      }
       return updated;
     });
+
+    // 2. Call backend API to delete subject for this student (same as verify page)
+    const subjObj = editResults[studentId]?.[subject];
+    if (subjObj && subjObj._id) {
+      try {
+        await fetch(`${API_BASE_URL}/api/results/delete/${subjObj._id}`, {
+          method: 'DELETE'
+        });
+      } catch (err) {
+        // Optionally handle error
+      }
+    }
   };
+  
+const fetchUpdatedResultsForEdited = async () => {
+  const updatedEditResults = { ...editResults };
+  for (const studentId of editedStudents) {
+    const res = await fetch(`${API_BASE_URL}/api/results/student/${studentId}/pushed?className=${selectedClass}&term=${selectedTerm}`);
+    const results = await res.json();
+    const studentResult = {};
+    const subjects = [];
+    results.forEach(r => {
+      if (r.subject && r.subject !== "Overall") {
+        subjects.push(r.subject);
+        studentResult[r.subject] = {
+          cat: r.firstCatScore ?? "",
+          exam: r.examScore ?? "",
+          grade: r.grade ?? "",
+          remark: r.remark ?? "",
+          _id: r._id,
+          notOffering: false
+        };
+      } else if (r.subject === "Overall") {
+        studentResult._overall = {
+          ...r,
+          handwriting: r.handwriting ?? "",
+          punctuality: r.punctuality ?? "",
+          initiative: r.initiative ?? "",
+          obedience: r.obedience ?? "",
+          honesty: r.honesty ?? "",
+          neatness: r.neatness ?? "",
+          attentiveness: r.attentiveness ?? "",
+          respect: r.respect ?? "",
+          attitude: r.attitude ?? "",
+          creativity: r.creativity ?? ""
+        };
+      }
+    });
+    studentResult.subjects = subjects;
+    updatedEditResults[studentId] = studentResult;
+  }
+  setEditResults(updatedEditResults);
+};
+const saveStudentResults = async (studentId, nextEditResults = null) => {
+  // Use the latest editResults (from param or state)
+  const results = nextEditResults || editResults;
+  // Chain saves for this student to avoid race conditions
+  if (!saveQueue.current[studentId]) saveQueue.current[studentId] = Promise.resolve();
+
+  saveQueue.current[studentId] = saveQueue.current[studentId].then(async () => {
+    for (const subject of subjects) {
+      const subjEdit = results[studentId]?.[subject];
+      if (subjEdit && !subjEdit.notOffering && subjEdit._id) {
+        await fetch(`${API_BASE_URL}/api/results/update/${subjEdit._id}`, {
+          method: 'PUT',
+          body: JSON.stringify({
+            firstCatScore: Number(subjEdit.cat ?? 0),
+            examScore: Number(subjEdit.exam ?? 0),
+            grade: subjEdit.grade ?? "",
+            remark: subjEdit.remark ?? "",
+            reviewed: false,
+            pending: true,
+            verified: false
+          }),
+          headers: { 'Content-Type': 'application/json' }
+        });
+      }
+    }
+    // Save key ratings/meta
+    const overall = results[studentId]?._overall;
+    if (overall && overall._id) {
+      await fetch(`${API_BASE_URL}/api/results/update/${overall._id}`, {
+        method: 'PUT',
+        body: JSON.stringify({
+          handwriting: overall.handwriting,
+          punctuality: overall.punctuality,
+          initiative: overall.initiative,
+          obedience: overall.obedience,
+          honesty: overall.honesty,
+          neatness: overall.neatness,
+          attentiveness: overall.attentiveness,
+          respect: overall.respect,
+          attitude: overall.attitude,
+          creativity: overall.creativity,
+          reviewed: false,
+          pending: true,
+          verified: false
+        }),
+        headers: { 'Content-Type': 'application/json' }
+      });
+    }
+  }).catch(() => {
+    // Optionally handle save error (e.g., show a toast)
+  });
+};
 
   // Save all changes
   const handleSaveAll = async () => {
-    setSaving(true); // Start saving state
-    for (const studentId of Object.keys(editResults)) {
+    setSaving(true);
+    for (const studentId of editedStudents) { // Only loop through edited students
       for (const subject of subjects) {
         const subjEdit = editResults[studentId][subject];
         if (subjEdit && !subjEdit.notOffering && subjEdit._id) {
@@ -288,7 +412,10 @@ const Spreadsheet = () => {
               firstCatScore: Number(subjEdit.cat ?? 0),
               examScore: Number(subjEdit.exam ?? 0),
               grade: subjEdit.grade ?? "",
-              remark: subjEdit.remark ?? ""
+              remark: subjEdit.remark ?? "",
+              reviewed: false,
+              pending: true,
+              verified: false
             }),
             headers: { 'Content-Type': 'application/json' }
           });
@@ -309,13 +436,18 @@ const Spreadsheet = () => {
             attentiveness: overall.attentiveness,
             respect: overall.respect,
             attitude: overall.attitude,
-            creativity: overall.creativity
+            creativity: overall.creativity,
+            reviewed: false,
+            pending: true,
+            verified: false
           }),
           headers: { 'Content-Type': 'application/json' }
         });
       }
     }
-    setSaving(false); // End saving state
+    setSaving(false);
+    await fetchUpdatedResultsForEdited(); // <-- Sync UI with backend
+    setEditedStudents(new Set());
     alert("All changes saved!");
   };
 
@@ -441,6 +573,14 @@ const Spreadsheet = () => {
     return "Not meeting the required benchmark";
   }
 
+  const resultStatusMap = location.state?.verifiedStudents || {};
+
+  // Add this:
+  const anyReviewedOrVerified = students.some(
+    s => resultStatusMap[s._id] === 'reviewed' || resultStatusMap[s._id] === 'verified'
+  );
+
+
   return (
     <div className="p-4">
       {/* Back Button */}
@@ -465,6 +605,13 @@ const Spreadsheet = () => {
         {selectedTerm && ` (${selectedTerm.charAt(0).toUpperCase() + selectedTerm.slice(1)} Term)`}
       </h2>
 
+      {/* Show message if any student is reviewed or verified */}
+      {anyReviewedOrVerified && (
+        <div className="mb-4 p-2 rounded bg-yellow-100 text-yellow-800 font-semibold text-center">
+          You cannot modify results here after review or verification. You can do that individually in the main page.
+        </div>
+      )}
+
       {/* Save Changes button OUTSIDE the scrollable table */}
       <button
         className="mb-4 px-4 py-2 bg-primary text-white rounded"
@@ -480,7 +627,7 @@ const Spreadsheet = () => {
             <thead>
               <tr>
                 <th className="border px-2 py-1 bg-gray-100">Student Name</th>
-                {subjects.map(subject => (
+                {subjectsOrder.map(subject => (
                   <React.Fragment key={subject}>
                     <th className="border px-2 py-1 bg-gray-100 relative" style={{ minWidth: 90 }}>
                       <span style={{ display: "inline-flex", alignItems: "center", gap: 4 }}>
@@ -493,7 +640,7 @@ const Spreadsheet = () => {
                             fontWeight: "bold",
                             background: "none",
                             border: "none",
-                            cursor: "pointer",
+                            cursor: anyReviewedOrVerified ? "not-allowed" : "pointer",
                             color: "#c41414", // black for visibility
                             fontSize: "1.1em",
                             marginLeft: 4,
@@ -510,7 +657,12 @@ const Spreadsheet = () => {
                             borderRadius: "50%",
                             transition: "background 0.2s"
                           }}
-                          className="hover:bg-gray-200 focus:bg-gray-300 active:bg-gray-400"
+                          className={
+                            anyReviewedOrVerified
+                              ? "opacity-50 cursor-not-allowed"
+                              : "hover:bg-gray-200 focus:bg-gray-300 active:bg-gray-400"
+                          }
+                          disabled={anyReviewedOrVerified}
                         >
                           &times;
                         </button>
@@ -570,8 +722,9 @@ const Spreadsheet = () => {
 
 <thead>
   <tr>
+    <th className="border px-2 py-1 bg-gray-100">Status</th>
     <th className="border px-2 py-1 bg-gray-100">Student Name</th>
-    {subjects.map(subject => (
+    {subjectsOrder.map(subject => (
       <React.Fragment key={subject}>
         <th className="border px-2 py-1 bg-gray-100 relative" style={{ minWidth: 90 }}>
           <span style={{ display: "inline-flex", alignItems: "center", gap: 4 }}>
@@ -584,7 +737,7 @@ const Spreadsheet = () => {
                 fontWeight: "bold",
                 background: "none",
                 border: "none",
-                cursor: "pointer",
+                cursor: anyReviewedOrVerified ? "not-allowed" : "pointer",
                 color: "#a51818", // black for visibility
                 fontSize: "1.1em",
                 marginLeft: 4,
@@ -601,7 +754,12 @@ const Spreadsheet = () => {
                 borderRadius: "50%",
                 transition: "background 0.2s"
               }}
-              className="hover:bg-gray-200 focus:bg-gray-300 active:bg-gray-400"
+              className={
+                anyReviewedOrVerified
+                  ? "opacity-50 cursor-not-allowed"
+                  : "hover:bg-gray-200 focus:bg-gray-300 active:bg-gray-400"
+              }
+              disabled={anyReviewedOrVerified}
             >
               &times;
             </button>
@@ -636,23 +794,32 @@ const Spreadsheet = () => {
                 {students.map(student => {
                   const studentResults = editResults[student._id] || {};
                   const overall = studentResults._overall || {};
-                  // Helper to get label for key rating
-                  const getKeyRatingLabel = val => {
-                    val = Number(val);
-                    if (val === 5) return 'EXCELLENT';
-                    if (val === 4) return 'VERY GOOD';
-                    if (val === 3) return 'SATISFACTORY';
-                    if (val === 2) return 'POOR';
-                    if (val === 1) return 'VERY POOR';
-                    return '';
-                  };
-                  // Get this student's subject list for fast lookup
+                  function getKeyRatingLabel(val) {
+  val = Number(val);
+  if (val === 5) return 'EXCELLENT';
+  if (val === 4) return 'VERY GOOD';
+  if (val === 3) return 'SATISFACTORY';
+  if (val === 2) return 'POOR';
+  if (val === 1) return 'VERY POOR';
+  return '';
+}
                   const studentSubjects = Array.isArray(studentResults.subjects) ? studentResults.subjects : [];
+                  const isLocked = resultStatusMap[student._id] === 'reviewed' || resultStatusMap[student._id] === 'verified';
                   return (
                     <tr key={student._id}>
+                      {/* Status column */}
+                      <td className="border px-2 py-1">
+                        {resultStatusMap[student._id] === 'verified' ? (
+                          <span className="text-success font-semibold">Verified</span>
+                        ) : resultStatusMap[student._id] === 'reviewed' ? (
+                          <span className="text-info font-semibold">Reviewed</span>
+                        ) : (
+                          <span className="text-warning font-semibold">Pending</span>
+                        )}
+                      </td>
+                      {/* Student Name column */}
                       <td className="border px-2 py-1">{student.name || student.fullName || student.username}</td>
-                      {subjects.map(subject => {
-                        // If the subject is not in this student's subjects, show Not Offering
+                      {subjectsOrder.map(subject => {
                         if (!studentSubjects.includes(subject)) {
                           return (
                             <td
@@ -674,6 +841,7 @@ const Spreadsheet = () => {
                                 value={subjEdit?.cat ?? subjEdit?.cat1 ?? ""}
                                 onChange={e => handleInputChange(student._id, subject, "cat", e.target.value)}
                                 className="w-16 border rounded px-1"
+                                disabled={isLocked}
                               />
                             </td>
                             <td>
@@ -682,6 +850,7 @@ const Spreadsheet = () => {
                                 value={subjEdit?.exam ?? ""}
                                 onChange={e => handleInputChange(student._id, subject, "exam", e.target.value)}
                                 className="w-16 border rounded px-1"
+                                disabled={isLocked}
                               />
                             </td>
                             <td>{Number(subjEdit?.cat ?? subjEdit?.cat1 ?? 0) + Number(subjEdit?.exam ?? 0)}</td>
@@ -706,6 +875,7 @@ const Spreadsheet = () => {
                               value={editResults[student._id]?._overall?.[key] ?? ""}
                               onChange={e => handleKeyRatingChange(student._id, key, e.target.value)}
                               className="w-12 border rounded px-1"
+                              disabled={isLocked}
                             />
                             <span className="text-xs text-muted-foreground mt-1">
                               {getKeyRatingLabel(overall[key])}
@@ -749,6 +919,12 @@ const Spreadsheet = () => {
       </p>
       <div className="flex flex-col gap-2 mt-6">
         <button
+          className="px-4 py-2 bg-danger text-white rounded hover:bg-danger/80 transition"
+          onClick={() => setShowDeleteConfirmModal({ type: 'individual', subject: confirmRemoveSubject })}
+        >
+          Remove for Individual Student
+        </button>
+        <button
           className="px-4 py-2 bg-warning text-white rounded hover:bg-warning/80 transition"
           onClick={() => setShowDeleteConfirmModal({ type: 'all', subject: confirmRemoveSubject })}
         >
@@ -764,7 +940,92 @@ const Spreadsheet = () => {
     </div>
   </div>
 )}
-{showDeleteConfirmModal && (
+
+{showDeleteConfirmModal && showDeleteConfirmModal.type === 'individual' && (
+  <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40">
+    <div className="bg-white rounded-lg shadow-lg p-6 w-full max-w-sm text-center">
+      <h3 className="font-bold text-lg mb-4">Select Student</h3>
+      <p className="mb-4">
+        Choose the student for whom you want to remove the subject <br />
+        <span className="font-bold text-primary">{showDeleteConfirmModal.subject}</span>
+      </p>
+      {/* Search bar for filtering students */}
+      <input
+        type="text"
+        placeholder="Search student by name..."
+        value={studentSearch}
+        onChange={e => setStudentSearch(e.target.value)}
+        className="w-full mb-4 px-3 py-2 border rounded"
+      />
+      <div className="flex flex-col gap-2 mt-6 max-h-60 overflow-y-auto">
+        {students
+          .filter(student =>
+            (student.name || student.fullName || student.username || "")
+              .toLowerCase()
+              .includes(studentSearch.toLowerCase())
+          )
+          .map(student => (
+            <button
+              key={student._id}
+              className="px-4 py-2 bg-info text-white rounded hover:bg-info/80 transition"
+              onClick={() => {
+                setSelectedStudentForDelete(student._id);
+                setShowStudentSelectModal({ subject: showDeleteConfirmModal.subject });
+                setShowDeleteConfirmModal(null);
+                setConfirmRemoveSubject(null);
+              }}
+            >
+              {student.name || student.fullName || student.username}
+            </button>
+          ))}
+        <button
+          className="px-4 py-2 bg-muted text-foreground rounded hover:bg-muted/80 transition"
+          onClick={() => {
+            setShowDeleteConfirmModal(null);
+            setConfirmRemoveSubject(null);
+          }}
+        >
+          Cancel
+        </button>
+      </div>
+    </div>
+  </div>
+)}
+
+{showStudentSelectModal && (
+  <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40">
+    <div className="bg-white rounded-lg shadow-lg p-6 w-full max-w-sm text-center">
+      <h3 className="font-bold text-lg mb-4">Confirm Individual Subject Removal</h3>
+      <p className="mb-4">
+        Are you sure you want to remove the subject <span className="text-primary font-bold">{showStudentSelectModal.subject}</span> for <br />
+        <span className="font-bold">{students.find(s => s._id === selectedStudentForDelete)?.name || 'Selected Student'}</span>?
+      </p>
+      <div className="flex justify-center gap-4 mt-6">
+        <button
+          className="px-4 py-2 bg-danger text-white rounded hover:bg-danger/80 transition"
+          onClick={async () => {
+            await handleRemoveSubjectIndividual(selectedStudentForDelete, showStudentSelectModal.subject);
+            setShowStudentSelectModal(null);
+            setSelectedStudentForDelete(null);
+          }}
+        >
+          Yes, Remove
+        </button>
+        <button
+          className="px-4 py-2 bg-muted text-foreground rounded hover:bg-muted/80 transition"
+          onClick={() => {
+            setShowStudentSelectModal(null);
+            setSelectedStudentForDelete(null);
+          }}
+        >
+          Cancel
+        </button>
+      </div>
+    </div>
+  </div>
+)}
+
+{showDeleteConfirmModal && showDeleteConfirmModal.type === 'all' && (
   <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40">
     <div className="bg-white rounded-lg shadow-lg p-6 w-full max-w-sm text-center">
       <h3 className="font-bold text-lg mb-4">

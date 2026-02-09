@@ -325,61 +325,66 @@ const VerifyResult = () => {
       [studentId]: 'pending'
     }));
   };
-  const handleSaveChanges = async (studentId) => {
-    setSaveLoading(true);
-    const result = editResults[studentId];
-    if (!result || !result.subjects || result.subjects.length === 0) {
-      alert('No changes to save.');
-      setSaveLoading(false);
-      return;
-    }
-    // Save all subject results (but do NOT set reviewed/verified)
-    for (const subject of result.subjects) {
-      const subj = result[subject];
-      if (subj && subj._id) {
-        const updateUrl = `${API_BASE_URL}/api/results/update/${subj._id}`;
-        const subjectPayload = {
-          firstCatScore: Number(subj.cat1 ?? 0),
-          examScore: Number(subj.exam ?? 0),
-          maxScore: subj.maxScore ?? '',
-          minScore: subj.minScore ?? '',
-          grade: subj.grade ?? '',
-          remark: subj.remark ?? '',
-        };
-        await fetch(updateUrl, {
-          method: 'PUT',
-          body: JSON.stringify(subjectPayload),
-          headers: { 'Content-Type': 'application/json' }
-        });
-      }
-    }
-    // Save "Overall" result (if present)
-    if (result._overallId) {
-      const overallFields = {};
-      [
-        'position', 'average',
-        'handwriting', 'punctuality', 'initiative', 'obedience', 'honesty', 'neatness',
-        'attentiveness', 'respect', 'attitude', 'creativity'
-      ].forEach(field => {
-        if (result[field] !== undefined) {
-          overallFields[field] = result[field];
-        }
-      });
-      overallFields.academicYear = "2025/2026";
-      overallFields.nextTerm = "18/01/2026";
-      // --- Set deans and rectors remark dynamically based on average ---
-      const avg = Number(result.average ?? 0);
-      overallFields.teacherComment = getDeansRemark(avg);
-      overallFields.headTeacherRemark = getRectorsRemark(avg);
-      await fetch(`${API_BASE_URL}/api/results/update/${result._overallId}`, {
+ const handleSaveChanges = async (studentId) => {
+  setSaveLoading(true);
+  const result = editResults[studentId];
+  if (!result || !result.subjects || result.subjects.length === 0) {
+    alert('No changes to save.');
+    setSaveLoading(false);
+    return;
+  }
+  // Save all subject results (set status to pending)
+  for (const subject of result.subjects) {
+    const subj = result[subject];
+    if (subj && subj._id) {
+      const updateUrl = `${API_BASE_URL}/api/results/update/${subj._id}`;
+      const subjectPayload = {
+        firstCatScore: Number(subj.cat1 ?? 0),
+        examScore: Number(subj.exam ?? 0),
+        maxScore: subj.maxScore ?? '',
+        minScore: subj.minScore ?? '',
+        grade: subj.grade ?? '',
+        remark: subj.remark ?? '',
+        reviewed: false,
+        pending: true,
+        verified: false
+      };
+      await fetch(updateUrl, {
         method: 'PUT',
-        body: JSON.stringify(overallFields),
+        body: JSON.stringify(subjectPayload),
         headers: { 'Content-Type': 'application/json' }
       });
     }
-    alert('Changes saved!');
-    setSaveLoading(false);
-  };
+  }
+  // Save "Overall" result (if present)
+  if (result._overallId) {
+    const overallFields = {};
+    [
+      'position', 'average',
+      'handwriting', 'punctuality', 'initiative', 'obedience', 'honesty', 'neatness',
+      'attentiveness', 'respect', 'attitude', 'creativity'
+    ].forEach(field => {
+      if (result[field] !== undefined) {
+        overallFields[field] = result[field];
+      }
+    });
+    overallFields.academicYear = "2025/2026";
+    overallFields.nextTerm = "18/01/2026";
+    const avg = Number(result.average ?? 0);
+    overallFields.teacherComment = getDeansRemark(avg);
+    overallFields.headTeacherRemark = getRectorsRemark(avg);
+    overallFields.reviewed = false;
+    overallFields.pending = true;
+    overallFields.verified = false;
+    await fetch(`${API_BASE_URL}/api/results/update/${result._overallId}`, {
+      method: 'PUT',
+      body: JSON.stringify(overallFields),
+      headers: { 'Content-Type': 'application/json' }
+    });
+  }
+  alert('Changes saved!');
+  setSaveLoading(false);
+};
   // Update handleRemoveSubject to support both individual and all-students removal
   const handleRemoveSubject = async (subject, forAll = true) => {
     if (forAll) {
@@ -917,7 +922,8 @@ const safeHandleResultChange = (studentId, field, value) => {
       selectedClass,
       selectedTerm,
       students,
-      editResults // pass the processed results object
+      editResults, // pass the processed results object
+      verifiedStudents
     }
   })}
 >

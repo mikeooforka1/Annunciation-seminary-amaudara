@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useState, useRef } from "react";
 import axios from "axios";
 import Icon from "../../components/AppIcon";
 import Button from "../../components/ui/Button";
@@ -56,6 +56,10 @@ const AdminDashboard = () => {
   const [errorMsg, setErrorMsg] = useState("");
   const navigate = useNavigate();
   const location = useLocation();
+  const [editingStudentId, setEditingStudentId] = useState(null);
+  const [editingStudentName, setEditingStudentName] = useState("");
+  const [savingStudentId, setSavingStudentId] = useState(null); // <-- Add this line
+  const inputRef = useRef(null);
 
   useEffect(() => {
     fetchClasses();
@@ -156,6 +160,43 @@ const AdminDashboard = () => {
     if (section === "teachers") fetchTeachers();
     if (section === "formators") fetchFormators();
     if (section === "nonAcademic") fetchNonAcademic();
+  };
+
+  const handleStudentNameEdit = (student) => {
+    setEditingStudentId(student._id);
+    setEditingStudentName(student.name);
+    setTimeout(() => {
+      if (inputRef.current) inputRef.current.focus();
+    }, 100);
+  };
+
+  const handleStudentNameChange = (e) => {
+    setEditingStudentName(e.target.value);
+  };
+
+  const handleStudentNameSave = async (student) => {
+    if (!editingStudentName.trim() || editingStudentName === student.name) {
+      setEditingStudentId(null);
+      setEditingStudentName("");
+      return;
+    }
+    setSavingStudentId(student._id);
+    try {
+      await axios.put(`${API_BASE_URL}/api/user/${student._id}/update-name`, {
+        name: editingStudentName.trim(),
+      });
+      setStudents((prev) =>
+        prev.map((s) =>
+          s._id === student._id ? { ...s, name: editingStudentName.trim() } : s
+        )
+      );
+      setEditingStudentId(null);
+      setEditingStudentName("");
+    } catch (err) {
+      alert("Failed to update student name.");
+    } finally {
+      setSavingStudentId(null);
+    }
   };
 
   return (
@@ -318,12 +359,74 @@ const AdminDashboard = () => {
                 <div
                   key={student._id}
                   className="flex items-center justify-between bg-muted/10 rounded-lg px-3 py-2 cursor-pointer hover:bg-primary/10 transition"
-                  onClick={() => navigate(`/admin/student/${student._id}`)}
                   title="View Profile"
                 >
-                  <span className="font-semibold">{student.name}</span>
-                  <span className="text-xs text-muted-foreground">
-                    {student.className}
+                  <span className="font-semibold flex items-center gap-2">
+                    {editingStudentId === student._id ? (
+                      <>
+                        <input
+                          ref={inputRef}
+                          type="text"
+                          value={editingStudentName}
+                          onChange={handleStudentNameChange}
+                          onKeyDown={(e) => {
+                            if (e.key === "Enter") handleStudentNameSave(student);
+                            if (e.key === "Escape") {
+                              setEditingStudentId(null);
+                              setEditingStudentName("");
+                            }
+                          }}
+                          className="border border-primary rounded px-2 py-1 text-sm"
+                          style={{ minWidth: 120 }}
+                          disabled={savingStudentId === student._id}
+                        />
+                        <button
+                          className="ml-2 text-green-600 font-bold"
+                          title="Save"
+                          onClick={() => handleStudentNameSave(student)}
+                          disabled={savingStudentId === student._id}
+                        >
+                          {savingStudentId === student._id ? "Saving..." : "Save"}
+                        </button>
+                        <button
+                          className="ml-1 text-red-500 font-bold"
+                          title="Cancel"
+                          onClick={() => {
+                            setEditingStudentId(null);
+                            setEditingStudentName("");
+                          }}
+                          disabled={savingStudentId === student._id}
+                        >
+                          Cancel
+                        </button>
+                      </>
+                    ) : (
+                      <>
+                        {student.name}
+                        <button
+                          className="ml-2 text-xs text-blue-600 underline"
+                          title="Edit Name"
+                          onClick={() => handleStudentNameEdit(student)}
+                        >
+                          Edit
+                        </button>
+                      </>
+                    )}
+                  </span>
+                  <span className="flex items-center gap-2">
+                    <span className="text-xs text-muted-foreground">
+                      {student.className}
+                    </span>
+                    <Button
+                      variant="secondary"
+                      size="sm"
+                      className="ml-2"
+                      onClick={() => navigate(`/admin/student/${student._id}`)}
+                      title="View Profile"
+                    >
+                      <Icon name="User" size={16} className="mr-1" />
+                      View Profile
+                    </Button>
                   </span>
                 </div>
               ))}

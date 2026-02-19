@@ -24,6 +24,9 @@ import AdminDashboard from './pages/admin'; // Add this import
 import StudentProfilePage from './pages/admin/components/student-profile'; // Import your student profile page
 import Assignments from './pages/student-dashboard/components/assignments.jsx'; // Add this import
 import Spreadsheet from './pages/admin/components/spreadsheet.jsx'; // <-- Add this import
+import CBTResultPortal from './pages/exam-creation-management/components/CBT-result-portal.jsx';// <-- Add this import
+import CBTResult from './pages/results-analytics-portal/components/cbt-result.jsx';
+import PrintAllResults from './pages/teacher-portal/PrintAllResults.jsx'; // Add this import
 
 const AppWrapper = ({ children }) => {
   const navigate = useNavigate();
@@ -175,7 +178,10 @@ const Routes = () => {
                   <Route path="/profile" element={<ProfilePage />} />
                   <Route path="/account-settings" element={<AccountSettingsPage />} />
                   <Route path="/teacher-portal" element={<TeacherPortal />} />
+                  <Route path="/print-all-results" element={<PrintAllResults />} />
                   <Route path="/post-announcement" element={<PostAnnouncement />} />
+                  <Route path="/cbt-result-portal" element={<CBTResultPortal />} />
+                  <Route path="/results-analytics-portal/cbt-result" element={<CBTResult />} />
                   <Route path="/admin" element={<AdminDashboard />} />
                   <Route path="/admin/student/:studentId" element={<StudentProfilePage />} />
                   <Route path="/admin/spreadsheet" element={<Spreadsheet />} />

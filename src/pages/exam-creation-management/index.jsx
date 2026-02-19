@@ -523,6 +523,16 @@ const ExamCreationManagement = () => {
     setIsLoading(false);
   };
 
+  const handlePreviewSave = (updatedQuestions, updatedStartDate, updatedEndDate) => {
+    setQuestions(updatedQuestions);
+    setExamData(prev => ({
+      ...prev,
+      questions: updatedQuestions,
+      startDate: updatedStartDate || prev.startDate,
+      endDate: updatedEndDate || prev.endDate,
+    }));
+  };
+
   return (
     <div className="min-h-screen bg-background">
       {/* Header */}
@@ -1043,6 +1053,7 @@ const ExamCreationManagement = () => {
           examData={examData}
           questions={questions}
           onClose={() => setShowPreview(false)}
+          onSave={handlePreviewSave}
         />
       )}
       {showQuestionBank && (

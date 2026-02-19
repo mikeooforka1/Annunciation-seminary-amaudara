@@ -309,20 +309,13 @@ blockquote, .quote {
   cursor: pointer;
 }
 
+
+
 /* --- Print styles for Results Table --- */
-@media print {
-  body * {
-    visibility: hidden !important;
-  }
-  .print-area, .print-area * {
-    visibility: visible !important;
-  }
-  .print-area {
-    page-break-before: auto !important;
-    margin-top: 0 !important;
-    padding-top: 0 !important;
-  }
-}
+
+
+
+
 
 button.publish-btn {
   background: linear-gradient(90deg, #bd1919 0%, #b91c1c 100%) !important; /* red */
@@ -349,3 +342,4 @@ button.draft-btn {
 .icon-delete-btn:hover {
   background: #fee2e2 !important; /* Tailwind red-100 */
 }
+

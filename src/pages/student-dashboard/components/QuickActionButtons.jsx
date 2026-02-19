@@ -18,12 +18,21 @@ const QuickActionButtons = ({ className = '' }) => {
       badge: null
     },
     {
-      id: 'view-results',
-      title: 'View Results',
+      id: 'view results',
+      title: 'View-Exam-Results',
       description: 'Check your grades and performance',
       icon: 'BarChart3',
       color: 'bg-success text-success-foreground',
       path: '/results-analytics-portal',
+      badge: null
+    },
+    {
+      id: 'check-cbt-result',
+      title: 'Check CBT Result',
+      description: 'See your CBT exam scores and feedback',
+      icon: 'MonitorCheck',
+      color: 'bg-blue-100 text-blue-700',
+      path: '/results-analytics-portal/cbt-result',
       badge: null
     },
     {
@@ -69,10 +78,10 @@ const QuickActionButtons = ({ className = '' }) => {
         </div>
       </div>
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-        {quickActions?.map((action) => (
+        {quickActions?.map((action, idx) => (
           <div
             key={action?.id}
-            className="relative group cursor-pointer"
+            className={`relative group cursor-pointer ${action.id === 'assignments' ? 'mt-10' : ''}`}
             onClick={() => handleActionClick(action)}
             ref={action.id === 'assignments' ? assignmentBtnRef : null}
           >
@@ -86,7 +95,6 @@ const QuickActionButtons = ({ className = '' }) => {
                     </span>
                   )}
                 </div>
-                
                 <div className="flex-1 min-w-0">
                   <h3 className="font-body font-semibold text-foreground group-hover:text-primary transition-colors">
                     {action?.title}
@@ -95,7 +103,6 @@ const QuickActionButtons = ({ className = '' }) => {
                     {action?.description}
                   </p>
                 </div>
-
                 <div className="flex-shrink-0">
                   <Icon 
                     name="ArrowRight" 
@@ -111,10 +118,17 @@ const QuickActionButtons = ({ className = '' }) => {
                 className="absolute -top-16 left-1/2 -translate-x-1/2 flex flex-col items-center z-50 pointer-events-none"
                 style={{ width: 'max-content' }}
               >
-                <div className="bg-yellow-100 border border-yellow-400 text-yellow-800 px-3 py-2 rounded shadow text-sm font-semibold mb-1 text-center">
+                <div className="bg-yellow-100 border border-yellow-400 text-yellow-800 px-3 py-2 rounded shadow text-sm font-semibold mb-1 text-center pointer-events-none">
                   Check and do your assignments here
                 </div>
-                <svg width="36" height="36" viewBox="0 0 24 24" fill="none">
+                <svg
+                  width="36"
+                  height="36"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  className="pointer-events-none animate-bounce"
+                  style={{ animationDuration: '1.2s' }}
+                >
                   <path d="M12 2v20m0 0l-6-6m6 6l6-6" stroke="#f59e42" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
                 </svg>
               </div>

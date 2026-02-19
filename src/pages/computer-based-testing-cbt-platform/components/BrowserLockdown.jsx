@@ -1,12 +1,14 @@
 import React, { useEffect, useState } from 'react';
 import Icon from '../../../components/AppIcon';
 
-const BrowserLockdown = ({ isActive, onViolation, children }) => {
+const BrowserLockdown = ({ isActive, onViolation, onAutoSubmit, children }) => {
   const [violations, setViolations] = useState([]);
   const [showWarning, setShowWarning] = useState(false);
   const [tabActive, setTabActive] = useState(true);
 
   useEffect(() => {
+    let autoSubmitTimeout = null;
+
     if (!isActive) return;
 
     // Disable right-click context menu
@@ -84,8 +86,16 @@ const BrowserLockdown = ({ isActive, onViolation, children }) => {
       if (document.hidden) {
         setTabActive(false);
         recordViolation('Tab switched or window minimized');
+        // Start auto-submit timer
+        autoSubmitTimeout = setTimeout(() => {
+          if (!tabActive && onAutoSubmit) {
+            onAutoSubmit();
+          }
+        }, 3000);
       } else {
         setTabActive(true);
+        // Cancel auto-submit timer if student returns
+        if (autoSubmitTimeout) clearTimeout(autoSubmitTimeout);
       }
     };
 
@@ -143,7 +153,7 @@ const BrowserLockdown = ({ isActive, onViolation, children }) => {
       window.removeEventListener('blur', handleWindowBlur);
       document.removeEventListener('selectstart', handleSelectStart);
     };
-  }, [isActive]);
+  }, [isActive, tabActive, onAutoSubmit]);
 
   const recordViolation = (type) => {
     const violation = {

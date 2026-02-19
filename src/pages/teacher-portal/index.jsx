@@ -155,6 +155,28 @@ const TeacherPortal = () => {
             <span className="font-heading font-bold text-lg mb-1 text-red-600">Set Result</span>
             <span className="text-sm text-muted-foreground text-center">Go to the result portal to set or view results.</span>
           </div>
+           {/* Set CBT Exam Result Card (NEW) */}
+            <div
+              className="bg-blue-100 border border-blue-400 rounded-lg shadow hover:shadow-lg transition cursor-pointer flex flex-col items-center justify-center p-6"
+              onClick={() => navigate('/cbt-result-portal')}
+            >
+              <span className="text-blue-600 text-3xl mb-2">
+                <i className="fas fa-laptop-code" />
+              </span>
+              <span className="font-heading font-bold text-lg mb-1 text-blue-600">Set CBT Exam Result</span>
+              <span className="text-sm text-muted-foreground text-center">Manage and view CBT exam results for your students.</span>
+            </div>
+          {/* Print All Results Card */}
+          <div
+            className="bg-green-100 border border-green-400 rounded-lg shadow hover:shadow-lg transition cursor-pointer flex flex-col items-center justify-center p-6"
+            onClick={() => navigate('/print-all-results')}
+          >
+            <span className="text-green-600 text-3xl mb-2">
+              <i className="fas fa-print" />
+            </span>
+            <span className="font-heading font-bold text-lg mb-1 text-green-600">Print All Results</span>
+            <span className="text-sm text-muted-foreground text-center">Print results for all students in your class and term.</span>
+          </div>
         </div>
       </div>
 

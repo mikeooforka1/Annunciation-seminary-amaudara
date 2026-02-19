@@ -286,6 +286,16 @@ const ExamConfigurationPanel = ({
     setQuestions(prev => prev.filter(q => q.id !== questionId));
   };
 
+  const handlePreviewSave = (updatedQuestions, updatedStartDate, updatedEndDate) => {
+    setQuestions(updatedQuestions);
+    onExamDataChange({
+      ...examData,
+      questions: updatedQuestions,
+      startDate: updatedStartDate || examData.startDate,
+      endDate: updatedEndDate || examData.endDate,
+    });
+  };
+
   return (
     <div className="exam-config-panel">
       <div className="bg-card border border-border rounded-lg h-full flex flex-col">
@@ -613,8 +623,9 @@ const ExamConfigurationPanel = ({
         {showPreview && (
           <ExamPreview
             examData={examData}
-            questions={examData.questions || []}
+            questions={questions}
             onClose={() => setShowPreview(false)}
+            onSave={handlePreviewSave}
             onEditSchedule={handleEditSchedule}
           />
         )}

@@ -95,36 +95,34 @@ const ResultsTable = ({
         <h3 className="font-heading text-lg font-semibold text-foreground">Exam Results</h3>
         <p className="font-body text-sm text-muted-foreground">Complete history of your academic performance</p>
       </div>
-      <div className="w-full overflow-x-auto">
-        <table className="min-w-[700px] w-full table-fixed md:table-auto text-xs md:text-sm border border-border rounded-lg overflow-hidden">
-          <thead className="bg-muted">
+      <div className="results-table mb-8 overflow-x-auto" style={{ position: 'relative', zIndex: 1 }}>
+        <table className="w-full table-fixed border border-border rounded-lg overflow-hidden">
+          <thead className="bg-muted font-bold text-base">
             <tr>
-              <th className="px-2 py-2 border-r border-border bg-muted/50 text-center">Subject</th>
-              <th className="px-2 py-2 border-r border-border bg-muted/50 text-center">C.A.T<br /><span className="text-xs text-muted-foreground">(30%)</span></th>
-              <th className="px-2 py-2 border-r border-border bg-muted/50 text-center">Exam<br /><span className="text-xs text-muted-foreground">(70%)</span></th>
-              <th className="px-2 py-2 border-r border-border bg-muted/50 text-center">Total<br /><span className="text-xs text-muted-foreground">(100%)</span></th>
-              {/* Removed Max Score */}
-              {/* Removed Min Score */}
-              <th className="px-2 py-2 border-r border-border bg-muted/50 text-center">Grade</th>
-              <th className="px-2 py-2 bg-muted/50 text-center">Remark</th>
+              <th className="px-2 py-2 border-r border-border bg-muted/50 text-center font-bold text-base">Subject</th>
+              <th className="px-2 py-2 border-r border-border bg-muted/50 text-center font-bold text-base">C.A.T<br /><span className="text-xs text-muted-foreground font-normal">(30%)</span></th>
+              <th className="px-2 py-2 border-r border-border bg-muted/50 text-center font-bold text-base">Exam<br /><span className="text-xs text-muted-foreground font-normal">(70%)</span></th>
+              <th className="px-2 py-2 border-r border-border bg-muted/50 text-center font-bold text-base">Total<br /><span className="text-xs text-muted-foreground font-normal">(100%)</span></th>
+              <th className="px-2 py-2 border-r border-border bg-muted/50 text-center font-bold text-base">Grade</th>
+              <th className="px-2 py-2 bg-muted/50 text-center font-bold text-base">Remark</th>
             </tr>
           </thead>
-          <tbody className="divide-y divide-border">
+          <tbody className="divide-y divide-border font-bold text-base">
             {Object.keys(groupedResults)
               .filter(subject => subject !== 'Overall')
               .map(subject => {
                 const cat1 = groupedResults[subject].cat1 || {};
                 const exam = groupedResults[subject].exam || {};
-                const cat1Score = cat1.score ?? '';
-                const examScore = exam.score ?? '';
+                const cat1Score = exam.firstCatScore ?? '';
+                const examScore = exam.examScore ?? exam.score ?? '';
                 const total = (Number(cat1Score) || 0) + (Number(examScore) || 0);
                 return (
-                  <tr key={subject} className="hover:bg-muted/50 transition-colors">
-                    <td className="px-2 py-2 border-r border-border bg-white font-semibold text-center break-words whitespace-normal max-w-[120px] md:max-w-none">
+                  <tr key={subject} className="hover:bg-muted/50 transition-colors font-bold text-base">
+                    <td className="px-2 py-2 border-r border-border bg-white font-bold text-center break-words whitespace-normal max-w-[120px] md:max-w-none">
                       {subject || <span className="italic text-muted-foreground">N/A</span>}
                     </td>
                     {/* C.A.T (30%) */}
-                    <td className="px-2 py-2 border-r border-border bg-white text-center">
+                    <td className="px-2 py-2 border-r border-border bg-white text-center font-bold">
                       {editable ? (
                         <input
                           type="number"
@@ -132,16 +130,16 @@ const ResultsTable = ({
                           max="30"
                           value={cat1Score}
                           onChange={e => onChange(subject, 'cat1', Number(e.target.value))}
-                          className="border rounded px-2 py-1 w-16 text-center"
+                          className="border rounded px-2 py-1 w-16 text-center font-bold"
                         />
                       ) : (
-                        <span className="block p-1 rounded bg-warning/10 border border-warning/20">
+                        <span className="block p-1 rounded bg-warning/10 border border-warning/20 font-bold">
                           {cat1Score !== '' ? cat1Score : <span className="italic text-muted-foreground">N/A</span>}
                         </span>
                       )}
                     </td>
                     {/* Exam (70%) */}
-                    <td className="px-2 py-2 border-r border-border bg-white text-center">
+                    <td className="px-2 py-2 border-r border-border bg-white text-center font-bold">
                       {editable ? (
                         <input
                           type="number"
@@ -149,22 +147,20 @@ const ResultsTable = ({
                           max="70"
                           value={examScore}
                           onChange={e => onChange(subject, 'exam', Number(e.target.value))}
-                          className="border rounded px-2 py-1 w-16 text-center"
+                          className="border rounded px-2 py-1 w-16 text-center font-bold"
                         />
                       ) : (
-                        <span className="block p-1 rounded bg-success/10 border border-success/20">
+                        <span className="block p-1 rounded bg-success/10 border border-success/20 font-bold">
                           {examScore !== '' ? examScore : <span className="italic text-muted-foreground">N/A</span>}
                         </span>
                       )}
                     </td>
                     {/* Total (100%) */}
-                    <td className="px-2 py-2 border-r border-border bg-white text-center font-bold text-primary">
+                    <td className="px-2 py-2 border-r border-border bg-white text-center font-bold text-base">
                       {total}
                     </td>
-                    {/* Removed Max Score */}
-                    {/* Removed Min Score */}
                     {/* Grade */}
-                    <td className="px-2 py-2 border-r border-border bg-white text-center">
+                    <td className="px-2 py-2 border-r border-border bg-white text-center font-bold">
                       {editable ? (
                         <input
                           type="text"
@@ -182,16 +178,16 @@ const ResultsTable = ({
                       )}
                     </td>
                     {/* Remark */}
-                    <td className="px-2 py-2 bg-white text-center">
+                    <td className="px-2 py-2 bg-white text-center font-bold">
                       {editable ? (
                         <input
                           type="text"
                           value={exam.remark ?? ''}
                           onChange={e => onChange(subject, 'remark', e.target.value)}
-                          className="border rounded px-2 py-1 w-24 text-center"
+                          className="border rounded px-2 py-1 w-24 text-center font-bold"
                         />
                       ) : (
-                        <span className="block p-1 rounded bg-muted/10 border border-muted/20">
+                        <span className="block p-1 rounded bg-muted/10 border border-muted/20 font-bold">
                           {typeof exam.remark === 'string' && exam.remark.trim() !== ''
                             ? exam.remark
                             : <span className="italic text-muted-foreground">N/A</span>}

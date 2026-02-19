@@ -41,6 +41,10 @@ const ComputerBasedTestingPlatform = () => {
   const [errorMsg, setErrorMsg] = useState('');
   const [takenExamIds, setTakenExamIds] = useState([]);
   const [activeTab, setActiveTab] = useState('pending'); // 'pending', 'taken', 'missed'
+  const [ipCheckLoading, setIpCheckLoading] = useState(true);
+  const [ipAllowed, setIpAllowed] = useState(null); // null=loading, true=allowed, false=blocked
+  const [ipErrorMsg, setIpErrorMsg] = useState('');
+  const [showIpModal, setShowIpModal] = useState(false);
 
   // New state for categorized exams
   const [pendingExams, setPendingExams] = useState([]);
@@ -102,6 +106,39 @@ const ComputerBasedTestingPlatform = () => {
     setIsLoadingMissed(false);
     setIsLoadingCancelled(false); // <-- Add this line
   }, [API_BASE_URL]);
+
+ useEffect(() => {
+  let interval;
+  const checkIp = () => {
+    setIpCheckLoading(true);
+    fetch(`${API_BASE_URL}/api/exams/check-ip`)
+      .then(res => res.json())
+      .then(data => {
+        if (data.allowed) {
+          setIpAllowed(true);
+          setIpErrorMsg('');
+        } else {
+          setIpAllowed(false);
+          setIpErrorMsg(data.error || 'Access denied: Your device is not authorized for this exam.');
+        }
+        setIpCheckLoading(false);
+        setShowIpModal(true); // Show modal after check
+      })
+      .catch(() => {
+        setIpAllowed(false);
+        setIpErrorMsg('Network error: Unable to verify your device IP. Please try again or contact your teacher.');
+        setIpCheckLoading(false);
+        setShowIpModal(true); // Show modal after check
+      });
+  };
+
+  checkIp(); // Initial check on landing
+
+  interval = setInterval(checkIp, 5000); // Repeat every 5 seconds
+
+  return () => clearInterval(interval);
+}, [API_BASE_URL]);
+
 
   useEffect(() => {
     const studentData = JSON.parse(localStorage.getItem('studentData') || '{}');
@@ -294,6 +331,12 @@ const ComputerBasedTestingPlatform = () => {
     }
   }, [answers, flaggedQuestions, timeRemaining, violations, navigate, selectedExam, student, API_BASE_URL]);
 
+  const handleAutoSubmitTabSwitch = useCallback(() => {
+    // Optionally show a message
+    alert("Exam auto-submitted due to tab switch.");
+    handleSubmitExam(true); // auto-submit
+  }, [handleSubmitExam]);
+
   // Auto-submit logic on exam end
   const handleAutoSubmit = useCallback(async () => {
     const now = new Date();
@@ -423,12 +466,75 @@ const ComputerBasedTestingPlatform = () => {
   const filteredMissedExams = missedExams.filter(exam => exam.term === currentTerm);
   const filteredCancelledExams = cancelledExams.filter(exam => exam.term === currentTerm);
 
+  useEffect(() => {
+    // Update countdowns every second for pending exams
+    if (pendingExams.length === 0) return;
+
+    const interval = setInterval(() => {
+      const now = new Date();
+      const updatedCountdowns = {};
+      pendingExams.forEach(exam => {
+        updatedCountdowns[exam._id] = getCountdownString(exam.startDate);
+      });
+      setPendingCountdowns(updatedCountdowns);
+    }, 1000);
+
+    return () => clearInterval(interval);
+  }, [pendingExams]);
+  // Show loading or error before exam UI
+  if (ipCheckLoading) {
+    return (
+      <div className="min-h-screen flex flex-col items-center justify-center bg-gray-50">
+        <div className="bg-white rounded-lg shadow-lg p-8 flex flex-col items-center">
+          <TbFidgetSpinner className="animate-spin text-5xl text-primary mb-4" />
+          <span className="text-lg font-semibold text-primary">Checking device authorization...</span>
+        </div>
+      </div>
+    );
+  }
+  // Show modal after IP check
+  if (showIpModal) {
+    return (
+      <div className="min-h-screen flex flex-col items-center justify-center bg-gray-50">
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-lg max-w-md w-full p-6">
+            <div className="text-center mb-6">
+              <div className="w-16 h-16 rounded-full flex items-center justify-center mx-auto mb-4"
+                 style={{ backgroundColor: ipAllowed ? "#D1FAE5" : "#FEE2E2" }}>
+                <span className={`text-2xl ${ipAllowed ? "text-green-600" : "text-red-600"}`}>
+                  {ipAllowed ? "✅" : "⛔"}
+                </span>
+              </div>
+              <h3 className="text-lg font-semibold text-gray-900 mb-2">
+                {ipAllowed ? "Device Authorized" : "Access Denied"}
+              </h3>
+              <p className="text-gray-600">
+                {ipAllowed
+                  ? "Your device is authorized for this exam. You may proceed."
+                  : ipErrorMsg || "Your device is not authorized for this exam."}
+              </p>
+            </div>
+            <div className="flex justify-center">
+              <button
+                onClick={() => {
+                  setShowIpModal(false);
+                  if (!ipAllowed) navigate('/student-dashboard');
+                }}
+                className="flex-1 px-4 py-2 rounded-lg font-medium bg-green-600 text-white hover:bg-green-700"
+              >
+                OK
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
+    );
+  }
   // Pre-exam screen: List all scheduled exams with tabs
   if (!examStarted) {
     return (
-      <div className="min-h-screen bg-gray-50 flex items-center justify-center p-4">
+      <div className="min-h-screen flex flex-col items-center justify-center bg-gray-50">
         <div className="bg-white rounded-lg shadow-lg max-w-2xl w-full p-8">
-       
           {/* School Logo */}
           <div className="flex flex-col items-center mb-8">
             <img src="/assets/images/school_logo-1754996036714.jpg" alt="Goshen Academy Logo" className="w-24 h-24 mb-2 rounded-full border-4 border-green-700" />
@@ -873,6 +979,7 @@ const ComputerBasedTestingPlatform = () => {
       <BrowserLockdown 
         isActive={examStarted} 
         onViolation={handleViolation}
+        onAutoSubmit={handleAutoSubmitTabSwitch}
       />
       {/* Exam Header */}
       <ExamHeader

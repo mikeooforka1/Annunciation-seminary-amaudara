@@ -4,6 +4,7 @@ import ResultsTable from '../../results-analytics-portal/components/ResultsTable
 
 const PrintableStudentResult = ({ student, results, overallResult, className, term, totalStudentsInClass }) => (
   <div
+    id={`result-print-section-${student?._id || student?.id || student?.name || 'unknown'}`} // <-- Add this line
     className="printable-student-result bg-white border rounded-lg shadow p-6 m-4"
     style={{
       width: '100%',
@@ -63,6 +64,60 @@ const PrintableStudentResult = ({ student, results, overallResult, className, te
     {/* RESULTS TABLE */}
     <div className="results-table mb-8 overflow-x-auto" style={{ position: 'relative', zIndex: 1 }}>
       <ResultsTable results={results} />
+    </div>
+
+    {/* KEY RATING SECTION */}
+    <div className="key-rating-section" style={{ position: 'relative', zIndex: 1 }}>
+      <h3 className="font-bold text-lg mb-2 text-center">Key Rating</h3>
+      <div className="flex flex-wrap justify-center gap-2 text-sm mb-4">
+        <span>5-EXCELLENT</span>
+        <span>4-VERY GOOD</span>
+        <span>3-SATISFACTORY</span>
+        <span>2-POOR</span>
+        <span>1-VERY POOR</span>
+      </div>
+      <div className="w-full">
+        <table className="w-full table-fixed border border-gray-300 rounded-lg mb-4">
+          <thead>
+            <tr className="bg-gray-100">
+              <th className="px-1 py-1 text-xs font-semibold text-center break-words whitespace-normal">Handwriting</th>
+              <th className="px-1 py-1 text-xs font-semibold text-center break-words whitespace-normal">Punctuality</th>
+              <th className="px-1 py-1 text-xs font-semibold text-center break-words whitespace-normal">Initiative</th>
+              <th className="px-1 py-1 text-xs font-semibold text-center break-words whitespace-normal">Obedience</th>
+              <th className="px-1 py-1 text-xs font-semibold text-center break-words whitespace-normal">Honesty</th>
+              <th className="px-1 py-1 text-xs font-semibold text-center break-words whitespace-normal">Neatness</th>
+              <th className="px-1 py-1 text-xs font-semibold text-center break-words whitespace-normal">Attentiveness</th>
+              <th className="px-1 py-1 text-xs font-semibold text-center break-words whitespace-normal">Respect</th>
+              <th className="px-1 py-1 text-xs font-semibold text-center break-words whitespace-normal">Attitude</th>
+              <th className="px-1 py-1 text-xs font-semibold text-center break-words whitespace-normal">Creativity</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              {([
+                'handwriting', 'punctuality', 'initiative', 'obedience', 'honesty',
+                'neatness', 'attentiveness', 'respect', 'attitude', 'creativity'
+              ]).map(key => {
+                const value = overallResult?.[key];
+                let label = '';
+                if (value === 5) label = 'Excellent';
+                else if (value === 4) label = 'Very Good';
+                else if (value === 3) label = 'Satisfactory';
+                else if (value === 2) label = 'Poor';
+                else if (value === 1) label = 'Very Poor';
+                return (
+                  <td className="px-1 py-1 text-center break-words whitespace-normal" key={key}>
+                    {value
+                      ? <span className="font-bold">{value} - {label}</span>
+                      : <span className="text-gray-400">Not marked</span>
+                    }
+                  </td>
+                );
+              })}
+            </tr>
+          </tbody>
+        </table>
+      </div>
     </div>
 
     {/* COMMENTS SECTION */}

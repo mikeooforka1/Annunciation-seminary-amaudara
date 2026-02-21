@@ -6,6 +6,7 @@ import ResultsTable from './components/ResultsTable';
 import ExamBreakdownModal from './components/ExamBreakdownModal';
 import Icon from '../../components/AppIcon';
 import Button from '../../components/ui/Button';
+import html2canvas from 'html2canvas';
 
 const ResultsAnalyticsPortal = () => {
   const [userRole] = useState('student');
@@ -53,7 +54,6 @@ const ResultsAnalyticsPortal = () => {
 
   // Fetch real subjects and exam types from backend
   
-
   // Fetch results pushed by teacher for this student and term
   const [examResults, setExamResults] = useState([]);
   const [isLoadingResults, setIsLoadingResults] = useState(false);
@@ -285,82 +285,53 @@ const ResultsAnalyticsPortal = () => {
 
   // --- ADD THIS LINE RIGHT BEFORE RETURN ---
   const overallResult = filteredResults.find(r => r.subject === 'Overall');
+  
 
-  const handlePrintResult = () => {
-    const style = document.createElement('style');
-    style.id = 'custom-print-style';
-     style.innerHTML = `
-      @media print {
-        @page {
-          size: A3;
-          margin: 10mm;
-        }
-        body * {
-          visibility: hidden !important;
-        }
-        #result-print-section, #result-print-section * {
-          visibility: visible !important;
-        }
-        #result-print-section {
-          position: absolute !important;
-          left: 0;
-          top: 0;
-          width: 100vw !important;
-          max-width: 100vw !important;
-          min-width: 0 !important;
-          margin: 0 !important;
-          background: none !important;
-          box-shadow: none !important;
-          -webkit-print-color-adjust: exact !important;
-          print-color-adjust: exact !important;
-          background-image: url("/assets/images/school_logo-1754996036714.jpg") !important;
-          background-repeat: no-repeat !important;
-          background-position: center center !important;
-          background-size: 60% !important;
-          font-size: 14px !important;
-          overflow-wrap: break-word !important;
-        }
-        #result-print-section h1, #result-print-section h2, #result-print-section h3 {
-          font-size: 1.2em !important;
-          word-break: break-word !important;
-        }
-        #result-print-section table {
-          width: 100% !important;
-          font-size: 12px !important;
-          table-layout: auto !important;
-          word-break: break-word !important;
-        }
-        #result-print-section td, #result-print-section th {
-          word-break: break-word !important;
-          padding: 2px 4px !important;
-        }
-        /* Mobile-specific print adjustments */
-        @media print and (max-width: 600px) {
-          #result-print-section {
-            width: 100vw !important;
-            max-width: 100vw !important;
-            font-size: 11px !important;
-            background-size: 90% !important;
-            padding: 0 !important;
-          }
-          #result-print-section table {
-            font-size: 10px !important;
-          }
-          #result-print-section h1, #result-print-section h2 {
-            font-size: 1em !important;
-          }
-        }
-      }
-    `;
-    document.head.appendChild(style);
+  const handlePrintResult = async () => {
+    const printSection = document.getElementById('result-print-section');
+    if (!printSection) return;
 
-    window.print();
+    // Ensure the results table and all its cells are fully visible
+    const tableContainer = printSection.querySelector('.results-table-responsive');
+    if (tableContainer) {
+      tableContainer.style.overflow = 'visible';
+      tableContainer.style.width = '100%';
+      tableContainer.style.background = '#fff';
+      tableContainer.style.opacity = '1';
+    }
+    const table = printSection.querySelector('table');
+    if (table) {
+      table.style.background = '#fff';
+      table.style.opacity = '1';
+      table.style.color = '#222';
+    }
+    // Make all table cells fully opaque and white background
+    const ths = printSection.querySelectorAll('.results-table-responsive th');
+    const tds = printSection.querySelectorAll('.results-table-responsive td');
+    ths.forEach(th => {
+      th.style.background = '#fff';
+      th.style.opacity = '1';
+      th.style.color = '#222';
+    });
+    tds.forEach(td => {
+      td.style.background = '#fff';
+      td.style.opacity = '1';
+      td.style.color = '#222';
+    });
 
-    window.onafterprint = () => {
-      const styleTag = document.getElementById('custom-print-style');
-      if (styleTag) styleTag.remove();
-      window.onafterprint = null;
-    };
+    // Use html2canvas to capture the section as an image
+    const canvas = await html2canvas(printSection, {
+      backgroundColor: '#fff',
+      scale: 2,
+      useCORS: true,
+      logging: false,
+    });
+
+    // Create a PNG download
+    const link = document.createElement('a');
+    link.download = `result-${userName.replace(/\s+/g, '_')}.png`;
+    link.href = canvas.toDataURL('image/png');
+    link.click();
   };
 
   const manualClassOptions = [
@@ -483,6 +454,20 @@ const [showMobilePrintWarning, setShowMobilePrintWarning] = useState(false);
 
   return (
     <>
+    // Place this inside your ResultsAnalyticsPortal component, before the return statement:
+<style>
+{`
+  #result-print-section .results-table,
+  #result-print-section .results-table-responsive,
+  #result-print-section table,
+  #result-print-section th,
+  #result-print-section td {
+    background: #fff !important;
+    opacity: 1 !important;
+    color: #222 !important;
+  }
+`}
+</style>
       {/* Mobile Print Warning */}
       {showMobilePrintWarning && (
         <div
@@ -539,15 +524,6 @@ const [showMobilePrintWarning, setShowMobilePrintWarning] = useState(false);
               margin: '0 auto',
             }}
           >
-            {/* Watermark overlay */}
-            <div className="watermark-overlay" style={{
-              position: 'absolute',
-              inset: 0,
-              zIndex: 0,
-              pointerEvents: 'none',
-              background: 'rgba(255,255,255,0.72)', // <-- Increased opacity from 0.7 to 0.72
-            }} />
-
             {/* HEADER */}
             <header
               className="print-area-header"
@@ -622,7 +598,7 @@ const [showMobilePrintWarning, setShowMobilePrintWarning] = useState(false);
             </section>
 
             {/* RESULTS TABLE */}
-            <div className="results-table mb-8 overflow-x-auto" style={{ position: 'relative', zIndex: 1 }}>
+            <div className="results-table mb-8" style={{ position: 'relative', zIndex: 1, overflow: 'visible', width: '100%' }}>
               {isLoadingResults ? (
                 <div className="flex items-center justify-center py-8">
                   <Icon name="Loader" size={32} className="animate-spin text-primary mr-2" />
@@ -645,28 +621,28 @@ const [showMobilePrintWarning, setShowMobilePrintWarning] = useState(false);
                 <span>2-POOR</span>
                 <span>1-VERY POOR</span>
               </div>
-              <div className="overflow-x-auto">
-                <table className="min-w-full border border-gray-300 rounded-lg mb-4">
+              <div className="w-full">
+                <table className="w-full table-fixed border border-gray-300 rounded-lg mb-4">
                   <thead>
                     <tr className="bg-gray-100">
-                      <th className="px-2 py-1">Handwriting</th>
-                      <th className="px-2 py-1">Punctuality</th>
-                      <th className="px-2 py-1">Initiative</th>
-                      <th className="px-2 py-1">Obedience</th>
-                      <th className="px-2 py-1">Honesty</th>
-                      <th className="px-2 py-1">Neatness</th>
-                      <th className="px-2 py-1">Attentiveness</th>
-                      <th className="px-2 py-1">Respect</th>
-                      <th className="px-2 py-1">Attitude</th>
-                      <th className="px-2 py-1">Creativity</th>
+                      <th className="px-1 py-1 text-xs font-semibold text-center break-words whitespace-normal">Handwriting</th>
+                      <th className="px-1 py-1 text-xs font-semibold text-center break-words whitespace-normal">Punctuality</th>
+                      <th className="px-1 py-1 text-xs font-semibold text-center break-words whitespace-normal">Initiative</th>
+                      <th className="px-1 py-1 text-xs font-semibold text-center break-words whitespace-normal">Obedience</th>
+                      <th className="px-1 py-1 text-xs font-semibold text-center break-words whitespace-normal">Honesty</th>
+                      <th className="px-1 py-1 text-xs font-semibold text-center break-words whitespace-normal">Neatness</th>
+                      <th className="px-1 py-1 text-xs font-semibold text-center break-words whitespace-normal">Attentiveness</th>
+                      <th className="px-1 py-1 text-xs font-semibold text-center break-words whitespace-normal">Respect</th>
+                      <th className="px-1 py-1 text-xs font-semibold text-center break-words whitespace-normal">Attitude</th>
+                      <th className="px-1 py-1 text-xs font-semibold text-center break-words whitespace-normal">Creativity</th>
                     </tr>
                   </thead>
                   <tbody>
                     <tr>
-                      {[
+                      {([
                         'handwriting', 'punctuality', 'initiative', 'obedience', 'honesty',
                         'neatness', 'attentiveness', 'respect', 'attitude', 'creativity'
-                      ].map(key => {
+                      ]).map(key => {
                         const value = overallResult?.[key];
                         let label = '';
                         if (value === 5) label = 'Excellent';
@@ -675,7 +651,7 @@ const [showMobilePrintWarning, setShowMobilePrintWarning] = useState(false);
                         else if (value === 2) label = 'Poor';
                         else if (value === 1) label = 'Very Poor';
                         return (
-                          <td className="px-2 py-1 text-center" key={key}>
+                          <td className="px-1 py-1 text-center break-words whitespace-normal" key={key}>
                             {value
                               ? <span className="font-bold">{value} - {label}</span>
                               : <span className="text-gray-400">Not marked</span>

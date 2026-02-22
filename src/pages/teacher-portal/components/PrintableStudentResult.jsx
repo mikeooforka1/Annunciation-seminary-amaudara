@@ -2,9 +2,12 @@
 import React from 'react';
 import ResultsTable from '../../results-analytics-portal/components/ResultsTable';
 
+const boldStyle = { fontWeight: 900 };
+const bolderStyle = { fontWeight: 700 };
+
 const PrintableStudentResult = ({ student, results, overallResult, className, term, totalStudentsInClass }) => (
   <div
-    id={`result-print-section-${student?._id || student?.id || student?.name || 'unknown'}`} // <-- Add this line
+    id={`result-print-section-${student?._id || student?.id || student?.name || 'unknown'}`}
     className="printable-student-result bg-white border rounded-lg shadow p-6 m-4"
     style={{
       width: '100%',
@@ -12,64 +15,89 @@ const PrintableStudentResult = ({ student, results, overallResult, className, te
       minHeight: '90vh',
       margin: '0 auto',
       display: 'block',
-      background: '#fff'
+      background: '#fff',
+      fontWeight: 700, // Make all text bolder by default
+      fontSize: '1.08rem', // Slightly larger for print clarity
     }}
   >
     {/* HEADER */}
-    <header className="mb-4 w-full">
+    <header className="mb-4 w-full" style={boldStyle}>
       <div className="flex flex-col items-center w-full">
         <img src="/assets/images/school_logo-1754996036714.jpg" alt="School Logo" style={{ width: 80, borderRadius: '50%' }} />
-        <h1 className="font-extrabold text-2xl text-center w-full">ANNUNCIATION SEMINARY AMAUDARA</h1>
-        <div className="text-sm text-center w-full font-extrabold">RENOVARE FACIEM TERRA</div>
-        <div className="text-xs text-center w-full font-extrabold">Isiala Ngwa South, Owerrinta Abia State</div>
-        <div className="text-xs text-center w-full font-extrabold">
-          Website: <a href="https://annunciationseminaryamaudara.online" className="text-blue-600 underline font-extrabold">www.annunciationseminaryamaudara.online</a>
+        <h1
+          className="text-2xl text-center w-full"
+          style={{ ...boldStyle, fontSize: '2.1rem', letterSpacing: '1px', marginBottom: 2 }}
+        >
+          ANNUNCIATION SEMINARY AMAUDARA
+        </h1>
+        <div className="text-sm text-center w-full" style={boldStyle}>RENOVARE FACIEM TERRA</div>
+        <div className="text-xs text-center w-full" style={{ ...boldStyle, color: '#fff' }}>
+          Website: <a href="https://annunciationseminaryamaudara.online" className="text-blue-600 underline" style={{ ...boldStyle, color: '#fff' }}>www.annunciationseminaryamaudara.online</a>
         </div>
       </div>
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-x-4 gap-y-2 mt-4 text-xs px-2 w-full">
-        <div className="text-white font-extrabold">
-          <span className="font-extrabold">Name:</span> <span className="font-extrabold">{student?.name || 'N/A'}</span>
-        </div>
-        <div className="text-white font-extrabold">
-          <span className="font-extrabold">Position:</span> <span className="font-extrabold">{overallResult?.position || 'N/A'}{totalStudentsInClass ? ` out of ${totalStudentsInClass}` : ''}</span>
-        </div>
-        <div className="text-white font-extrabold">
-          <span className="font-extrabold">Class:</span> <span className="font-extrabold">{className || 'N/A'}</span>
-        </div>
-        <div className="text-white font-extrabold">
-          <span className="font-extrabold">Term:</span> <span className="font-extrabold">{term || 'N/A'}</span>
-        </div>
+      {/* STUDENT INFO SECTION - MAKE THIS BIGGER AND BOLDER */}
+      <div
+        className="grid grid-cols-2 md:grid-cols-4 gap-x-4 gap-y-2 mt-4 px-2 w-full"
+        style={{
+          fontSize: '1.35rem', // Larger font
+          fontWeight: 900,      // Extra bold
+          letterSpacing: '0.5px',
+          marginBottom: '8px',
+          color: '#fff',        // <-- Make font color white
+           // Optional: add shadow for print contrast
+        }}
+      >
+        <div style={{color: '#fff'}}><span style={{color: '#fff'}}>Name:</span> <span style={{color: '#fff'}}>{student?.name || 'N/A'}</span></div>
+        <div style={{color: '#fff'}}><span style={{color: '#fff'}}>Position:</span> <span style={{color: '#fff'}}>{overallResult?.position || 'N/A'}{totalStudentsInClass ? ` out of ${totalStudentsInClass}` : ''}</span></div>
+        <div style={{color: '#fff'}}><span style={{color: '#fff'}}>Class:</span> <span style={{color: '#fff'}}>{className || 'N/A'}</span></div>
+        <div style={{color: '#fff'}}><span style={{color: '#fff'}}>Term:</span> <span style={{color: '#fff'}}>{term || 'N/A'}</span></div>
       </div>
-      <div className="grid grid-cols-2 gap-x-4 gap-y-2 mt-2 text-xs px-2 w-full">
-        <div className="text-white font-extrabold">
-          <span className="font-extrabold">Academic Session:</span> <span className="font-extrabold">{overallResult?.academicYear || '____'}</span>
-        </div>
-        <div className="text-white font-extrabold">
-          <span className="font-extrabold">Average:</span> <span className="font-extrabold">{overallResult?.average || '____'}</span>
-        </div>
+      <div
+        className="grid grid-cols-2 gap-x-4 gap-y-2 mt-2 px-2 w-full"
+        style={{
+          fontSize: '1.25rem', // Larger font
+          fontWeight: 900,      // Extra bold
+          letterSpacing: '0.5px',
+          marginBottom: '8px',
+          color: '#fff',        // <-- Make font color white
+           // Optional: add shadow for print contrast
+        }}
+      >
+        <div style={{color: '#fff'}}><span style={{color: '#fff'}}>Academic Session:</span> <span style={{color: '#fff'}}>{overallResult?.academicYear || '____'}</span></div>
+        <div style={{color: '#fff'}}><span style={{color: '#fff'}}>Average:</span> <span style={{color: '#fff'}}>{overallResult?.average || '____'}</span></div>
       </div>
-      <div className="mt-2 text-xs px-2 w-full text-white font-extrabold">
-        <span className="font-extrabold">Next Term Begins:</span> <span className="font-extrabold">{overallResult?.nextTerm || '____'}</span>
+      <div
+        className="mt-2 px-2 w-full"
+        style={{
+          fontSize: '1.25rem', // Larger font
+          fontWeight: 900,      // Extra bold
+          letterSpacing: '0.5px',
+          marginBottom: '8px',
+          color: '#fff',        // <-- Make font color white
+          // Optional: add shadow for print contrast
+        }}
+      >
+        <span style={{color: '#fff'}}>Next Term Begins:</span> <span style={{color: '#fff'}}>{overallResult?.nextTerm || '____'}</span>
       </div>
-      <hr style={{ margin: '16px auto', borderTop: '1px solid #ccc' }} />
+      <hr style={{ margin: '16px auto', borderTop: '2px solid #222' }} />
     </header>
 
     {/* SUBHEADING */}
-    <section style={{ marginBottom: '24px', textAlign: 'center' }}>
-      <h2 style={{ fontSize: '1.2rem', fontWeight: 'bold', marginBottom: '8px', textTransform: 'uppercase', letterSpacing: '1px' }}>
+    <section style={{ marginBottom: '24px', textAlign: 'center', ...boldStyle }}>
+      <h2 style={{ fontSize: '1.2rem', fontWeight: 900, marginBottom: '8px', textTransform: 'uppercase', letterSpacing: '1px' }}>
         COGNITIVE DOMAIN [PERFORMANCE IN SUBJECTS]
       </h2>
     </section>
 
     {/* RESULTS TABLE */}
-    <div className="results-table mb-8 overflow-x-auto" style={{ position: 'relative', zIndex: 1 }}>
+    <div className="results-table mb-8 overflow-x-auto" style={{ position: 'relative', zIndex: 1, ...bolderStyle }}>
       <ResultsTable results={results} />
     </div>
 
     {/* KEY RATING SECTION */}
-    <div className="key-rating-section" style={{ position: 'relative', zIndex: 1 }}>
-      <h3 className="font-bold text-lg mb-2 text-center">Key Rating</h3>
-      <div className="flex flex-wrap justify-center gap-2 text-sm mb-4">
+    <div className="key-rating-section" style={{ position: 'relative', zIndex: 1, ...bolderStyle }}>
+      <h3 className="font-bold text-lg mb-2 text-center" style={boldStyle}>Key Rating</h3>
+      <div className="flex flex-wrap justify-center gap-2 text-sm mb-4" style={bolderStyle}>
         <span>5-EXCELLENT</span>
         <span>4-VERY GOOD</span>
         <span>3-SATISFACTORY</span>
@@ -77,19 +105,19 @@ const PrintableStudentResult = ({ student, results, overallResult, className, te
         <span>1-VERY POOR</span>
       </div>
       <div className="w-full">
-        <table className="w-full table-fixed border border-gray-300 rounded-lg mb-4">
+        <table className="w-full table-fixed border border-gray-300 rounded-lg mb-4" style={bolderStyle}>
           <thead>
             <tr className="bg-gray-100">
-              <th className="px-1 py-1 text-xs font-semibold text-center break-words whitespace-normal">Handwriting</th>
-              <th className="px-1 py-1 text-xs font-semibold text-center break-words whitespace-normal">Punctuality</th>
-              <th className="px-1 py-1 text-xs font-semibold text-center break-words whitespace-normal">Initiative</th>
-              <th className="px-1 py-1 text-xs font-semibold text-center break-words whitespace-normal">Obedience</th>
-              <th className="px-1 py-1 text-xs font-semibold text-center break-words whitespace-normal">Honesty</th>
-              <th className="px-1 py-1 text-xs font-semibold text-center break-words whitespace-normal">Neatness</th>
-              <th className="px-1 py-1 text-xs font-semibold text-center break-words whitespace-normal">Attentiveness</th>
-              <th className="px-1 py-1 text-xs font-semibold text-center break-words whitespace-normal">Respect</th>
-              <th className="px-1 py-1 text-xs font-semibold text-center break-words whitespace-normal">Attitude</th>
-              <th className="px-1 py-1 text-xs font-semibold text-center break-words whitespace-normal">Creativity</th>
+              <th className="px-1 py-1 text-xs font-semibold text-center break-words whitespace-normal" style={boldStyle}>Handwriting</th>
+              <th className="px-1 py-1 text-xs font-semibold text-center break-words whitespace-normal" style={boldStyle}>Punctuality</th>
+              <th className="px-1 py-1 text-xs font-semibold text-center break-words whitespace-normal" style={boldStyle}>Initiative</th>
+              <th className="px-1 py-1 text-xs font-semibold text-center break-words whitespace-normal" style={boldStyle}>Obedience</th>
+              <th className="px-1 py-1 text-xs font-semibold text-center break-words whitespace-normal" style={boldStyle}>Honesty</th>
+              <th className="px-1 py-1 text-xs font-semibold text-center break-words whitespace-normal" style={boldStyle}>Neatness</th>
+              <th className="px-1 py-1 text-xs font-semibold text-center break-words whitespace-normal" style={boldStyle}>Attentiveness</th>
+              <th className="px-1 py-1 text-xs font-semibold text-center break-words whitespace-normal" style={boldStyle}>Respect</th>
+              <th className="px-1 py-1 text-xs font-semibold text-center break-words whitespace-normal" style={boldStyle}>Attitude</th>
+              <th className="px-1 py-1 text-xs font-semibold text-center break-words whitespace-normal" style={boldStyle}>Creativity</th>
             </tr>
           </thead>
           <tbody>
@@ -106,10 +134,10 @@ const PrintableStudentResult = ({ student, results, overallResult, className, te
                 else if (value === 2) label = 'Poor';
                 else if (value === 1) label = 'Very Poor';
                 return (
-                  <td className="px-1 py-1 text-center break-words whitespace-normal" key={key}>
+                  <td className="px-1 py-1 text-center break-words whitespace-normal" key={key} style={bolderStyle}>
                     {value
-                      ? <span className="font-bold">{value} - {label}</span>
-                      : <span className="text-gray-400">Not marked</span>
+                      ? <span style={boldStyle}>{value} - {label}</span>
+                      : <span className="text-gray-400" style={bolderStyle}>Not marked</span>
                     }
                   </td>
                 );
@@ -123,14 +151,14 @@ const PrintableStudentResult = ({ student, results, overallResult, className, te
     {/* COMMENTS SECTION */}
     <div
       className="comments-section grid grid-cols-1 md:grid-cols-3 gap-4 justify-between mt-4 w-full"
-      style={{ position: 'relative', zIndex: 1 }}
+      style={{ position: 'relative', zIndex: 1, ...bolderStyle }}
     >
       <div className="flex flex-col">
-        <label className="font-semibold mb-1">Deans Remark:</label>
-        <div className="border rounded px-2 py-1 min-h-[32px]">{overallResult?.teacherComment || '_________________________'}</div>
+        <label className="mb-1" style={boldStyle}>Deans Remark:</label>
+        <div className="border rounded px-2 py-1 min-h-[32px]" style={bolderStyle}>{overallResult?.teacherComment || '_________________________'}</div>
       </div>
       <div className="flex flex-col items-center justify-center">
-        <label className="font-semibold mb-1">Rector's Signature:</label>
+        <label className="mb-1" style={boldStyle}>Rector's Signature:</label>
         <div className="flex items-center mt-2 justify-center">
           <img
             src="/assets/images/rector-signature.jpg"
@@ -141,8 +169,8 @@ const PrintableStudentResult = ({ student, results, overallResult, className, te
         </div>
       </div>
       <div className="flex flex-col">
-        <label className="font-semibold mb-1">Rectors Remark:</label>
-        <div className="border rounded px-2 py-1 min-h-[32px]">{overallResult?.headTeacherRemark || '_________________________'}</div>
+        <label className="mb-1" style={boldStyle}>Rectors Remark:</label>
+        <div className="border rounded px-2 py-1 min-h-[32px]" style={bolderStyle}>{overallResult?.headTeacherRemark || '_________________________'}</div>
       </div>
     </div>
   </div>

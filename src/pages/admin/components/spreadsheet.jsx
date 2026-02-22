@@ -2,6 +2,8 @@ import React, { useEffect, useState } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 import { TiArrowBackOutline } from "react-icons/ti";
 import { FixedSizeList as List } from 'react-window';
+import { addToQueue, getQueue, clearQueue } from '../../../utils/offlineQueue';
+import { loadOfflineState, saveOfflineState } from '../../../utils/offlineQueue';
 
 const API_BASE_URL = process.env.REACT_APP_API_BASE_URL;
 
@@ -24,6 +26,12 @@ const Spreadsheet = () => {
   const [studentSearch, setStudentSearch] = useState(""); // For filtering students
   const saveQueue = React.useRef({}); // { [studentId]: Promise } to serialize saves per student
   const [subjectsOrder, setSubjectsOrder] = useState([]);
+  const [showSyncModal, setShowSyncModal] = useState(false);
+  const [syncMessage, setSyncMessage] = useState('');
+  const [wasOffline, setWasOffline] = useState(false);
+  const [syncing, setSyncing] = useState(false);
+  const [deferredPrompt, setDeferredPrompt] = useState(null);
+  const [showInstallBtn, setShowInstallBtn] = useState(false);
 
   useEffect(() => {
     let didSetFromState = false;
@@ -102,7 +110,21 @@ const Spreadsheet = () => {
       didSetFromState = true;
     }
 
-    // 2. Always fetch latest from backend for sustainability (on page load, refresh, or after save)
+    // 2. If offline, load from IndexedDB and skip backend fetch
+    if (!navigator.onLine) {
+      (async () => {
+        const offlineState = await loadOfflineState();
+        if (offlineState) {
+          setStudents(offlineState.students || []);
+          setEditResults(offlineState.editResults || {});
+          setSubjects(offlineState.subjects || []);
+          setSubjectsOrder(offlineState.subjectsOrder || []);
+        }
+      })();
+      return; // <-- Prevent backend fetch
+    }
+
+    // 3. Always fetch latest from backend for sustainability (on page load, refresh, or after save)
     if (!selectedClass || !selectedTerm) return;
     setLoading(true);
 
@@ -213,8 +235,19 @@ const Spreadsheet = () => {
       const updated = { ...prev };
       if (!updated[studentId]) updated[studentId] = {};
       if (!updated[studentId][subject]) updated[studentId][subject] = {};
-      updated[studentId][subject][field] = value;
-      if (field === "cat") updated[studentId][subject]["cat1"] = value;
+
+      // Clamp CAT and Exam scores
+      let newValue = value;
+      if (field === "cat") {
+        newValue = Math.max(0, Math.min(Number(value), 30));
+        updated[studentId][subject][field] = newValue;
+        updated[studentId][subject]["cat1"] = newValue;
+      } else if (field === "exam") {
+        newValue = Math.max(0, Math.min(Number(value), 70));
+        updated[studentId][subject][field] = newValue;
+      } else {
+        updated[studentId][subject][field] = value;
+      }
 
       if (field === "cat" || field === "exam") {
         const cat = Number(updated[studentId][subject].cat ?? updated[studentId][subject].cat1 ?? 0);
@@ -223,8 +256,18 @@ const Spreadsheet = () => {
         updated[studentId][subject].grade = getGrade(total);
         updated[studentId][subject].remark = getRemark(updated[studentId][subject].grade);
       }
-      // Save with the latest state
+
+      // Always queue/save the action for offline persistence
       saveStudentResults(studentId, updated);
+
+      // Always save offline state for persistence (even online)
+      saveOfflineState({
+        students,
+        editResults: updated,
+        subjects,
+        subjectsOrder
+      });
+
       return updated;
     });
     setEditedStudents(prev => new Set(prev).add(studentId));
@@ -238,6 +281,13 @@ const Spreadsheet = () => {
       updated[studentId]._overall[field] = value;
       // Save with the latest state
       saveStudentResults(studentId, updated);
+      // Save offline state for persistence
+      saveOfflineState({
+        students,
+        editResults: updated,
+        subjects,
+        subjectsOrder
+      });
       return updated;
     });
     setEditedStudents(prev => new Set(prev).add(studentId));
@@ -354,9 +404,21 @@ const fetchUpdatedResultsForEdited = async () => {
   }
   setEditResults(updatedEditResults);
 };
-const saveStudentResults = async (studentId, nextEditResults = null) => {
-  // Use the latest editResults (from param or state)
+async function saveStudentResults(studentId, nextEditResults = null) {
   const results = nextEditResults || editResults;
+  const action = {
+    type: 'saveStudentResults',
+    studentId,
+    results,
+    subjects,
+  };
+
+  if (!navigator.onLine) {
+    await addToQueue(action);
+    // No modal here!
+    return;
+  }
+
   // Chain saves for this student to avoid race conditions
   if (!saveQueue.current[studentId]) saveQueue.current[studentId] = Promise.resolve();
 
@@ -459,6 +521,102 @@ const saveStudentResults = async (studentId, nextEditResults = null) => {
     alert("All changes saved!");
   };
 
+  useEffect(() => {
+  async function syncQueue() {
+    if (navigator.onLine && wasOffline) {
+      setSyncMessage("You are now online. Offline changes will be synced to the online database.");
+      setShowSyncModal(true);
+      setSyncing(true);
+
+      const queue = await getQueue();
+      let synced = false;
+      for (const action of queue) {
+        if (action.type === 'saveStudentResults') {
+          for (const subject of action.subjects) {
+            const subjEdit = action.results[action.studentId]?.[subject];
+            if (subjEdit && !subjEdit.notOffering && subjEdit._id) {
+              await fetch(`${API_BASE_URL}/api/results/update/${subjEdit._id}`, {
+                method: 'PUT',
+                body: JSON.stringify({
+                  firstCatScore: Number(subjEdit.cat ?? 0),
+                  examScore: Number(subjEdit.exam ?? 0),
+                  grade: subjEdit.grade ?? "",
+                  remark: subjEdit.remark ?? "",
+                  reviewed: false,
+                  pending: true,
+                  verified: false
+                }),
+                headers: { 'Content-Type': 'application/json' }
+              });
+            }
+          }
+          const overall = action.results[action.studentId]?._overall;
+          if (overall && overall._id) {
+            await fetch(`${API_BASE_URL}/api/results/update/${overall._id}`, {
+              method: 'PUT',
+              body: JSON.stringify({
+                handwriting: overall.handwriting,
+                punctuality: overall.punctuality,
+                initiative: overall.initiative,
+                obedience: overall.obedience,
+                honesty: overall.honesty,
+                neatness: overall.neatness,
+                attentiveness: overall.attentiveness,
+                respect: overall.respect,
+                attitude: overall.attitude,
+                creativity: overall.creativity,
+                reviewed: false,
+                pending: true,
+                verified: false
+              }),
+              headers: { 'Content-Type': 'application/json' }
+            });
+          }
+          synced = true;
+        }
+      }
+      if (synced) {
+        await clearQueue();
+        setSyncMessage("Offline changes have been synced to the online database.");
+      }
+      setSyncing(false);
+      setWasOffline(false);
+    }
+  }
+
+  window.addEventListener('online', syncQueue);
+  syncQueue();
+
+  return () => window.removeEventListener('online', syncQueue);
+}, [wasOffline]);
+useEffect(() => {
+  function handleOffline() {
+    setSyncMessage("You are now working offline. Changes will sync when online.");
+    setShowSyncModal(true);
+    setWasOffline(true);
+  }
+
+  window.addEventListener('offline', handleOffline);
+
+  // Show modal if page loads offline
+  if (!navigator.onLine) {
+    setWasOffline(true); // <-- Ensure wasOffline is set!
+    handleOffline();
+  }
+
+  return () => {
+    window.removeEventListener('offline', handleOffline);
+  };
+}, []);
+useEffect(() => {
+  function handleBeforeInstallPrompt(e) {
+    e.preventDefault();
+    setDeferredPrompt(e);
+    setShowInstallBtn(true);
+  }
+  window.addEventListener('beforeinstallprompt', handleBeforeInstallPrompt);
+  return () => window.removeEventListener('beforeinstallprompt', handleBeforeInstallPrompt);
+}, []);
   // --- Add: Live position & average calculation for all students (same as verify-result.jsx) ---
   useEffect(() => {
     if (students.length > 0) {
@@ -591,6 +749,23 @@ const saveStudentResults = async (studentId, nextEditResults = null) => {
 
   return (
     <div className="p-4">
+      {/* Online/Offline Status Indicator */}
+      <div className="flex items-center mb-4">
+        <span
+          style={{
+            display: "inline-block",
+            width: 12,
+            height: 12,
+            borderRadius: "50%",
+            background: navigator.onLine ? "#22c55e" : "#f87171",
+            marginRight: 8,
+            border: "1px solid #222"
+          }}
+        ></span>
+        <span className="font-bold" style={{ color: navigator.onLine ? "#22c55e" : "#f87171" }}>
+          {navigator.onLine ? "Online" : "Offline"}
+        </span>
+      </div>
       {/* Back Button */}
       <button
         className="flex items-center mb-4 px-3 py-2 bg-gray-200 hover:bg-gray-300 rounded text-gray-800 font-semibold"
@@ -1066,6 +1241,66 @@ const saveStudentResults = async (studentId, nextEditResults = null) => {
       </div>
     </div>
   </div>
+)}
+
+{showSyncModal && (
+  <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40">
+    <div className="bg-white rounded-lg shadow-lg p-6 w-full max-w-sm text-center">
+      <h3 className="font-bold text-lg mb-4">Sync Status</h3>
+      <p className="mb-4">{syncMessage}</p>
+      {syncing && (
+        <div className="flex justify-center mb-4">
+          <svg
+            style={{ width: 32, height: 32, margin: "auto", display: "block" }}
+            viewBox="0 0 50 50"
+          >
+            <circle
+              cx="25"
+              cy="25"
+              r="20"
+              fill="none"
+              stroke="#2563eb"
+              strokeWidth="5"
+              strokeLinecap="round"
+              strokeDasharray="31.4 31.4"
+            >
+              <animateTransform
+                attributeName="transform"
+                type="rotate"
+                from="0 25 25"
+                to="360 25 25"
+                dur="1s"
+                repeatCount="indefinite"
+              />
+            </circle>
+          </svg>
+        </div>
+      )}
+      {!syncing && (
+        <button
+          className="px-4 py-2 bg-primary text-white rounded"
+          onClick={() => setShowSyncModal(false)}
+        >
+          OK
+        </button>
+      )}
+    </div>
+  </div>
+)}
+
+{/* Add to Home Screen Button */}
+{showInstallBtn && (
+  <button
+    className="mb-4 px-4 py-2 bg-green-600 text-white rounded"
+    onClick={() => {
+      if (deferredPrompt) {
+        deferredPrompt.prompt();
+        setShowInstallBtn(false);
+      }
+    }}
+  >
+    Add Spreadsheet to Home Screen
+  </button>
 )}
 
     </div>

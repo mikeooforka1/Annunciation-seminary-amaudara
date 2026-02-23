@@ -315,8 +315,6 @@ blockquote, .quote {
 
 
 
-
-
 button.publish-btn {
   background: linear-gradient(90deg, #bd1919 0%, #b91c1c 100%) !important; /* red */
   color: #fff !important;
@@ -342,4 +340,6 @@ button.draft-btn {
 .icon-delete-btn:hover {
   background: #fee2e2 !important; /* Tailwind red-100 */
 }
+
+
 

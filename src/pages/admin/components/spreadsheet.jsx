@@ -17,14 +17,14 @@ const Spreadsheet = () => {
   const [subjects, setSubjects] = useState([]);
   const [resultsMap, setResultsMap] = useState({});
   const [loading, setLoading] = useState(false);
-  const [saving, setSaving] = useState(false); // Add this line
-  const [confirmRemoveSubject, setConfirmRemoveSubject] = useState(null); // subject name to confirm
-  const [showDeleteConfirmModal, setShowDeleteConfirmModal] = useState(null); // { type, subject }
+  const [saving, setSaving] = useState(false);
+  const [confirmRemoveSubject, setConfirmRemoveSubject] = useState(null);
+  const [showDeleteConfirmModal, setShowDeleteConfirmModal] = useState(null);
   const [editedStudents, setEditedStudents] = useState(new Set());
-  const [showStudentSelectModal, setShowStudentSelectModal] = useState(null); // { subject }
+  const [showStudentSelectModal, setShowStudentSelectModal] = useState(null);
   const [selectedStudentForDelete, setSelectedStudentForDelete] = useState(null);
-  const [studentSearch, setStudentSearch] = useState(""); // For filtering students
-  const saveQueue = React.useRef({}); // { [studentId]: Promise } to serialize saves per student
+  const [studentSearch, setStudentSearch] = useState("");
+  const saveQueue = React.useRef({});
   const [subjectsOrder, setSubjectsOrder] = useState([]);
   const [showSyncModal, setShowSyncModal] = useState(false);
   const [syncMessage, setSyncMessage] = useState('');
@@ -34,7 +34,20 @@ const Spreadsheet = () => {
   const [showInstallBtn, setShowInstallBtn] = useState(false);
   const [hasShownOnlineModal, setHasShownOnlineModal] = useState(false);
 
-   const fetchData = async () => {
+  // --- New state for 3-dot dropdown ---
+  const [openDropdownSubject, setOpenDropdownSubject] = useState(null);
+  const [showAddSubjectAllModal, setShowAddSubjectAllModal] = useState(false);
+  const [showAddSubjectIndividualModal, setShowAddSubjectIndividualModal] = useState(false);
+  const [newSubjectName, setNewSubjectName] = useState('');
+  const [addSubjectStudentSearch, setAddSubjectStudentSearch] = useState('');
+  const [selectedStudentForAdd, setSelectedStudentForAdd] = useState(null);
+  const [showAddSubjectIndividualConfirm, setShowAddSubjectIndividualConfirm] = useState(false);
+  const [addSubjectLoading, setAddSubjectLoading] = useState(false);
+  const [addSubjectForSubject, setAddSubjectForSubject] = useState(null);
+
+  const [resultStatusMap, setResultStatusMap] = useState(location.state?.verifiedStudents || {});
+
+  const fetchData = async () => {
       try {
         const res = await fetch(`${API_BASE_URL}/api/user/class/${selectedClass}/all/students?term=${selectedTerm}`);
         let studentData = await res.json();
@@ -108,7 +121,7 @@ const Spreadsheet = () => {
         });
 
         Object.keys(editMap).forEach(studentId => {
-          const studentSubjects = Object.keys(editMap[studentId]).filter(s => s !== "_overall" && editMap[studentId][s] && !editMap[studentId][s].notOffering);
+          const studentSubjects = Object.keys(editMap[studentId]).filter(s => s !== "_overall" && s !== "subjects" && editMap[studentId][s] && !editMap[studentId][s].notOffering);
           allSubjectsOrdered.forEach(subject => {
             if (!studentSubjects.includes(subject)) {
               editMap[studentId][subject] = { notOffering: true };
@@ -117,23 +130,23 @@ const Spreadsheet = () => {
         });
 
         setSubjects(allSubjectsOrdered);
+        setSubjectsOrder(allSubjectsOrdered);
         setResultsMap(map);
         setEditResults(editMap);
         setLoading(false);
       } catch (err) {
         setStudents([]);
         setSubjects([]);
+        setSubjectsOrder([]);
         setResultsMap({});
         setEditResults({});
         setLoading(false);
       }
     };
 
-
   useEffect(() => {
     let didSetFromState = false;
 
-    // 1. If data is passed from verify page, use it for instant load
     if (
       location.state?.students &&
       location.state?.editResults &&
@@ -141,7 +154,6 @@ const Spreadsheet = () => {
     ) {
       setStudents(location.state.students);
 
-      // Build subject list from all students' subjects (in order, no duplicates)
       const allSubjectsOrdered = [];
       const allSubjectsSet = new Set();
       location.state.students.forEach(student => {
@@ -154,15 +166,13 @@ const Spreadsheet = () => {
         });
       });
       setSubjects(allSubjectsOrdered);
-      setSubjectsOrder(allSubjectsOrdered); // <-- Save the initial order
+      setSubjectsOrder(allSubjectsOrdered);
 
-      // Map all fields for each student exactly as in verify page
       const fixedEditResults = {};
       location.state.students.forEach(student => {
         const result = location.state.editResults[student._id] || {};
         fixedEditResults[student._id] = {};
 
-        // Copy all subject results
         if (Array.isArray(result.subjects)) {
           fixedEditResults[student._id].subjects = [...result.subjects];
           result.subjects.forEach(subject => {
@@ -170,7 +180,6 @@ const Spreadsheet = () => {
           });
         }
 
-        // Copy all meta/key fields (including key ratings, position, average, etc.)
         [
           "_overallId", "position", "average", "schoolOpened", "present", "absent",
           "teacherComment", "headTeacherRemark", "academicYear", "nextTerm",
@@ -182,7 +191,6 @@ const Spreadsheet = () => {
           }
         });
 
-        // For spreadsheet compatibility, also nest key ratings/meta under _overall
         fixedEditResults[student._id]._overall = {
           handwriting: result.handwriting ?? "",
           punctuality: result.punctuality ?? "",
@@ -207,7 +215,6 @@ const Spreadsheet = () => {
       didSetFromState = true;
     }
 
-    // 2. If offline, load from IndexedDB and skip backend fetch
     if (!navigator.onLine) {
       (async () => {
         const offlineState = await loadOfflineState();
@@ -218,26 +225,21 @@ const Spreadsheet = () => {
           setSubjectsOrder(offlineState.subjectsOrder || []);
         }
       })();
-      return; // <-- Prevent backend fetch
+      return;
     }
 
-    // 3. Always fetch latest from backend for sustainability (on page load, refresh, or after save)
     if (!selectedClass || !selectedTerm) return;
     setLoading(true);
 
-   
-    // Always fetch from backend for sustainability
     fetchData();
   }, [selectedClass, selectedTerm, location.state]);
 
-  // Handle input change for scores and key ratings
   const handleInputChange = (studentId, subject, field, value) => {
     setEditResults(prev => {
       const updated = { ...prev };
       if (!updated[studentId]) updated[studentId] = {};
       if (!updated[studentId][subject]) updated[studentId][subject] = {};
 
-      // Clamp CAT and Exam scores
       let newValue = value;
       if (field === "cat") {
         newValue = Math.max(0, Math.min(Number(value), 30));
@@ -258,10 +260,8 @@ const Spreadsheet = () => {
         updated[studentId][subject].remark = getRemark(updated[studentId][subject].grade);
       }
 
-      // Always queue/save the action for offline persistence
       saveStudentResults(studentId, updated);
 
-      // Always save offline state for persistence (even online)
       saveOfflineState({
         students,
         editResults: updated,
@@ -280,9 +280,7 @@ const Spreadsheet = () => {
       if (!updated[studentId]) updated[studentId] = {};
       if (!updated[studentId]._overall) updated[studentId]._overall = {};
       updated[studentId]._overall[field] = value;
-      // Save with the latest state
       saveStudentResults(studentId, updated);
-      // Save offline state for persistence
       saveOfflineState({
         students,
         editResults: updated,
@@ -294,9 +292,7 @@ const Spreadsheet = () => {
     setEditedStudents(prev => new Set(prev).add(studentId));
   };
 
-  // Remove subject for all students
   const handleRemoveSubjectAll = async (subject) => {
-    // 1. Collect all subject result IDs to delete
     const subjectResultIds = [];
     Object.keys(editResults).forEach(studentId => {
       const subjObj = editResults[studentId]?.[subject];
@@ -305,132 +301,431 @@ const Spreadsheet = () => {
       }
     });
 
-    // 2. Update local state for all students (remove subject from subjects array and object)
+    const newSubjects = subjects.filter(s => s !== subject);
+    const newSubjectsOrder = subjectsOrder.filter(s => s !== subject);
+
     setEditResults(prevResults => {
       const updatedResults = { ...prevResults };
       Object.keys(updatedResults).forEach(studentId => {
         if (updatedResults[studentId]) {
-          Object.keys(updatedResults[studentId]).forEach(key => {
-            if (key === subject || key.startsWith(`${subject}_`)) {
-              delete updatedResults[studentId][key];
+          const copy = { ...updatedResults[studentId] };
+          delete copy[subject];
+          Object.keys(copy).forEach(key => {
+            if (key.startsWith(`${subject}_`)) {
+              delete copy[key];
             }
           });
-          if (Array.isArray(updatedResults[studentId].subjects)) {
-            updatedResults[studentId].subjects = updatedResults[studentId].subjects.filter(s => s !== subject);
+          if (Array.isArray(copy.subjects)) {
+            copy.subjects = copy.subjects.filter(s => s !== subject);
           }
+          updatedResults[studentId] = copy;
         }
       });
+
+      // Save offline state after update
+      saveOfflineState({
+        students,
+        editResults: updatedResults,
+        subjects: newSubjects,
+        subjectsOrder: newSubjectsOrder
+      });
+
       return updatedResults;
     });
 
-    setSubjects(prev => prev.filter(s => s !== subject));
-    setSubjectsOrder(prev => prev.filter(s => s !== subject));
+    setSubjects(newSubjects);
+    setSubjectsOrder(newSubjectsOrder);
 
-    // 3. Call backend API to delete subject results for all students
-    for (const resultId of subjectResultIds) {
-      try {
-        await fetch(`${API_BASE_URL}/api/results/delete/${resultId}`, {
-          method: 'DELETE'
+    if (navigator.onLine) {
+      for (const resultId of subjectResultIds) {
+        try {
+          await fetch(`${API_BASE_URL}/api/results/delete/${resultId}`, {
+            method: 'DELETE'
+          });
+        } catch (err) {}
+      }
+    } else {
+      // Queue each delete for syncing later
+      for (const resultId of subjectResultIds) {
+        await addToQueue({
+          type: 'deleteResult',
+          resultId
         });
-      } catch (err) {
-        // Optionally handle error
       }
     }
   };
 
-  // Remove subject for individual student
   const handleRemoveSubjectIndividual = async (studentId, subject) => {
-    // 1. Mark notOffering in local state
+    const subjObj = editResults[studentId]?.[subject];
+    const resultId = subjObj?._id;
+
     setEditResults(prev => {
       const updated = { ...prev };
       if (!updated[studentId]) updated[studentId] = {};
-      if (!updated[studentId][subject]) updated[studentId][subject] = {};
-      updated[studentId][subject].notOffering = true;
-      // Remove subject from subjects array if present
+      updated[studentId] = { ...updated[studentId] };
+      updated[studentId][subject] = { ...updated[studentId][subject], notOffering: true };
       if (Array.isArray(updated[studentId].subjects)) {
         updated[studentId].subjects = updated[studentId].subjects.filter(s => s !== subject);
       }
+
+      // Save offline state after update
+      saveOfflineState({
+        students,
+        editResults: updated,
+        subjects,
+        subjectsOrder
+      });
+
       return updated;
     });
 
-    // 2. Call backend API to delete subject for this student (same as verify page)
-    const subjObj = editResults[studentId]?.[subject];
-    if (subjObj && subjObj._id) {
-      try {
-        await fetch(`${API_BASE_URL}/api/results/delete/${subjObj._id}`, {
-          method: 'DELETE'
+    if (resultId) {
+      if (navigator.onLine) {
+        try {
+          await fetch(`${API_BASE_URL}/api/results/delete/${resultId}`, {
+            method: 'DELETE'
+          });
+        } catch (err) {}
+      } else {
+        await addToQueue({
+          type: 'deleteResult',
+          resultId
         });
-      } catch (err) {
-        // Optionally handle error
       }
     }
   };
-  
-const fetchUpdatedResultsForEdited = async () => {
-  const updatedEditResults = { ...editResults };
-  for (const studentId of editedStudents) {
-    const res = await fetch(`${API_BASE_URL}/api/results/student/${studentId}/pushed?className=${selectedClass}&term=${selectedTerm}`);
-    const results = await res.json();
-    const studentResult = {};
-    const subjects = [];
-    results.forEach(r => {
-      if (r.subject && r.subject !== "Overall") {
-        subjects.push(r.subject);
-        studentResult[r.subject] = {
-          cat: r.firstCatScore ?? "",
-          exam: r.examScore ?? "",
-          grade: r.grade ?? "",
-          remark: r.remark ?? "",
-          _id: r._id,
+
+  // --- Add Subject for All Students ---
+  const handleAddSubjectAll = async () => {
+    const subject = newSubjectName.trim();
+    if (!subject) return;
+    if (subjects.includes(subject)) {
+      alert(`Subject "${subject}" already exists.`);
+      return;
+    }
+    setAddSubjectLoading(true);
+
+    const updatedSubjects = [...subjects, subject];
+    const updatedSubjectsOrder = [...subjectsOrder, subject];
+
+    // Update local state immediately
+    setEditResults(prev => {
+      const updated = { ...prev };
+      students.forEach(student => {
+        if (!updated[student._id]) updated[student._id] = {};
+        updated[student._id] = { ...updated[student._id] };
+        updated[student._id][subject] = {
+          cat: "",
+          exam: "",
+          grade: "",
+          remark: "",
+          _id: null,
           notOffering: false
         };
-      } else if (r.subject === "Overall") {
-        studentResult._overall = {
-          ...r,
-          handwriting: r.handwriting ?? "",
-          punctuality: r.punctuality ?? "",
-          initiative: r.initiative ?? "",
-          obedience: r.obedience ?? "",
-          honesty: r.honesty ?? "",
-          neatness: r.neatness ?? "",
-          attentiveness: r.attentiveness ?? "",
-          respect: r.respect ?? "",
-          attitude: r.attitude ?? "",
-          creativity: r.creativity ?? ""
-        };
-      }
+        if (Array.isArray(updated[student._id].subjects)) {
+          if (!updated[student._id].subjects.includes(subject)) {
+            updated[student._id].subjects = [...updated[student._id].subjects, subject];
+          }
+        } else {
+          updated[student._id].subjects = [subject];
+        }
+      });
+
+      saveOfflineState({
+        students,
+        editResults: updated,
+        subjects: updatedSubjects,
+        subjectsOrder: updatedSubjectsOrder
+      });
+
+      return updated;
     });
-    studentResult.subjects = subjects;
-    updatedEditResults[studentId] = studentResult;
-  }
-  setEditResults(updatedEditResults);
-};
-async function saveStudentResults(studentId, nextEditResults = null) {
-  const results = nextEditResults || editResults;
-  const action = {
-    type: 'saveStudentResults',
-    studentId,
-    results,
-    subjects,
+
+    setSubjects(updatedSubjects);
+    setSubjectsOrder(updatedSubjectsOrder);
+
+    if (navigator.onLine) {
+      try {
+        const setRes = await fetch(`${API_BASE_URL}/api/class-subjects/set`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            className: selectedClass,
+            term: selectedTerm,
+            subjects: updatedSubjects
+          }),
+        });
+        if (!setRes.ok) {
+          const err = await setRes.json();
+          alert(`Failed to update class subjects: ${err.error || 'Unknown error'}`);
+          setAddSubjectLoading(false);
+          return;
+        }
+
+        let failCount = 0;
+        for (const student of students) {
+          const addRes = await fetch(`${API_BASE_URL}/api/class-subjects/add-subject-individual`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              studentId: student._id,
+              className: selectedClass,
+              term: selectedTerm,
+              subject
+            }),
+          });
+          if (!addRes.ok) {
+            const errData = await addRes.json().catch(() => ({}));
+            if (errData.error && !errData.error.includes('already exists')) {
+              failCount++;
+              console.error(`Failed to add subject for student ${student._id}:`, errData.error);
+            }
+          }
+        }
+
+        if (failCount > 0) {
+          alert(`Subject added but failed for ${failCount} student(s). Check console for details.`);
+        }
+
+        // Refresh to get _id values from backend
+        setLoading(true);
+        await fetchData();
+      } catch (err) {
+        console.error('Error adding subject for all:', err);
+        alert('An error occurred while adding the subject.');
+      }
+    } else {
+      // Queue for syncing later
+      await addToQueue({
+        type: 'addSubjectAll',
+        className: selectedClass,
+        term: selectedTerm,
+        subject,
+        studentIds: students.map(s => s._id)
+      });
+    }
+
+    setNewSubjectName('');
+    setShowAddSubjectAllModal(false);
+    setOpenDropdownSubject(null);
+    setAddSubjectLoading(false);
   };
 
-  if (!navigator.onLine) {
-    await addToQueue(action);
-    return;
-  }
+  // --- Add Subject for Individual Student ---
+  const handleAddSubjectIndividual = async () => {
+    const subject = addSubjectForSubject || newSubjectName.trim();
+    if (!subject || !selectedStudentForAdd) return;
+    setAddSubjectLoading(true);
 
-  // Online: save directly to backend, do NOT add to queue
-  saveQueue.current[studentId] = (saveQueue.current[studentId] || Promise.resolve()).then(async () => {
-    for (const subject of subjects) {
-      const subjEdit = results[studentId]?.[subject];
-      if (subjEdit && !subjEdit.notOffering && subjEdit._id) {
-        await fetch(`${API_BASE_URL}/api/results/update/${subjEdit._id}`, {
+    const needsNewSubjectColumn = !subjects.includes(subject);
+    const updatedSubjects = needsNewSubjectColumn ? [...subjects, subject] : subjects;
+    const updatedSubjectsOrder = needsNewSubjectColumn ? [...subjectsOrder, subject] : subjectsOrder;
+
+    // Update local state immediately
+    setEditResults(prev => {
+      const updated = { ...prev };
+      if (!updated[selectedStudentForAdd]) updated[selectedStudentForAdd] = {};
+      updated[selectedStudentForAdd] = { ...updated[selectedStudentForAdd] };
+      updated[selectedStudentForAdd][subject] = {
+        cat: "",
+        exam: "",
+        grade: "",
+        remark: "",
+        _id: null,
+        notOffering: false
+      };
+      if (Array.isArray(updated[selectedStudentForAdd].subjects)) {
+        if (!updated[selectedStudentForAdd].subjects.includes(subject)) {
+          updated[selectedStudentForAdd].subjects = [...updated[selectedStudentForAdd].subjects, subject];
+        }
+      } else {
+        updated[selectedStudentForAdd].subjects = [subject];
+      }
+
+      // If new subject column, mark all other students as notOffering
+      if (needsNewSubjectColumn) {
+        students.forEach(student => {
+          if (student._id !== selectedStudentForAdd) {
+            if (!updated[student._id]) updated[student._id] = {};
+            updated[student._id] = { ...updated[student._id] };
+            if (!updated[student._id][subject]) {
+              updated[student._id][subject] = { notOffering: true };
+            }
+          }
+        });
+      }
+
+      // Save offline state after update
+      saveOfflineState({
+        students,
+        editResults: updated,
+        subjects: updatedSubjects,
+        subjectsOrder: updatedSubjectsOrder
+      });
+
+      return updated;
+    });
+
+    if (needsNewSubjectColumn) {
+      setSubjects(updatedSubjects);
+      setSubjectsOrder(updatedSubjectsOrder);
+    }
+
+    if (navigator.onLine) {
+      try {
+        if (needsNewSubjectColumn) {
+          const setRes = await fetch(`${API_BASE_URL}/api/class-subjects/set`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              className: selectedClass,
+              term: selectedTerm,
+              subjects: updatedSubjects
+            }),
+          });
+          if (!setRes.ok) {
+            const err = await setRes.json();
+            alert(`Failed to update class subjects: ${err.error || 'Unknown error'}`);
+            setAddSubjectLoading(false);
+            return;
+          }
+        }
+
+        const addRes = await fetch(`${API_BASE_URL}/api/class-subjects/add-subject-individual`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            studentId: selectedStudentForAdd,
+            className: selectedClass,
+            term: selectedTerm,
+            subject
+          }),
+        });
+
+        if (!addRes.ok) {
+          const errData = await addRes.json().catch(() => ({}));
+          alert(`Failed to add subject: ${errData.error || 'Unknown error'}`);
+          setAddSubjectLoading(false);
+          return;
+        }
+
+        // Refresh to get _id values from backend
+        setLoading(true);
+        await fetchData();
+      } catch (err) {
+        console.error('Error adding subject for individual:', err);
+        alert('An error occurred while adding the subject.');
+      }
+    } else {
+      // Queue for syncing later
+      await addToQueue({
+        type: 'addSubjectIndividual',
+        className: selectedClass,
+        term: selectedTerm,
+        subject,
+        studentId: selectedStudentForAdd,
+        needsNewSubjectColumn,
+        allSubjects: updatedSubjects
+      });
+    }
+
+    setNewSubjectName('');
+    setSelectedStudentForAdd(null);
+    setShowAddSubjectIndividualConfirm(false);
+    setShowAddSubjectIndividualModal(false);
+    setAddSubjectForSubject(null);
+    setOpenDropdownSubject(null);
+    setAddSubjectLoading(false);
+  };
+
+  const fetchUpdatedResultsForEdited = async () => {
+    const updatedEditResults = { ...editResults };
+    for (const studentId of editedStudents) {
+      const res = await fetch(`${API_BASE_URL}/api/results/student/${studentId}/pushed?className=${selectedClass}&term=${selectedTerm}`);
+      const results = await res.json();
+      const studentResult = {};
+      const subjects = [];
+      results.forEach(r => {
+        if (r.subject && r.subject !== "Overall") {
+          subjects.push(r.subject);
+          studentResult[r.subject] = {
+            cat: r.firstCatScore ?? "",
+            exam: r.examScore ?? "",
+            grade: r.grade ?? "",
+            remark: r.remark ?? "",
+            _id: r._id,
+            notOffering: false
+          };
+        } else if (r.subject === "Overall") {
+          studentResult._overall = {
+            ...r,
+            handwriting: r.handwriting ?? "",
+            punctuality: r.punctuality ?? "",
+            initiative: r.initiative ?? "",
+            obedience: r.obedience ?? "",
+            honesty: r.honesty ?? "",
+            neatness: r.neatness ?? "",
+            attentiveness: r.attentiveness ?? "",
+            respect: r.respect ?? "",
+            attitude: r.attitude ?? "",
+            creativity: r.creativity ?? ""
+          };
+        }
+      });
+      studentResult.subjects = subjects;
+      updatedEditResults[studentId] = studentResult;
+    }
+    setEditResults(updatedEditResults);
+  };
+
+  async function saveStudentResults(studentId, nextEditResults = null) {
+    const results = nextEditResults || editResults;
+    const action = {
+      type: 'saveStudentResults',
+      studentId,
+      results,
+      subjects,
+    };
+
+    if (!navigator.onLine) {
+      await addToQueue(action);
+      return;
+    }
+
+    saveQueue.current[studentId] = (saveQueue.current[studentId] || Promise.resolve()).then(async () => {
+      for (const subject of subjects) {
+        const subjEdit = results[studentId]?.[subject];
+        if (subjEdit && !subjEdit.notOffering && subjEdit._id) {
+          await fetch(`${API_BASE_URL}/api/results/update/${subjEdit._id}`, {
+            method: 'PUT',
+            body: JSON.stringify({
+              firstCatScore: Number(subjEdit.cat ?? 0),
+              examScore: Number(subjEdit.exam ?? 0),
+              grade: subjEdit.grade ?? "",
+              remark: subjEdit.remark ?? "",
+              reviewed: false,
+              pending: true,
+              verified: false
+            }),
+            headers: { 'Content-Type': 'application/json' }
+          });
+        }
+      }
+      const overall = results[studentId]?._overall;
+      if (overall && overall._id) {
+        await fetch(`${API_BASE_URL}/api/results/update/${overall._id}`, {
           method: 'PUT',
           body: JSON.stringify({
-            firstCatScore: Number(subjEdit.cat ?? 0),
-            examScore: Number(subjEdit.exam ?? 0),
-            grade: subjEdit.grade ?? "",
-            remark: subjEdit.remark ?? "",
+            handwriting: overall.handwriting,
+            punctuality: overall.punctuality,
+            initiative: overall.initiative,
+            obedience: overall.obedience,
+            honesty: overall.honesty,
+            neatness: overall.neatness,
+            attentiveness: overall.attentiveness,
+            respect: overall.respect,
+            attitude: overall.attitude,
+            creativity: overall.creativity,
             reviewed: false,
             pending: true,
             verified: false
@@ -438,38 +733,13 @@ async function saveStudentResults(studentId, nextEditResults = null) {
           headers: { 'Content-Type': 'application/json' }
         });
       }
-    }
-    const overall = results[studentId]?._overall;
-    if (overall && overall._id) {
-      await fetch(`${API_BASE_URL}/api/results/update/${overall._id}`, {
-        method: 'PUT',
-        body: JSON.stringify({
-          handwriting: overall.handwriting,
-          punctuality: overall.punctuality,
-          initiative: overall.initiative,
-          obedience: overall.obedience,
-          honesty: overall.honesty,
-          neatness: overall.neatness,
-          attentiveness: overall.attentiveness,
-          respect: overall.respect,
-          attitude: overall.attitude,
-          creativity: overall.creativity,
-          reviewed: false,
-          pending: true,
-          verified: false
-        }),
-        headers: { 'Content-Type': 'application/json' }
-      });
-    }
-    // Clear queue after successful online save to prevent stale items
-    await clearQueue();
-  }).catch(() => {});
-}
+      await clearQueue();
+    }).catch(() => {});
+  }
 
-  // Save all changes
   const handleSaveAll = async () => {
     setSaving(true);
-    for (const studentId of editedStudents) { // Only loop through edited students
+    for (const studentId of editedStudents) {
       for (const subject of subjects) {
         const subjEdit = editResults[studentId][subject];
         if (subjEdit && !subjEdit.notOffering && subjEdit._id) {
@@ -488,7 +758,6 @@ async function saveStudentResults(studentId, nextEditResults = null) {
           });
         }
       }
-      // Save key ratings/meta
       const overall = editResults[studentId]._overall;
       if (overall && overall._id) {
         await fetch(`${API_BASE_URL}/api/results/update/${overall._id}`, {
@@ -513,35 +782,52 @@ async function saveStudentResults(studentId, nextEditResults = null) {
       }
     }
     setSaving(false);
-    await fetchUpdatedResultsForEdited(); // <-- Sync UI with backend
+    await fetchUpdatedResultsForEdited();
     setEditedStudents(new Set());
     alert("All changes saved!");
   };
 
- useEffect(() => {
-  async function checkUnsyncedQueue() {
-    const queue = await getQueue();
-    const hasUnsyncedChanges = queue && queue.length > 0;
+  useEffect(() => {
+    async function syncQueuedActions(queue) {
+      // Collect subjects added offline so we can sync their scores after
+      const addedSubjects = [];
 
-    if (hasUnsyncedChanges && navigator.onLine) {
-      // Only show sync modal if there are actual unsynced changes
-      setSyncMessage("Unsynced offline changes detected. Syncing to online database...");
-      setShowSyncModal(true);
-      setSyncing(true);
-
-      let synced = false;
       for (const action of queue) {
-        if (action.type === 'saveStudentResults') {
-          for (const subject of action.subjects) {
-            const subjEdit = action.results[action.studentId]?.[subject];
-            if (subjEdit && !subjEdit.notOffering && subjEdit._id) {
-              await fetch(`${API_BASE_URL}/api/results/update/${subjEdit._id}`, {
+        try {
+          if (action.type === 'saveStudentResults') {
+            for (const subject of action.subjects) {
+              const subjEdit = action.results[action.studentId]?.[subject];
+              if (subjEdit && !subjEdit.notOffering && subjEdit._id) {
+                await fetch(`${API_BASE_URL}/api/results/update/${subjEdit._id}`, {
+                  method: 'PUT',
+                  body: JSON.stringify({
+                    firstCatScore: Number(subjEdit.cat ?? 0),
+                    examScore: Number(subjEdit.exam ?? 0),
+                    grade: subjEdit.grade ?? "",
+                    remark: subjEdit.remark ?? "",
+                    reviewed: false,
+                    pending: true,
+                    verified: false
+                  }),
+                  headers: { 'Content-Type': 'application/json' }
+                });
+              }
+            }
+            const overall = action.results[action.studentId]?._overall;
+            if (overall && overall._id) {
+              await fetch(`${API_BASE_URL}/api/results/update/${overall._id}`, {
                 method: 'PUT',
                 body: JSON.stringify({
-                  firstCatScore: Number(subjEdit.cat ?? 0),
-                  examScore: Number(subjEdit.exam ?? 0),
-                  grade: subjEdit.grade ?? "",
-                  remark: subjEdit.remark ?? "",
+                  handwriting: overall.handwriting,
+                  punctuality: overall.punctuality,
+                  initiative: overall.initiative,
+                  obedience: overall.obedience,
+                  honesty: overall.honesty,
+                  neatness: overall.neatness,
+                  attentiveness: overall.attentiveness,
+                  respect: overall.respect,
+                  attitude: overall.attitude,
+                  creativity: overall.creativity,
                   reviewed: false,
                   pending: true,
                   verified: false
@@ -549,103 +835,205 @@ async function saveStudentResults(studentId, nextEditResults = null) {
                 headers: { 'Content-Type': 'application/json' }
               });
             }
-          }
-          const overall = action.results[action.studentId]?._overall;
-          if (overall && overall._id) {
-            await fetch(`${API_BASE_URL}/api/results/update/${overall._id}`, {
-              method: 'PUT',
+          } else if (action.type === 'deleteResult') {
+            await fetch(`${API_BASE_URL}/api/results/delete/${action.resultId}`, {
+              method: 'DELETE'
+            });
+          } else if (action.type === 'addSubjectAll') {
+            const currentSubjectsRes = await fetch(`${API_BASE_URL}/api/class-subjects/${action.className}?term=${action.term}`);
+            const currentSubjects = await currentSubjectsRes.json();
+            if (!currentSubjects.includes(action.subject)) {
+              await fetch(`${API_BASE_URL}/api/class-subjects/set`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                  className: action.className,
+                  term: action.term,
+                  subjects: [...currentSubjects, action.subject]
+                }),
+              });
+            }
+            for (const studentId of action.studentIds) {
+              await fetch(`${API_BASE_URL}/api/class-subjects/add-subject-individual`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                  studentId,
+                  className: action.className,
+                  term: action.term,
+                  subject: action.subject
+                }),
+              }).catch(() => {});
+            }
+            // Track for score sync
+            addedSubjects.push({
+              subject: action.subject,
+              studentIds: action.studentIds,
+              className: action.className,
+              term: action.term
+            });
+          } else if (action.type === 'addSubjectIndividual') {
+            if (action.needsNewSubjectColumn) {
+              const currentSubjectsRes = await fetch(`${API_BASE_URL}/api/class-subjects/${action.className}?term=${action.term}`);
+              const currentSubjects = await currentSubjectsRes.json();
+              if (!currentSubjects.includes(action.subject)) {
+                await fetch(`${API_BASE_URL}/api/class-subjects/set`, {
+                  method: 'POST',
+                  headers: { 'Content-Type': 'application/json' },
+                  body: JSON.stringify({
+                    className: action.className,
+                    term: action.term,
+                    subjects: [...currentSubjects, action.subject]
+                  }),
+                });
+              }
+            }
+            await fetch(`${API_BASE_URL}/api/class-subjects/add-subject-individual`, {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
               body: JSON.stringify({
-                handwriting: overall.handwriting,
-                punctuality: overall.punctuality,
-                initiative: overall.initiative,
-                obedience: overall.obedience,
-                honesty: overall.honesty,
-                neatness: overall.neatness,
-                attentiveness: overall.attentiveness,
-                respect: overall.respect,
-                attitude: overall.attitude,
-                creativity: overall.creativity,
-                reviewed: false,
-                pending: true,
-                verified: false
+                studentId: action.studentId,
+                className: action.className,
+                term: action.term,
+                subject: action.subject
               }),
-              headers: { 'Content-Type': 'application/json' }
+            }).catch(() => {});
+            // Track for score sync
+            addedSubjects.push({
+              subject: action.subject,
+              studentIds: [action.studentId],
+              className: action.className,
+              term: action.term
             });
           }
-          synced = true;
+        } catch (err) {
+          console.error('Error syncing queued action:', err);
         }
       }
-      if (synced) {
+
+      // After all add-subject actions, sync offline scores for newly added subjects
+      if (addedSubjects.length > 0) {
+        // Load the offline state to get scores entered while offline
+        const offlineState = await loadOfflineState();
+        const offlineEditResults = offlineState?.editResults || editResults;
+
+        for (const added of addedSubjects) {
+          for (const studentId of added.studentIds) {
+            const offlineSubjEdit = offlineEditResults[studentId]?.[added.subject];
+            // Only sync if there are actual scores entered offline
+            if (
+              offlineSubjEdit &&
+              !offlineSubjEdit.notOffering &&
+              (Number(offlineSubjEdit.cat ?? offlineSubjEdit.cat1 ?? 0) !== 0 ||
+               Number(offlineSubjEdit.exam ?? 0) !== 0)
+            ) {
+              try {
+                // Fetch the newly created result to get its _id
+                const resArr = await fetch(
+                  `${API_BASE_URL}/api/results/student/${studentId}/pushed?className=${added.className}&term=${added.term}`
+                ).then(r => r.json());
+
+                const matchingResult = resArr.find(r => r.subject === added.subject);
+                if (matchingResult && matchingResult._id) {
+                  const cat = Number(offlineSubjEdit.cat ?? offlineSubjEdit.cat1 ?? 0);
+                  const exam = Number(offlineSubjEdit.exam ?? 0);
+                  const total = cat + exam;
+                  await fetch(`${API_BASE_URL}/api/results/update/${matchingResult._id}`, {
+                    method: 'PUT',
+                    body: JSON.stringify({
+                      firstCatScore: cat,
+                      examScore: exam,
+                      grade: getGrade(total),
+                      remark: getRemark(getGrade(total)),
+                      reviewed: false,
+                      pending: true,
+                      verified: false
+                    }),
+                    headers: { 'Content-Type': 'application/json' }
+                  });
+                }
+              } catch (err) {
+                console.error(`Error syncing scores for ${added.subject} / ${studentId}:`, err);
+              }
+            }
+          }
+        }
+      }
+    }
+
+    async function checkUnsyncedQueue() {
+      const queue = await getQueue();
+      const hasUnsyncedChanges = queue && queue.length > 0;
+
+      if (hasUnsyncedChanges && navigator.onLine) {
+        setSyncMessage("Unsynced offline changes detected. Syncing to online database...");
+        setShowSyncModal(true);
+        setSyncing(true);
+
+        await syncQueuedActions(queue);
         await clearQueue();
         setSyncMessage("Offline changes have been synced to the online database.");
-        await fetchData(); // Refresh UI with latest data
+        await fetchData();
+
+        setSyncing(false);
+        setWasOffline(false);
+      } else if (navigator.onLine && !hasUnsyncedChanges) {
+        setShowSyncModal(false);
+        setSyncing(false);
       }
-      setSyncing(false);
-      setWasOffline(false);
-    } else if (navigator.onLine && !hasUnsyncedChanges) {
-      // No unsynced changes — do nothing, no modal
-      setShowSyncModal(false);
-      setSyncing(false);
     }
-  }
 
-  if (navigator.onLine) {
-    checkUnsyncedQueue();
-  }
+    if (navigator.onLine) {
+      checkUnsyncedQueue();
+    }
 
-  window.addEventListener('online', checkUnsyncedQueue);
+    window.addEventListener('online', checkUnsyncedQueue);
 
-  return () => window.removeEventListener('online', checkUnsyncedQueue);
-}, []);
+    return () => window.removeEventListener('online', checkUnsyncedQueue);
+  }, []);
 
+  useEffect(() => {
+    function handleOffline() {
+      setSyncMessage("You are now working offline. Changes will sync when online.");
+      setShowSyncModal(true);
+      setWasOffline(true);
+    }
 
-useEffect(() => {
-  function handleOffline() {
-    setSyncMessage("You are now working offline. Changes will sync when online.");
-    setShowSyncModal(true);
-    setWasOffline(true);
-  }
+    window.addEventListener('offline', handleOffline);
 
-  window.addEventListener('offline', handleOffline);
+    if (!navigator.onLine) {
+      setWasOffline(true);
+      handleOffline();
+    }
 
-  // Show modal if page loads offline
-  if (!navigator.onLine) {
-    setWasOffline(true); // <-- Ensure wasOffline is set!
-    handleOffline();
-  }
+    return () => {
+      window.removeEventListener('offline', handleOffline);
+    };
+  }, []);
 
-  return () => {
-    window.removeEventListener('offline', handleOffline);
-  };
-}, []);
-useEffect(() => {
-  function handleBeforeInstallPrompt(e) {
-    e.preventDefault();
-    setDeferredPrompt(e);
-    setShowInstallBtn(true);
-  }
-  window.addEventListener('beforeinstallprompt', handleBeforeInstallPrompt);
-  return () => window.removeEventListener('beforeinstallprompt', handleBeforeInstallPrompt);
-}, []);
+  useEffect(() => {
+    function handleBeforeInstallPrompt(e) {
+      e.preventDefault();
+      setDeferredPrompt(e);
+      setShowInstallBtn(true);
+    }
+    window.addEventListener('beforeinstallprompt', handleBeforeInstallPrompt);
+    return () => window.removeEventListener('beforeinstallprompt', handleBeforeInstallPrompt);
+  }, []);
 
-
-  // --- Add: Live position & average calculation for all students (same as verify-result.jsx) ---
   useEffect(() => {
     if (students.length > 0) {
-      // 1. Calculate each student's total C.A.T + Exam for all their subjects
       const studentTotals = students.map(student => {
         const studentId = student._id;
         let totalScore = 0;
         let subjectCount = 0;
-        const result = editResults[studentId];
+        const result = editResults[student._id];
         if (result) {
-          Object.keys(result).forEach(subject => {
-            if (subject === "_overall") return;
+          subjectsOrder.forEach(subject => {
             const subjEdit = result[subject];
             if (subjEdit && !subjEdit.notOffering) {
-              const cat = Number(subjEdit.cat ?? 0);
+              const cat = Number(subjEdit.cat ?? subjEdit.cat1 ?? 0);
               const exam = Number(subjEdit.exam ?? 0);
-              // Only count if at least one score is entered
               if (cat !== 0 || exam !== 0) {
                 totalScore += cat + exam;
                 subjectCount += 1;
@@ -653,10 +1041,9 @@ useEffect(() => {
             }
           });
         }
-        // If no subjects have scores, fallback to subjects.length
         if (subjectCount === 0 && result) {
-          subjectCount = Object.keys(result).filter(
-            s => s !== "_overall" && result[s] && !result[s].notOffering
+          subjectCount = subjectsOrder.filter(
+            s => result[s] && !result[s].notOffering
           ).length;
         }
         let average = subjectCount > 0 ? totalScore / subjectCount : 0;
@@ -668,10 +1055,8 @@ useEffect(() => {
         };
       });
 
-      // 2. Sort by average DESC for position
       const sorted = [...studentTotals].sort((a, b) => b.average - a.average);
 
-      // 3. Assign positions (handle ties)
       const positionMap = {};
       let lastAverage = null;
       let lastPosition = 0;
@@ -687,7 +1072,6 @@ useEffect(() => {
         actualPosition++;
       });
 
-      // 4. Update average, position, and remarks for each student
       setEditResults(prev => {
         let changed = false;
         const updated = { ...prev };
@@ -698,14 +1082,14 @@ useEffect(() => {
             ? `${positionMap[studentId]}${positionMap[studentId] === 1 ? 'st' : positionMap[studentId] === 2 ? 'nd' : positionMap[studentId] === 3 ? 'rd' : 'th'}`
             : '';
           if (!updated[studentId]) updated[studentId] = {};
-          // Only update if not manually set
           if (
             updated[studentId]._overall?.manualPosition !== true
           ) {
             if (!updated[studentId]._overall) updated[studentId]._overall = {};
+            updated[studentId] = { ...updated[studentId] };
+            updated[studentId]._overall = { ...updated[studentId]._overall };
             updated[studentId]._overall.average = autoAverage;
             updated[studentId]._overall.position = autoPosition;
-            // Update remarks using same logic as verify-result.jsx
             updated[studentId]._overall.teacherComment = getDeansRemark(autoAverage);
             updated[studentId]._overall.headTeacherRemark = getRectorsRemark(autoAverage);
             changed = true;
@@ -714,8 +1098,7 @@ useEffect(() => {
         return changed ? updated : prev;
       });
     }
-  }, [students, editResults, subjects]);
-  // --- End Add ---
+  }, [students, editResults, subjectsOrder]);
 
   function getGrade(score) {
     if (score >= 75 && score <= 100) return "A1";
@@ -751,13 +1134,102 @@ useEffect(() => {
     return "Not meeting the required benchmark";
   }
 
-  const resultStatusMap = location.state?.verifiedStudents || {};
-
-  // Add this:
   const anyReviewedOrVerified = students.some(
     s => resultStatusMap[s._id] === 'reviewed' || resultStatusMap[s._id] === 'verified'
   );
 
+  // Close dropdown when clicking outside
+  useEffect(() => {
+    function handleClickOutside(e) {
+      if (openDropdownSubject && !e.target.closest('.subject-dropdown')) {
+        setOpenDropdownSubject(null);
+      }
+    }
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, [openDropdownSubject]);
+
+  const [resetLoading, setResetLoading] = useState(false);
+
+  // --- Reset All Results to Pending ---
+  const handleResetToPending = async () => {
+    if (!window.confirm('Are you sure you want to reset all results to pending? This will allow editing but remove reviewed/verified status.')) {
+      return;
+    }
+    setResetLoading(true);
+
+    try {
+      for (const student of students) {
+        const studentResult = editResults[student._id];
+        if (!studentResult) continue;
+
+        // Reset each subject result
+        const studentSubjects = Array.isArray(studentResult.subjects) ? studentResult.subjects : [];
+        for (const subject of studentSubjects) {
+          const subjEdit = studentResult[subject];
+          if (subjEdit && subjEdit._id) {
+            if (navigator.onLine) {
+              await fetch(`${API_BASE_URL}/api/results/update/${subjEdit._id}`, {
+                method: 'PUT',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                  reviewed: false,
+                  verified: false,
+                  pending: true
+                })
+              });
+            } else {
+              await addToQueue({
+                type: 'resetToPending',
+                resultId: subjEdit._id
+              });
+            }
+          }
+        }
+
+        // Reset Overall result
+        const overall = studentResult._overall;
+        if (overall && overall._id) {
+          if (navigator.onLine) {
+            await fetch(`${API_BASE_URL}/api/results/update/${overall._id}`, {
+              method: 'PUT',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({
+                reviewed: false,
+                verified: false,
+                pending: true
+              })
+            });
+          } else {
+            await addToQueue({
+              type: 'resetToPending',
+              resultId: overall._id
+            });
+          }
+        }
+      }
+
+      // Update the local status map immediately
+      const updatedStatusMap = {};
+      students.forEach(student => {
+        updatedStatusMap[student._id] = 'pending';
+      });
+      setResultStatusMap(updatedStatusMap);
+
+      alert('All results have been reset to pending. You can now edit.');
+
+      // Refresh data to reflect changes
+      if (navigator.onLine) {
+        setLoading(true);
+        await fetchData();
+      }
+    } catch (err) {
+      console.error('Error resetting to pending:', err);
+      alert('An error occurred while resetting results.');
+    }
+
+    setResetLoading(false);
+  };
 
   return (
     <div className="p-4">
@@ -800,14 +1272,20 @@ useEffect(() => {
         {selectedTerm && ` (${selectedTerm.charAt(0).toUpperCase() + selectedTerm.slice(1)} Term)`}
       </h2>
 
-      {/* Show message if any student is reviewed or verified */}
       {anyReviewedOrVerified && (
         <div className="mb-4 p-2 rounded bg-yellow-100 text-yellow-800 font-semibold text-center">
           You cannot modify results here after review or verification. You can do that individually in the main page.
+          <br />
+          <button
+            className="mt-2 px-4 py-2 bg-red-600 text-white rounded hover:bg-red-700 transition font-semibold"
+            onClick={handleResetToPending}
+            disabled={resetLoading}
+          >
+            {resetLoading ? 'Resetting...' : '🔄 Reset All to Pending (Enable Editing)'}
+          </button>
         </div>
       )}
 
-      {/* Save Changes button OUTSIDE the scrollable table */}
       <button
         className="mb-4 px-4 py-2 bg-primary text-white rounded"
         onClick={handleSaveAll}
@@ -824,45 +1302,7 @@ useEffect(() => {
                 <th className="border px-2 py-1 bg-gray-100">Student Name</th>
                 {subjectsOrder.map(subject => (
                   <React.Fragment key={subject}>
-                    <th className="border px-2 py-1 bg-gray-100 relative" style={{ minWidth: 90 }}>
-                      <span style={{ display: "inline-flex", alignItems: "center", gap: 4 }}>
-                        {subject} CAT
-                        <button
-                          type="button"
-                          title="Remove subject for all students"
-                          onClick={() => setConfirmRemoveSubject(subject)}
-                          style={{
-                            fontWeight: "bold",
-                            background: "none",
-                            border: "none",
-                            cursor: anyReviewedOrVerified ? "not-allowed" : "pointer",
-                            color: "#c41414", // black for visibility
-                            fontSize: "1.1em",
-                            marginLeft: 4,
-                            padding: 0,
-                            lineHeight: 1,
-                            position: "relative",
-                            top: 0,
-                            right: 0,
-                            width: 22,
-                            height: 22,
-                            display: "inline-flex",
-                            alignItems: "center",
-                            justifyContent: "center",
-                            borderRadius: "50%",
-                            transition: "background 0.2s"
-                          }}
-                          className={
-                            anyReviewedOrVerified
-                              ? "opacity-50 cursor-not-allowed"
-                              : "hover:bg-gray-200 focus:bg-gray-300 active:bg-gray-400"
-                          }
-                          disabled={anyReviewedOrVerified}
-                        >
-                          &times;
-                        </button>
-                      </span>
-                    </th>
+                    <th className="border px-2 py-1 bg-gray-100">{subject} CAT</th>
                     <th className="border px-2 py-1 bg-gray-100">{subject} Exam</th>
                     <th className="border px-2 py-1 bg-gray-100">{subject} Total</th>
                     <th className="border px-2 py-1 bg-gray-100">{subject} Grade</th>
@@ -906,7 +1346,7 @@ useEffect(() => {
           style={{
             width: "100%",
             minHeight: 300,
-            maxHeight: "70vh",
+            height: "calc(100vh - 220px)",
             overflowX: "auto",
             overflowY: "auto",
             position: "relative"
@@ -914,95 +1354,131 @@ useEffect(() => {
         >
           <div style={{ minWidth: "1200px" }}>
             <table className="min-w-max border border-gray-300">
-
-<thead>
-  <tr>
-    <th className="border px-2 py-1 bg-gray-100">Status</th>
-    <th className="border px-2 py-1 bg-gray-100">Student Name</th>
-    {subjectsOrder.map(subject => (
-      <React.Fragment key={subject}>
-        <th className="border px-2 py-1 bg-gray-100 relative" style={{ minWidth: 90 }}>
-          <span style={{ display: "inline-flex", alignItems: "center", gap: 4 }}>
-            {subject} CAT
-            <button
-              type="button"
-              title="Remove subject for all students"
-              onClick={() => setConfirmRemoveSubject(subject)}
-              style={{
-                fontWeight: "bold",
-                background: "none",
-                border: "none",
-                cursor: anyReviewedOrVerified ? "not-allowed" : "pointer",
-                color: "#a51818", // black for visibility
-                fontSize: "1.1em",
-                marginLeft: 4,
-                padding: 0,
-                lineHeight: 1,
-                position: "relative",
-                top: 0,
-                right: 0,
-                width: 22,
-                height: 22,
-                display: "inline-flex",
-                alignItems: "center",
-                justifyContent: "center",
-                borderRadius: "50%",
-                transition: "background 0.2s"
-              }}
-              className={
-                anyReviewedOrVerified
-                  ? "opacity-50 cursor-not-allowed"
-                  : "hover:bg-gray-200 focus:bg-gray-300 active:bg-gray-400"
-              }
-              disabled={anyReviewedOrVerified}
-            >
-              &times;
-            </button>
-          </span>
-        </th>
-        <th className="border px-2 py-1 bg-gray-100">{subject} Exam</th>
-        <th className="border px-2 py-1 bg-gray-100">{subject} Total</th>
-        <th className="border px-2 py-1 bg-gray-100">{subject} Grade</th>
-        <th className="border px-2 py-1 bg-gray-100">{subject} Remark</th>
-      </React.Fragment>
-    ))}
-    <th className="border px-2 py-1 bg-gray-100">Average</th>
-    <th className="border px-2 py-1 bg-gray-100">Position</th>
-    <th>Handwriting</th>
-    <th>Punctuality</th>
-    <th>Initiative</th>
-    <th>Obedience</th>
-    <th>Honesty</th>
-    <th>Neatness</th>
-    <th>Attentiveness</th>
-    <th>Respect</th>
-    <th>Attitude</th>
-    <th>Creativity</th>
-    <th className="border px-2 py-1 bg-gray-100">Deans Remark</th>
-    <th className="border px-2 py-1 bg-gray-100">Rectors Remark</th>
-    <th className="border px-2 py-1 bg-gray-100">Academic Session</th>
-    <th className="border px-2 py-1 bg-gray-100">Next Term Begins</th>
-    <th className="border px-2 py-1 bg-gray-100">Rector's Signature</th>
-  </tr>
-</thead>
+              <thead>
+                <tr>
+                  <th className="border px-2 py-1 bg-gray-100">Status</th>
+                  <th className="border px-2 py-1 bg-gray-100">Student Name</th>
+                  {subjectsOrder.map(subject => (
+                    <React.Fragment key={subject}>
+                      <th className="border px-2 py-1 bg-gray-100 relative subject-dropdown" style={{ minWidth: 90 }}>
+                        <span style={{ display: "inline-flex", alignItems: "center", gap: 4 }}>
+                          {subject} CAT
+                          <button
+                            type="button"
+                            title="Subject options"
+                            className="subject-dropdown-trigger"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              setOpenDropdownSubject(openDropdownSubject === subject ? null : subject);
+                            }}
+                            disabled={anyReviewedOrVerified}
+                          >
+                            ⋮
+                          </button>
+                          {openDropdownSubject === subject && (
+                            <div
+                              className="subject-dropdown"
+                              style={{
+                                position: "absolute",
+                                top: "100%",
+                                right: 0,
+                                zIndex: 100,
+                                background: "#fff",
+                                border: "1px solid #ddd",
+                                borderRadius: 8,
+                                boxShadow: "0 4px 16px rgba(0,0,0,0.15)",
+                                minWidth: 180,
+                                padding: "4px 0"
+                              }}
+                            >
+                              <button
+                                type="button"
+                                className="subject-dropdown-btn add-btn"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  setNewSubjectName('');
+                                  setShowAddSubjectAllModal(true);
+                                  setOpenDropdownSubject(null);
+                                }}
+                              >
+                                ➕ Add Subject
+                              </button>
+                              {students.some(student => {
+                                const studentSubjects = editResults[student._id]?.subjects || [];
+                                return !studentSubjects.includes(subject);
+                              }) && (
+                                <button
+                                  type="button"
+                                  className="subject-dropdown-btn add-individual-btn"
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    setAddSubjectForSubject(subject);
+                                    setAddSubjectStudentSearch('');
+                                    setSelectedStudentForAdd(null);
+                                    setShowAddSubjectIndividualModal(true);
+                                    setOpenDropdownSubject(null);
+                                  }}
+                                >
+                                  ➕ Add "{subject}" for Individual
+                                </button>
+                              )}
+                              <button
+                                type="button"
+                                className="subject-dropdown-btn delete-btn"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  setConfirmRemoveSubject(subject);
+                                  setOpenDropdownSubject(null);
+                                }}
+                              >
+                                🗑️ Delete Subject
+                              </button>
+                            </div>
+                          )}
+                        </span>
+                      </th>
+                      <th className="border px-2 py-1 bg-gray-100">{subject} Exam</th>
+                      <th className="border px-2 py-1 bg-gray-100">{subject} Total</th>
+                      <th className="border px-2 py-1 bg-gray-100">{subject} Grade</th>
+                      <th className="border px-2 py-1 bg-gray-100">{subject} Remark</th>
+                    </React.Fragment>
+                  ))}
+                  <th className="border px-2 py-1 bg-gray-100">Average</th>
+                  <th className="border px-2 py-1 bg-gray-100">Position</th>
+                  <th>Handwriting</th>
+                  <th>Punctuality</th>
+                  <th>Initiative</th>
+                  <th>Obedience</th>
+                  <th>Honesty</th>
+                  <th>Neatness</th>
+                  <th>Attentiveness</th>
+                  <th>Respect</th>
+                  <th>Attitude</th>
+                  <th>Creativity</th>
+                  <th className="border px-2 py-1 bg-gray-100">Deans Remark</th>
+                  <th className="border px-2 py-1 bg-gray-100">Rectors Remark</th>
+                  <th className="border px-2 py-1 bg-gray-100">Academic Session</th>
+                  <th className="border px-2 py-1 bg-gray-100">Next Term Begins</th>
+                  <th className="border px-2 py-1 bg-gray-100">Rector's Signature</th>
+                </tr>
+              </thead>
               <tbody>
                 {students.map(student => {
                   const studentResults = editResults[student._id] || {};
                   const overall = studentResults._overall || {};
                   function getKeyRatingLabel(val) {
-  val = Number(val);
-  if (val === 5) return 'EXCELLENT';
-  if (val === 4) return 'VERY GOOD';
-  if (val === 3) return 'SATISFACTORY';
-  if (val === 2) return 'POOR';
-  if (val === 1) return 'VERY POOR';
-  return '';
-}
+                    val = Number(val);
+                    if (val === 5) return 'EXCELLENT';
+                    if (val === 4) return 'VERY GOOD';
+                    if (val === 3) return 'SATISFACTORY';
+                    if (val === 2) return 'POOR';
+                    if (val === 1) return 'VERY POOR';
+                    return '';
+                  }
                   const studentSubjects = Array.isArray(studentResults.subjects) ? studentResults.subjects : [];
                   const isLocked = resultStatusMap[student._id] === 'reviewed' || resultStatusMap[student._id] === 'verified';
                   return (
                     <tr key={student._id}>
-                      {/* Status column */}
                       <td className="border px-2 py-1">
                         {resultStatusMap[student._id] === 'verified' ? (
                           <span className="text-success font-semibold">Verified</span>
@@ -1012,7 +1488,6 @@ useEffect(() => {
                           <span className="text-warning font-semibold">Pending</span>
                         )}
                       </td>
-                      {/* Student Name column */}
                       <td className="border px-2 py-1">{student.name || student.fullName || student.username}</td>
                       {subjectsOrder.map(subject => {
                         if (!studentSubjects.includes(subject)) {
@@ -1056,7 +1531,6 @@ useEffect(() => {
                       })}
                       <td className="border px-2 py-1">{editResults[student._id]?._overall?.average ?? ""}</td>
                       <td className="border px-2 py-1">{editResults[student._id]?._overall?.position ?? ""}</td>
-                      {/* --- Key Rating fields with boxes --- */}
                       {[
                         "handwriting", "punctuality", "initiative", "obedience", "honesty",
                         "neatness", "attentiveness", "respect", "attitude", "creativity"
@@ -1097,209 +1571,344 @@ useEffect(() => {
                   );
                 })}
               </tbody>
-      </table>
-    </div>
-  </div>
-)}
-
-{/* Confirmation Modals */}
-{confirmRemoveSubject && (
-  <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40">
-    <div className="bg-white rounded-lg shadow-lg p-6 w-full max-w-sm text-center">
-      <h3 className="font-bold text-lg mb-4">Remove Subject</h3>
-      <p className="mb-4">
-        Are you sure you want to <span className="font-semibold text-red-600">remove</span> the subject <br />
-        <span className="font-bold text-primary">{confirmRemoveSubject}</span> <br />
-        <span className="font-bold">?</span>
-      </p>
-      <div className="flex flex-col gap-2 mt-6">
-        <button
-          className="px-4 py-2 bg-danger text-white rounded hover:bg-danger/80 transition"
-          onClick={() => setShowDeleteConfirmModal({ type: 'individual', subject: confirmRemoveSubject })}
-        >
-          Remove for Individual Student
-        </button>
-        <button
-          className="px-4 py-2 bg-warning text-white rounded hover:bg-warning/80 transition"
-          onClick={() => setShowDeleteConfirmModal({ type: 'all', subject: confirmRemoveSubject })}
-        >
-          Remove for All Students
-        </button>
-        <button
-          className="px-4 py-2 bg-muted text-foreground rounded hover:bg-muted/80 transition"
-          onClick={() => setConfirmRemoveSubject(null)}
-        >
-          Cancel
-        </button>
-      </div>
-    </div>
-  </div>
-)}
-
-{showDeleteConfirmModal && showDeleteConfirmModal.type === 'individual' && (
-  <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40">
-    <div className="bg-white rounded-lg shadow-lg p-6 w-full max-w-sm text-center">
-      <h3 className="font-bold text-lg mb-4">Select Student</h3>
-      <p className="mb-4">
-        Choose the student for whom you want to remove the subject <br />
-        <span className="font-bold text-primary">{showDeleteConfirmModal.subject}</span>
-      </p>
-      {/* Search bar for filtering students */}
-      <input
-        type="text"
-        placeholder="Search student by name..."
-        value={studentSearch}
-        onChange={e => setStudentSearch(e.target.value)}
-        className="w-full mb-4 px-3 py-2 border rounded"
-      />
-      <div className="flex flex-col gap-2 mt-6 max-h-60 overflow-y-auto">
-        {students
-          .filter(student =>
-            (student.name || student.fullName || student.username || "")
-              .toLowerCase()
-              .includes(studentSearch.toLowerCase())
-          )
-          .map(student => (
-            <button
-              key={student._id}
-              className="px-4 py-2 bg-info text-white rounded hover:bg-info/80 transition"
-              onClick={() => {
-                setSelectedStudentForDelete(student._id);
-                setShowStudentSelectModal({ subject: showDeleteConfirmModal.subject });
-                setShowDeleteConfirmModal(null);
-                setConfirmRemoveSubject(null);
-              }}
-            >
-              {student.name || student.fullName || student.username}
-            </button>
-          ))}
-        <button
-          className="px-4 py-2 bg-muted text-foreground rounded hover:bg-muted/80 transition"
-          onClick={() => {
-            setShowDeleteConfirmModal(null);
-            setConfirmRemoveSubject(null);
-          }}
-        >
-          Cancel
-        </button>
-      </div>
-    </div>
-  </div>
-)}
-
-{showStudentSelectModal && (
-  <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40">
-    <div className="bg-white rounded-lg shadow-lg p-6 w-full max-w-sm text-center">
-      <h3 className="font-bold text-lg mb-4">Confirm Individual Subject Removal</h3>
-      <p className="mb-4">
-        Are you sure you want to remove the subject <span className="text-primary font-bold">{showStudentSelectModal.subject}</span> for <br />
-        <span className="font-bold">{students.find(s => s._id === selectedStudentForDelete)?.name || 'Selected Student'}</span>?
-      </p>
-      <div className="flex justify-center gap-4 mt-6">
-        <button
-          className="px-4 py-2 bg-danger text-white rounded hover:bg-danger/80 transition"
-          onClick={async () => {
-            await handleRemoveSubjectIndividual(selectedStudentForDelete, showStudentSelectModal.subject);
-            setShowStudentSelectModal(null);
-            setSelectedStudentForDelete(null);
-          }}
-        >
-          Yes, Remove
-        </button>
-        <button
-          className="px-4 py-2 bg-muted text-foreground rounded hover:bg-muted/80 transition"
-          onClick={() => {
-            setShowStudentSelectModal(null);
-            setSelectedStudentForDelete(null);
-          }}
-        >
-          Cancel
-        </button>
-      </div>
-    </div>
-  </div>
-)}
-
-{showDeleteConfirmModal && showDeleteConfirmModal.type === 'all' && (
-  <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40">
-    <div className="bg-white rounded-lg shadow-lg p-6 w-full max-w-sm text-center">
-      <h3 className="font-bold text-lg mb-4">
-        Confirm General Subject Removal
-      </h3>
-      <p className="mb-4">
-        Are you <span className="font-semibold text-red-600">sure</span> you want to{" "}
-        <span className="font-bold">
-          remove the subject <span className="text-primary">{showDeleteConfirmModal.subject}</span>
-        </span>{" "}
-        for all students?
-      </p>
-      <div className="flex justify-center gap-4 mt-6">
-        <button
-          className="px-4 py-2 bg-warning text-white rounded hover:opacity-90 transition"
-          onClick={async () => {
-            await handleRemoveSubjectAll(showDeleteConfirmModal.subject);
-            setShowDeleteConfirmModal(null);
-            setConfirmRemoveSubject(null);
-          }}
-        >
-          Yes, Remove
-        </button>
-        <button
-          className="px-4 py-2 bg-muted text-foreground rounded hover:bg-muted/80 transition"
-          onClick={() => setShowDeleteConfirmModal(null)}
-        >
-          Cancel
-        </button>
-      </div>
-    </div>
-  </div>
-)}
-
-{showSyncModal && (
-  <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40">
-    <div className="bg-white rounded-lg shadow-lg p-6 w-full max-w-sm text-center">
-      <h3 className="font-bold text-lg mb-4">Sync Status</h3>
-      <p className="mb-4">{syncMessage}</p>
-      {syncing && (
-        <div className="flex justify-center mb-4">
-          <svg
-            style={{ width: 32, height: 32, margin: "auto", display: "block" }}
-            viewBox="0 0 50 50"
-          >
-            <circle
-              cx="25"
-              cy="25"
-              r="20"
-              fill="none"
-              stroke="#2563eb"
-              strokeWidth="5"
-              strokeLinecap="round"
-              strokeDasharray="31.4 31.4"
-            >
-              <animateTransform
-                attributeName="transform"
-                type="rotate"
-                from="0 25 25"
-                to="360 25 25"
-                dur="1s"
-                repeatCount="indefinite"
-              />
-            </circle>
-          </svg>
+            </table>
+          </div>
         </div>
       )}
-      {!syncing && (
-        <button
-          className="px-4 py-2 bg-primary text-white rounded"
-          onClick={() => setShowSyncModal(false)}
-        >
-          OK
-        </button>
-      )}
-    </div>
-  </div>
-)}
 
+      {/* --- Add Subject for All Modal --- */}
+      {showAddSubjectAllModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40">
+          <div className="bg-white rounded-lg shadow-lg p-6 w-full max-w-sm text-center">
+            <h3 className="font-bold text-lg mb-4">Add New Subject</h3>
+            <p className="mb-2">Enter the new subject name to add for all students.</p>
+            <input
+              type="text"
+              placeholder="Enter new subject name"
+              value={newSubjectName}
+              onChange={e => setNewSubjectName(e.target.value)}
+              className="w-full mb-4 px-3 py-2 border rounded"
+            />
+            <div className="flex flex-col gap-2 mt-2">
+              <button
+                className="px-4 py-2 bg-green-600 text-white rounded hover:bg-green-700 transition font-semibold"
+                onClick={handleAddSubjectAll}
+                disabled={!newSubjectName.trim() || addSubjectLoading}
+              >
+                {addSubjectLoading ? "Adding..." : "Add for All Students"}
+              </button>
+              <button
+                className="px-4 py-2 bg-muted text-foreground rounded hover:bg-muted/80 transition"
+                onClick={() => {
+                  setShowAddSubjectAllModal(false);
+                  setNewSubjectName('');
+                }}
+              >
+                Cancel
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* --- Add Subject for Individual: Select Student Modal --- */}
+      {showAddSubjectIndividualModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40">
+          <div className="bg-white rounded-lg shadow-lg p-6 w-full max-w-sm text-center">
+            <h3 className="font-bold text-lg mb-4">Select Student</h3>
+            <p className="mb-4">
+              Choose the student for whom you want to add the subject <br />
+              <span className="font-bold text-primary">{addSubjectForSubject || newSubjectName}</span>
+            </p>
+            <input
+              type="text"
+              placeholder="Search student by name..."
+              value={addSubjectStudentSearch}
+              onChange={e => setAddSubjectStudentSearch(e.target.value)}
+              className="w-full mb-4 px-3 py-2 border rounded"
+            />
+            <div className="flex flex-col gap-2 mt-2 max-h-60 overflow-y-auto">
+              {students
+                .filter(student => {
+                  const subjectToAdd = addSubjectForSubject || newSubjectName.trim();
+                  const studentSubjects = editResults[student._id]?.subjects || [];
+                  return !studentSubjects.includes(subjectToAdd);
+                })
+                .filter(student =>
+                  (student.name || student.fullName || student.username || "")
+                    .toLowerCase()
+                    .includes(addSubjectStudentSearch.toLowerCase())
+                )
+                .map(student => (
+                  <button
+                    key={student._id}
+                    className="px-4 py-2 bg-info text-white rounded hover:bg-info/80 transition"
+                    onClick={() => {
+                      setSelectedStudentForAdd(student._id);
+                      setShowAddSubjectIndividualModal(false);
+                      setShowAddSubjectIndividualConfirm(true);
+                    }}
+                  >
+                    {student.name || student.fullName || student.username}
+                  </button>
+                ))}
+              {students
+                .filter(student => {
+                  const subjectToAdd = addSubjectForSubject || newSubjectName.trim();
+                  const studentSubjects = editResults[student._id]?.subjects || [];
+                  return !studentSubjects.includes(subjectToAdd);
+                })
+                .filter(student =>
+                  (student.name || student.fullName || student.username || "")
+                    .toLowerCase()
+                    .includes(addSubjectStudentSearch.toLowerCase())
+                ).length === 0 && (
+                <p className="text-gray-500 italic py-2">All students already offer this subject.</p>
+              )}
+              <button
+                className="px-4 py-2 bg-muted text-foreground rounded hover:bg-muted/80 transition"
+                onClick={() => {
+                  setShowAddSubjectIndividualModal(false);
+                  setNewSubjectName('');
+                  setAddSubjectForSubject(null);
+                }}
+              >
+                Cancel
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* --- Add Subject for Individual: Confirm Modal --- */}
+      {showAddSubjectIndividualConfirm && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40">
+          <div className="bg-white rounded-lg shadow-lg p-6 w-full max-w-sm text-center">
+            <h3 className="font-bold text-lg mb-4">Confirm Add Subject</h3>
+            <p className="mb-4">
+              Are you sure you want to add the subject <span className="text-primary font-bold">{addSubjectForSubject || newSubjectName}</span> for <br />
+              <span className="font-bold">{students.find(s => s._id === selectedStudentForAdd)?.name || students.find(s => s._id === selectedStudentForAdd)?.fullName || students.find(s => s._id === selectedStudentForAdd)?.username || 'Selected Student'}</span>?
+            </p>
+            <div className="flex justify-center gap-4 mt-6">
+              <button
+                className="px-4 py-2 bg-green-600 text-white rounded hover:bg-green-700 transition"
+                onClick={handleAddSubjectIndividual}
+                disabled={addSubjectLoading}
+              >
+                {addSubjectLoading ? "Adding..." : "Yes, Add"}
+              </button>
+              <button
+                className="px-4 py-2 bg-muted text-foreground rounded hover:bg-muted/80 transition"
+                onClick={() => {
+                  setShowAddSubjectIndividualConfirm(false);
+                  setSelectedStudentForAdd(null);
+                  setNewSubjectName('');
+                  setAddSubjectForSubject(null);
+                }}
+              >
+                Cancel
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* --- Delete Subject Modals (existing logic, unchanged) --- */}
+      {confirmRemoveSubject && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40">
+          <div className="bg-white rounded-lg shadow-lg p-6 w-full max-w-sm text-center">
+            <h3 className="font-bold text-lg mb-4">Remove Subject</h3>
+            <p className="mb-4">
+              Are you sure you want to <span className="font-semibold text-red-600">remove</span> the subject <br />
+              <span className="font-bold text-primary">{confirmRemoveSubject}</span> <br />
+              <span className="font-bold">?</span>
+            </p>
+            <div className="flex flex-col gap-2 mt-6">
+              <button
+                className="px-4 py-2 bg-danger text-white rounded hover:bg-danger/80 transition"
+                onClick={() => setShowDeleteConfirmModal({ type: 'individual', subject: confirmRemoveSubject })}
+              >
+                Remove for Individual Student
+              </button>
+              <button
+                className="px-4 py-2 bg-warning text-white rounded hover:bg-warning/80 transition"
+                onClick={() => setShowDeleteConfirmModal({ type: 'all', subject: confirmRemoveSubject })}
+              >
+                Remove for All Students
+              </button>
+              <button
+                className="px-4 py-2 bg-muted text-foreground rounded hover:bg-muted/80 transition"
+                onClick={() => setConfirmRemoveSubject(null)}
+              >
+                Cancel
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {showDeleteConfirmModal && showDeleteConfirmModal.type === 'individual' && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40">
+          <div className="bg-white rounded-lg shadow-lg p-6 w-full max-w-sm text-center">
+            <h3 className="font-bold text-lg mb-4">Select Student</h3>
+            <p className="mb-4">
+              Choose the student for whom you want to remove the subject <br />
+              <span className="font-bold text-primary">{showDeleteConfirmModal.subject}</span>
+            </p>
+            <input
+              type="text"
+              placeholder="Search student by name..."
+              value={studentSearch}
+              onChange={e => setStudentSearch(e.target.value)}
+              className="w-full mb-4 px-3 py-2 border rounded"
+            />
+            <div className="flex flex-col gap-2 mt-6 max-h-60 overflow-y-auto">
+              {students
+                .filter(student =>
+                  (student.name || student.fullName || student.username || "")
+                    .toLowerCase()
+                    .includes(studentSearch.toLowerCase())
+                )
+                .map(student => (
+                  <button
+                    key={student._id}
+                    className="px-4 py-2 bg-info text-white rounded hover:bg-info/80 transition"
+                    onClick={() => {
+                      setSelectedStudentForDelete(student._id);
+                      setShowStudentSelectModal({ subject: showDeleteConfirmModal.subject });
+                      setShowDeleteConfirmModal(null);
+                      setConfirmRemoveSubject(null);
+                    }}
+                  >
+                    {student.name || student.fullName || student.username}
+                  </button>
+                ))}
+              <button
+                className="px-4 py-2 bg-muted text-foreground rounded hover:bg-muted/80 transition"
+                onClick={() => {
+                  setShowDeleteConfirmModal(null);
+                  setConfirmRemoveSubject(null);
+                }}
+              >
+                Cancel
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {showStudentSelectModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40">
+          <div className="bg-white rounded-lg shadow-lg p-6 w-full max-w-sm text-center">
+            <h3 className="font-bold text-lg mb-4">Confirm Individual Subject Removal</h3>
+            <p className="mb-4">
+              Are you sure you want to remove the subject <span className="text-primary font-bold">{showStudentSelectModal.subject}</span> for <br />
+              <span className="font-bold">{students.find(s => s._id === selectedStudentForDelete)?.name || 'Selected Student'}</span>?
+            </p>
+            <div className="flex justify-center gap-4 mt-6">
+              <button
+                className="px-4 py-2 bg-danger text-white rounded hover:bg-danger/80 transition"
+                onClick={async () => {
+                  await handleRemoveSubjectIndividual(selectedStudentForDelete, showStudentSelectModal.subject);
+                  setShowStudentSelectModal(null);
+                  setSelectedStudentForDelete(null);
+                }}
+              >
+                Yes, Remove
+              </button>
+              <button
+                className="px-4 py-2 bg-muted text-foreground rounded hover:bg-muted/80 transition"
+                onClick={() => {
+                  setShowStudentSelectModal(null);
+                  setSelectedStudentForDelete(null);
+                }}
+              >
+                Cancel
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {showDeleteConfirmModal && showDeleteConfirmModal.type === 'all' && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40">
+          <div className="bg-white rounded-lg shadow-lg p-6 w-full max-w-sm text-center">
+            <h3 className="font-bold text-lg mb-4">
+              Confirm General Subject Removal
+            </h3>
+            <p className="mb-4">
+              Are you <span className="font-semibold text-red-600">sure</span> you want to{" "}
+              <span className="font-bold">
+                remove the subject <span className="text-primary">{showDeleteConfirmModal.subject}</span>
+              </span>{" "}
+              for all students?
+            </p>
+            <div className="flex justify-center gap-4 mt-6">
+              <button
+                className="px-4 py-2 bg-warning text-white rounded hover:opacity-90 transition"
+                onClick={async () => {
+                  await handleRemoveSubjectAll(showDeleteConfirmModal.subject);
+                  setShowDeleteConfirmModal(null);
+                  setConfirmRemoveSubject(null);
+                }}
+              >
+                Yes, Remove
+              </button>
+              <button
+                className="px-4 py-2 bg-muted text-foreground rounded hover:bg-muted/80 transition"
+                onClick={() => setShowDeleteConfirmModal(null)}
+              >
+                Cancel
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {showSyncModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40">
+          <div className="bg-white rounded-lg shadow-lg p-6 w-full max-w-sm text-center">
+            <h3 className="font-bold text-lg mb-4">Sync Status</h3>
+            <p className="mb-4">{syncMessage}</p>
+            {syncing && (
+              <div className="flex justify-center mb-4">
+                <svg
+                  style={{ width: 32, height: 32, margin: "auto", display: "block" }}
+                  viewBox="0 0 50 50"
+                >
+                  <circle
+                    cx="25"
+                    cy="25"
+                    r="20"
+                    fill="none"
+                    stroke="#2563eb"
+                    strokeWidth="5"
+                    strokeLinecap="round"
+                    strokeDasharray="31.4 31.4"
+                  >
+                    <animateTransform
+                      attributeName="transform"
+                      type="rotate"
+                      from="0 25 25"
+                      to="360 25 25"
+                      dur="1s"
+                      repeatCount="indefinite"
+                    />
+                  </circle>
+                </svg>
+              </div>
+            )}
+            {!syncing && (
+              <button
+                className="px-4 py-2 bg-primary text-white rounded"
+                onClick={() => setShowSyncModal(false)}
+              >
+                OK
+              </button>
+            )}
+          </div>
+        </div>
+      )}
     </div>
   );
 };

@@ -32,6 +32,103 @@ const Spreadsheet = () => {
   const [syncing, setSyncing] = useState(false);
   const [deferredPrompt, setDeferredPrompt] = useState(null);
   const [showInstallBtn, setShowInstallBtn] = useState(false);
+  const [hasShownOnlineModal, setHasShownOnlineModal] = useState(false);
+
+   const fetchData = async () => {
+      try {
+        const res = await fetch(`${API_BASE_URL}/api/user/class/${selectedClass}/all/students?term=${selectedTerm}`);
+        let studentData = await res.json();
+        studentData = Array.isArray(studentData)
+          ? [...studentData].sort((a, b) =>
+              (a.name || a.fullName || a.username || '').localeCompare(
+                b.name || b.fullName || b.username || ''
+              )
+            )
+          : [];
+        setStudents(studentData);
+
+        const fetches = studentData.map(student =>
+          fetch(`${API_BASE_URL}/api/results/student/${student._id}/pushed?className=${selectedClass}&term=${selectedTerm}`)
+            .then(res => res.json())
+            .then(results => ({ studentId: student._id, results }))
+        );
+
+        const resultsArr = await Promise.all(fetches);
+        const allSubjectsSet = new Set();
+        const allSubjectsOrdered = [];
+        const map = {};
+        const editMap = {};
+
+        resultsArr.forEach(({ studentId, results }) => {
+          map[studentId] = {};
+          editMap[studentId] = {};
+          const subjects = [];
+
+          results.forEach(r => {
+            if (r.subject && r.subject !== "Overall") {
+              subjects.push(r.subject);
+              map[studentId][r.subject] = r;
+              editMap[studentId][r.subject] = {
+                cat: r.firstCatScore ?? "",
+                exam: r.examScore ?? "",
+                grade: r.grade ?? "",
+                remark: r.remark ?? "",
+                _id: r._id,
+                notOffering: false
+              };
+              if (!allSubjectsSet.has(r.subject)) {
+                allSubjectsSet.add(r.subject);
+                allSubjectsOrdered.push(r.subject);
+              }
+            } else if (r.subject === "Overall") {
+              map[studentId]._overall = r;
+              editMap[studentId]._overall = {
+                ...r,
+                handwriting: r.handwriting ?? "",
+                punctuality: r.punctuality ?? "",
+                initiative: r.initiative ?? "",
+                obedience: r.obedience ?? "",
+                honesty: r.honesty ?? "",
+                neatness: r.neatness ?? "",
+                attentiveness: r.attentiveness ?? "",
+                respect: r.respect ?? "",
+                attitude: r.attitude ?? "",
+                creativity: r.creativity ?? ""
+              };
+            }
+          });
+
+          editMap[studentId].subjects = subjects;
+
+          allSubjectsOrdered.forEach(subject => {
+            if (!subjects.includes(subject)) {
+              editMap[studentId][subject] = { notOffering: true };
+            }
+          });
+        });
+
+        Object.keys(editMap).forEach(studentId => {
+          const studentSubjects = Object.keys(editMap[studentId]).filter(s => s !== "_overall" && editMap[studentId][s] && !editMap[studentId][s].notOffering);
+          allSubjectsOrdered.forEach(subject => {
+            if (!studentSubjects.includes(subject)) {
+              editMap[studentId][subject] = { notOffering: true };
+            }
+          });
+        });
+
+        setSubjects(allSubjectsOrdered);
+        setResultsMap(map);
+        setEditResults(editMap);
+        setLoading(false);
+      } catch (err) {
+        setStudents([]);
+        setSubjects([]);
+        setResultsMap({});
+        setEditResults({});
+        setLoading(false);
+      }
+    };
+
 
   useEffect(() => {
     let didSetFromState = false;
@@ -128,103 +225,7 @@ const Spreadsheet = () => {
     if (!selectedClass || !selectedTerm) return;
     setLoading(true);
 
-    const fetchData = async () => {
-      try {
-        const res = await fetch(`${API_BASE_URL}/api/user/class/${selectedClass}/all/students?term=${selectedTerm}`);
-        let studentData = await res.json();
-        // Sort students alphabetically by name
-        studentData = Array.isArray(studentData)
-          ? [...studentData].sort((a, b) =>
-              (a.name || a.fullName || a.username || '').localeCompare(
-                b.name || b.fullName || b.username || ''
-              )
-            )
-          : [];
-        setStudents(studentData);
-
-        const fetches = studentData.map(student =>
-          fetch(`${API_BASE_URL}/api/results/student/${student._id}/pushed?className=${selectedClass}&term=${selectedTerm}`)
-            .then(res => res.json())
-            .then(results => ({ studentId: student._id, results }))
-        );
-
-        const resultsArr = await Promise.all(fetches);
-        const allSubjectsSet = new Set();
-        const allSubjectsOrdered = [];
-        const map = {};
-        const editMap = {};
-
-        resultsArr.forEach(({ studentId, results }) => {
-          map[studentId] = {};
-          editMap[studentId] = {};
-          const subjects = [];
-
-          results.forEach(r => {
-            if (r.subject && r.subject !== "Overall") {
-              subjects.push(r.subject);
-              map[studentId][r.subject] = r;
-              editMap[studentId][r.subject] = {
-                cat: r.firstCatScore ?? "",
-                exam: r.examScore ?? "",
-                grade: r.grade ?? "",
-                remark: r.remark ?? "",
-                _id: r._id,
-                notOffering: false
-              };
-              if (!allSubjectsSet.has(r.subject)) {
-                allSubjectsSet.add(r.subject);
-                allSubjectsOrdered.push(r.subject);
-              }
-            } else if (r.subject === "Overall") {
-              map[studentId]._overall = r;
-              editMap[studentId]._overall = {
-                ...r,
-                handwriting: r.handwriting ?? "",
-                punctuality: r.punctuality ?? "",
-                initiative: r.initiative ?? "",
-                obedience: r.obedience ?? "",
-                honesty: r.honesty ?? "",
-                neatness: r.neatness ?? "",
-                attentiveness: r.attentiveness ?? "",
-                respect: r.respect ?? "",
-                attitude: r.attitude ?? "",
-                creativity: r.creativity ?? ""
-              };
-            }
-          });
-
-          // **Add this line to set the subjects array for each student:**
-          editMap[studentId].subjects = subjects;
-
-          allSubjectsOrdered.forEach(subject => {
-            if (!subjects.includes(subject)) {
-              editMap[studentId][subject] = { notOffering: true };
-            }
-          });
-        });
-
-        Object.keys(editMap).forEach(studentId => {
-          const studentSubjects = Object.keys(editMap[studentId]).filter(s => s !== "_overall" && editMap[studentId][s] && !editMap[studentId][s].notOffering);
-          allSubjectsOrdered.forEach(subject => {
-            if (!studentSubjects.includes(subject)) {
-              editMap[studentId][subject] = { notOffering: true };
-            }
-          });
-        });
-
-        setSubjects(allSubjectsOrdered);
-        setResultsMap(map);
-        setEditResults(editMap);
-        setLoading(false);
-      } catch (err) {
-        setStudents([]);
-        setSubjects([]);
-        setResultsMap({});
-        setEditResults({});
-        setLoading(false);
-      }
-    };
-
+   
     // Always fetch from backend for sustainability
     fetchData();
   }, [selectedClass, selectedTerm, location.state]);
@@ -415,14 +416,11 @@ async function saveStudentResults(studentId, nextEditResults = null) {
 
   if (!navigator.onLine) {
     await addToQueue(action);
-    // No modal here!
     return;
   }
 
-  // Chain saves for this student to avoid race conditions
-  if (!saveQueue.current[studentId]) saveQueue.current[studentId] = Promise.resolve();
-
-  saveQueue.current[studentId] = saveQueue.current[studentId].then(async () => {
+  // Online: save directly to backend, do NOT add to queue
+  saveQueue.current[studentId] = (saveQueue.current[studentId] || Promise.resolve()).then(async () => {
     for (const subject of subjects) {
       const subjEdit = results[studentId]?.[subject];
       if (subjEdit && !subjEdit.notOffering && subjEdit._id) {
@@ -441,7 +439,6 @@ async function saveStudentResults(studentId, nextEditResults = null) {
         });
       }
     }
-    // Save key ratings/meta
     const overall = results[studentId]?._overall;
     if (overall && overall._id) {
       await fetch(`${API_BASE_URL}/api/results/update/${overall._id}`, {
@@ -464,10 +461,10 @@ async function saveStudentResults(studentId, nextEditResults = null) {
         headers: { 'Content-Type': 'application/json' }
       });
     }
-  }).catch(() => {
-    // Optionally handle save error (e.g., show a toast)
-  });
-};
+    // Clear queue after successful online save to prevent stale items
+    await clearQueue();
+  }).catch(() => {});
+}
 
   // Save all changes
   const handleSaveAll = async () => {
@@ -521,14 +518,17 @@ async function saveStudentResults(studentId, nextEditResults = null) {
     alert("All changes saved!");
   };
 
-  useEffect(() => {
-  async function syncQueue() {
-    if (navigator.onLine && wasOffline) {
-      setSyncMessage("You are now online. Offline changes will be synced to the online database.");
+ useEffect(() => {
+  async function checkUnsyncedQueue() {
+    const queue = await getQueue();
+    const hasUnsyncedChanges = queue && queue.length > 0;
+
+    if (hasUnsyncedChanges && navigator.onLine) {
+      // Only show sync modal if there are actual unsynced changes
+      setSyncMessage("Unsynced offline changes detected. Syncing to online database...");
       setShowSyncModal(true);
       setSyncing(true);
 
-      const queue = await getQueue();
       let synced = false;
       for (const action of queue) {
         if (action.type === 'saveStudentResults') {
@@ -578,17 +578,27 @@ async function saveStudentResults(studentId, nextEditResults = null) {
       if (synced) {
         await clearQueue();
         setSyncMessage("Offline changes have been synced to the online database.");
+        await fetchData(); // Refresh UI with latest data
       }
       setSyncing(false);
       setWasOffline(false);
+    } else if (navigator.onLine && !hasUnsyncedChanges) {
+      // No unsynced changes — do nothing, no modal
+      setShowSyncModal(false);
+      setSyncing(false);
     }
   }
 
-  window.addEventListener('online', syncQueue);
-  syncQueue();
+  if (navigator.onLine) {
+    checkUnsyncedQueue();
+  }
 
-  return () => window.removeEventListener('online', syncQueue);
-}, [wasOffline]);
+  window.addEventListener('online', checkUnsyncedQueue);
+
+  return () => window.removeEventListener('online', checkUnsyncedQueue);
+}, []);
+
+
 useEffect(() => {
   function handleOffline() {
     setSyncMessage("You are now working offline. Changes will sync when online.");
@@ -617,6 +627,8 @@ useEffect(() => {
   window.addEventListener('beforeinstallprompt', handleBeforeInstallPrompt);
   return () => window.removeEventListener('beforeinstallprompt', handleBeforeInstallPrompt);
 }, []);
+
+
   // --- Add: Live position & average calculation for all students (same as verify-result.jsx) ---
   useEffect(() => {
     if (students.length > 0) {
@@ -1286,21 +1298,6 @@ useEffect(() => {
       )}
     </div>
   </div>
-)}
-
-{/* Add to Home Screen Button */}
-{showInstallBtn && (
-  <button
-    className="mb-4 px-4 py-2 bg-green-600 text-white rounded"
-    onClick={() => {
-      if (deferredPrompt) {
-        deferredPrompt.prompt();
-        setShowInstallBtn(false);
-      }
-    }}
-  >
-    Add Spreadsheet to Home Screen
-  </button>
 )}
 
     </div>

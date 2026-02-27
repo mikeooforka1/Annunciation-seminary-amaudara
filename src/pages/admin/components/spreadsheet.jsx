@@ -33,6 +33,10 @@ const Spreadsheet = () => {
   const [deferredPrompt, setDeferredPrompt] = useState(null);
   const [showInstallBtn, setShowInstallBtn] = useState(false);
   const [hasShownOnlineModal, setHasShownOnlineModal] = useState(false);
+  const [syncProgress, setSyncProgress] = useState(0);
+  const [showSyncRetryModal, setShowSyncRetryModal] = useState(false);
+  const [syncRetryProgress, setSyncRetryProgress] = useState(0);
+  const [syncRetryMessage, setSyncRetryMessage] = useState("");
 
   // --- New state for 3-dot dropdown ---
   const [openDropdownSubject, setOpenDropdownSubject] = useState(null);
@@ -699,7 +703,7 @@ const Spreadsheet = () => {
           await fetch(`${API_BASE_URL}/api/results/update/${subjEdit._id}`, {
             method: 'PUT',
             body: JSON.stringify({
-              firstCatScore: Number(subjEdit.cat ?? 0),
+              firstCatScore: Number(subjEdit.cat ?? subjEdit.cat1 ?? 0),
               examScore: Number(subjEdit.exam ?? 0),
               grade: subjEdit.grade ?? "",
               remark: subjEdit.remark ?? "",
@@ -746,7 +750,7 @@ const Spreadsheet = () => {
           await fetch(`${API_BASE_URL}/api/results/update/${subjEdit._id}`, {
             method: 'PUT',
             body: JSON.stringify({
-              firstCatScore: Number(subjEdit.cat ?? 0),
+              firstCatScore: Number(subjEdit.cat ?? subjEdit.cat1 ?? 0),
               examScore: Number(subjEdit.exam ?? 0),
               grade: subjEdit.grade ?? "",
               remark: subjEdit.remark ?? "",
@@ -788,46 +792,27 @@ const Spreadsheet = () => {
   };
 
   useEffect(() => {
-    async function syncQueuedActions(queue) {
-      // Collect subjects added offline so we can sync their scores after
-      const addedSubjects = [];
+  async function syncQueuedActions(queue) {
+    setSyncProgress(0);
+    // Collect subjects added offline so we can sync their scores after
+    const addedSubjects = [];
+    const total = queue.length;
+    let done = 0;
+    let syncFailed = false;
 
-      for (const action of queue) {
-        try {
-          if (action.type === 'saveStudentResults') {
-            for (const subject of action.subjects) {
-              const subjEdit = action.results[action.studentId]?.[subject];
-              if (subjEdit && !subjEdit.notOffering && subjEdit._id) {
-                await fetch(`${API_BASE_URL}/api/results/update/${subjEdit._id}`, {
-                  method: 'PUT',
-                  body: JSON.stringify({
-                    firstCatScore: Number(subjEdit.cat ?? 0),
-                    examScore: Number(subjEdit.exam ?? 0),
-                    grade: subjEdit.grade ?? "",
-                    remark: subjEdit.remark ?? "",
-                    reviewed: false,
-                    pending: true,
-                    verified: false
-                  }),
-                  headers: { 'Content-Type': 'application/json' }
-                });
-              }
-            }
-            const overall = action.results[action.studentId]?._overall;
-            if (overall && overall._id) {
-              await fetch(`${API_BASE_URL}/api/results/update/${overall._id}`, {
+    for (const action of queue) {
+      try {
+        if (action.type === 'saveStudentResults') {
+          for (const subject of action.subjects) {
+            const subjEdit = action.results[action.studentId]?.[subject];
+            if (subjEdit && !subjEdit.notOffering && subjEdit._id) {
+              await fetch(`${API_BASE_URL}/api/results/update/${subjEdit._id}`, {
                 method: 'PUT',
                 body: JSON.stringify({
-                  handwriting: overall.handwriting,
-                  punctuality: overall.punctuality,
-                  initiative: overall.initiative,
-                  obedience: overall.obedience,
-                  honesty: overall.honesty,
-                  neatness: overall.neatness,
-                  attentiveness: overall.attentiveness,
-                  respect: overall.respect,
-                  attitude: overall.attitude,
-                  creativity: overall.creativity,
+                  firstCatScore: Number(subjEdit.cat ?? subjEdit.cat1 ?? 0),
+                  examScore: Number(subjEdit.exam ?? 0),
+                  grade: subjEdit.grade ?? "",
+                  remark: subjEdit.remark ?? "",
                   reviewed: false,
                   pending: true,
                   verified: false
@@ -835,11 +820,68 @@ const Spreadsheet = () => {
                 headers: { 'Content-Type': 'application/json' }
               });
             }
-          } else if (action.type === 'deleteResult') {
-            await fetch(`${API_BASE_URL}/api/results/delete/${action.resultId}`, {
-              method: 'DELETE'
+          }
+          const overall = action.results[action.studentId]?._overall;
+          if (overall && overall._id) {
+            await fetch(`${API_BASE_URL}/api/results/update/${overall._id}`, {
+              method: 'PUT',
+              body: JSON.stringify({
+                handwriting: overall.handwriting,
+                punctuality: overall.punctuality,
+                initiative: overall.initiative,
+                obedience: overall.obedience,
+                honesty: overall.honesty,
+                neatness: overall.neatness,
+                attentiveness: overall.attentiveness,
+                respect: overall.respect,
+                attitude: overall.attitude,
+                creativity: overall.creativity,
+                reviewed: false,
+                pending: true,
+                verified: false
+              }),
+              headers: { 'Content-Type': 'application/json' }
             });
-          } else if (action.type === 'addSubjectAll') {
+          }
+        } else if (action.type === 'deleteResult') {
+          await fetch(`${API_BASE_URL}/api/results/delete/${action.resultId}`, {
+            method: 'DELETE'
+          });
+        } else if (action.type === 'addSubjectAll') {
+          const currentSubjectsRes = await fetch(`${API_BASE_URL}/api/class-subjects/${action.className}?term=${action.term}`);
+          const currentSubjects = await currentSubjectsRes.json();
+          if (!currentSubjects.includes(action.subject)) {
+            await fetch(`${API_BASE_URL}/api/class-subjects/set`, {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({
+                className: action.className,
+                term: action.term,
+                subjects: [...currentSubjects, action.subject]
+              }),
+            });
+          }
+          for (const studentId of action.studentIds) {
+            await fetch(`${API_BASE_URL}/api/class-subjects/add-subject-individual`, {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({
+                studentId,
+                className: action.className,
+                term: action.term,
+                subject: action.subject
+              }),
+            }).catch(() => {});
+          }
+          // Track for score sync
+          addedSubjects.push({
+            subject: action.subject,
+            studentIds: action.studentIds,
+            className: action.className,
+            term: action.term
+          });
+        } else if (action.type === 'addSubjectIndividual') {
+          if (action.needsNewSubjectColumn) {
             const currentSubjectsRes = await fetch(`${API_BASE_URL}/api/class-subjects/${action.className}?term=${action.term}`);
             const currentSubjects = await currentSubjectsRes.json();
             if (!currentSubjects.includes(action.subject)) {
@@ -853,144 +895,127 @@ const Spreadsheet = () => {
                 }),
               });
             }
-            for (const studentId of action.studentIds) {
-              await fetch(`${API_BASE_URL}/api/class-subjects/add-subject-individual`, {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({
-                  studentId,
-                  className: action.className,
-                  term: action.term,
-                  subject: action.subject
-                }),
-              }).catch(() => {});
-            }
-            // Track for score sync
-            addedSubjects.push({
-              subject: action.subject,
-              studentIds: action.studentIds,
+          }
+          await fetch(`${API_BASE_URL}/api/class-subjects/add-subject-individual`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              studentId: action.studentId,
               className: action.className,
-              term: action.term
-            });
-          } else if (action.type === 'addSubjectIndividual') {
-            if (action.needsNewSubjectColumn) {
-              const currentSubjectsRes = await fetch(`${API_BASE_URL}/api/class-subjects/${action.className}?term=${action.term}`);
-              const currentSubjects = await currentSubjectsRes.json();
-              if (!currentSubjects.includes(action.subject)) {
-                await fetch(`${API_BASE_URL}/api/class-subjects/set`, {
-                  method: 'POST',
-                  headers: { 'Content-Type': 'application/json' },
+              term: action.term,
+              subject: action.subject
+            }),
+          }).catch(() => {});
+          // Track for score sync
+          addedSubjects.push({
+            subject: action.subject,
+            studentIds: [action.studentId],
+            className: action.className,
+            term: action.term
+          });
+        }
+      } catch (err) {
+        syncFailed = true;
+        console.error('Error syncing queued action:', err);
+        break;
+      }
+      done++;
+      setSyncProgress(Math.round((done / total) * 100));
+    }
+
+    // After all add-subject actions, sync offline scores for newly added subjects
+    if (addedSubjects.length > 0) {
+      const offlineState = await loadOfflineState();
+      const offlineEditResults = offlineState?.editResults || editResults;
+
+      for (const added of addedSubjects) {
+        for (const studentId of added.studentIds) {
+          const offlineSubjEdit = offlineEditResults[studentId]?.[added.subject];
+          if (
+            offlineSubjEdit &&
+            !offlineSubjEdit.notOffering &&
+            (Number(offlineSubjEdit.cat ?? offlineSubjEdit.cat1 ?? 0) !== 0 ||
+             Number(offlineSubjEdit.exam ?? 0) !== 0)
+          ) {
+            try {
+              const resArr = await fetch(
+                `${API_BASE_URL}/api/results/student/${studentId}/pushed?className=${added.className}&term=${added.term}`
+              ).then(r => r.json());
+
+              const matchingResult = resArr.find(r => r.subject === added.subject);
+              if (matchingResult && matchingResult._id) {
+                const cat = Number(offlineSubjEdit.cat ?? offlineSubjEdit.cat1 ?? 0);
+                const exam = Number(offlineSubjEdit.exam ?? 0);
+                const total = cat + exam;
+                await fetch(`${API_BASE_URL}/api/results/update/${matchingResult._id}`, {
+                  method: 'PUT',
                   body: JSON.stringify({
-                    className: action.className,
-                    term: action.term,
-                    subjects: [...currentSubjects, action.subject]
+                    firstCatScore: cat,
+                    examScore: exam,
+                    grade: getGrade(total),
+                    remark: getRemark(getGrade(total)),
+                    reviewed: false,
+                    pending: true,
+                    verified: false
                   }),
+                  headers: { 'Content-Type': 'application/json' }
                 });
               }
-            }
-            await fetch(`${API_BASE_URL}/api/class-subjects/add-subject-individual`, {
-              method: 'POST',
-              headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify({
-                studentId: action.studentId,
-                className: action.className,
-                term: action.term,
-                subject: action.subject
-              }),
-            }).catch(() => {});
-            // Track for score sync
-            addedSubjects.push({
-              subject: action.subject,
-              studentIds: [action.studentId],
-              className: action.className,
-              term: action.term
-            });
-          }
-        } catch (err) {
-          console.error('Error syncing queued action:', err);
-        }
-      }
-
-      // After all add-subject actions, sync offline scores for newly added subjects
-      if (addedSubjects.length > 0) {
-        // Load the offline state to get scores entered while offline
-        const offlineState = await loadOfflineState();
-        const offlineEditResults = offlineState?.editResults || editResults;
-
-        for (const added of addedSubjects) {
-          for (const studentId of added.studentIds) {
-            const offlineSubjEdit = offlineEditResults[studentId]?.[added.subject];
-            // Only sync if there are actual scores entered offline
-            if (
-              offlineSubjEdit &&
-              !offlineSubjEdit.notOffering &&
-              (Number(offlineSubjEdit.cat ?? offlineSubjEdit.cat1 ?? 0) !== 0 ||
-               Number(offlineSubjEdit.exam ?? 0) !== 0)
-            ) {
-              try {
-                // Fetch the newly created result to get its _id
-                const resArr = await fetch(
-                  `${API_BASE_URL}/api/results/student/${studentId}/pushed?className=${added.className}&term=${added.term}`
-                ).then(r => r.json());
-
-                const matchingResult = resArr.find(r => r.subject === added.subject);
-                if (matchingResult && matchingResult._id) {
-                  const cat = Number(offlineSubjEdit.cat ?? offlineSubjEdit.cat1 ?? 0);
-                  const exam = Number(offlineSubjEdit.exam ?? 0);
-                  const total = cat + exam;
-                  await fetch(`${API_BASE_URL}/api/results/update/${matchingResult._id}`, {
-                    method: 'PUT',
-                    body: JSON.stringify({
-                      firstCatScore: cat,
-                      examScore: exam,
-                      grade: getGrade(total),
-                      remark: getRemark(getGrade(total)),
-                      reviewed: false,
-                      pending: true,
-                      verified: false
-                    }),
-                    headers: { 'Content-Type': 'application/json' }
-                  });
-                }
-              } catch (err) {
-                console.error(`Error syncing scores for ${added.subject} / ${studentId}:`, err);
-              }
+            } catch (err) {
+              console.error(`Error syncing scores for ${added.subject} / ${studentId}:`, err);
             }
           }
         }
       }
     }
 
-    async function checkUnsyncedQueue() {
-      const queue = await getQueue();
-      const hasUnsyncedChanges = queue && queue.length > 0;
-
-      if (hasUnsyncedChanges && navigator.onLine) {
-        setSyncMessage("Unsynced offline changes detected. Syncing to online database...");
-        setShowSyncModal(true);
-        setSyncing(true);
-
-        await syncQueuedActions(queue);
-        await clearQueue();
-        setSyncMessage("Offline changes have been synced to the online database.");
-        await fetchData();
-
-        setSyncing(false);
-        setWasOffline(false);
-      } else if (navigator.onLine && !hasUnsyncedChanges) {
-        setShowSyncModal(false);
-        setSyncing(false);
-      }
+    if (!syncFailed) {
+      await clearQueue();
+      setSyncMessage("Offline changes have been synced to the online database.");
+      await fetchData();
+      setSyncing(false);
+      setWasOffline(false);
+      setShowSyncRetryModal(false);
+    } else {
+      setSyncMessage("Sync interrupted due to connection issues. Your changes are safe and will sync automatically when the connection is restored.");
+      setSyncing(false);
+      setShowSyncRetryModal(true);
+      setSyncRetryProgress(syncProgress);
+      setSyncRetryMessage("Sync failed due to poor or lost connection. Progress: " + syncProgress + "%. Retrying when connection is restored...");
+      // Do NOT clear the queue, so it will retry on next connection
     }
+  }
 
-    if (navigator.onLine) {
-      checkUnsyncedQueue();
+  async function checkUnsyncedQueue() {
+    const queue = await getQueue();
+    const hasUnsyncedChanges = queue && queue.length > 0;
+
+    if (hasUnsyncedChanges && navigator.onLine) {
+      setSyncMessage("Unsynced offline changes detected. Syncing to online database...");
+      setShowSyncModal(true);
+      setSyncing(true);
+
+      await syncQueuedActions(queue);
+    } else if (navigator.onLine && !hasUnsyncedChanges) {
+      setShowSyncModal(false);
+      setSyncing(false);
+      setShowSyncRetryModal(false);
     }
+  }
 
-    window.addEventListener('online', checkUnsyncedQueue);
+  if (navigator.onLine) {
+    checkUnsyncedQueue();
+  }
 
-    return () => window.removeEventListener('online', checkUnsyncedQueue);
-  }, []);
+  window.addEventListener('online', checkUnsyncedQueue);
+
+  return () => window.removeEventListener('online', checkUnsyncedQueue);
+}, []);
+
+// ...existing code...
+
+
+// ...existing code...
 
   useEffect(() => {
     function handleOffline() {
@@ -1150,64 +1175,25 @@ const Spreadsheet = () => {
   }, [openDropdownSubject]);
 
   const [resetLoading, setResetLoading] = useState(false);
+  const [showResetModal, setShowResetModal] = useState(false);
+  const [showResetConfirmModal, setShowResetConfirmModal] = useState(false);
+  const [showOfflineResetModal, setShowOfflineResetModal] = useState(false);
 
   // --- Reset All Results to Pending ---
   const handleResetToPending = async () => {
-    if (!window.confirm('Are you sure you want to reset all results to pending? This will allow editing but remove reviewed/verified status.')) {
-      return;
-    }
+    setShowResetConfirmModal(false);
     setResetLoading(true);
 
     try {
-      for (const student of students) {
-        const studentResult = editResults[student._id];
-        if (!studentResult) continue;
-
-        // Reset each subject result
-        const studentSubjects = Array.isArray(studentResult.subjects) ? studentResult.subjects : [];
-        for (const subject of studentSubjects) {
-          const subjEdit = studentResult[subject];
-          if (subjEdit && subjEdit._id) {
-            if (navigator.onLine) {
-              await fetch(`${API_BASE_URL}/api/results/update/${subjEdit._id}`, {
-                method: 'PUT',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({
-                  reviewed: false,
-                  verified: false,
-                  pending: true
-                })
-              });
-            } else {
-              await addToQueue({
-                type: 'resetToPending',
-                resultId: subjEdit._id
-              });
-            }
-          }
-        }
-
-        // Reset Overall result
-        const overall = studentResult._overall;
-        if (overall && overall._id) {
-          if (navigator.onLine) {
-            await fetch(`${API_BASE_URL}/api/results/update/${overall._id}`, {
-              method: 'PUT',
-              headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify({
-                reviewed: false,
-                verified: false,
-                pending: true
-              })
-            });
-          } else {
-            await addToQueue({
-              type: 'resetToPending',
-              resultId: overall._id
-            });
-          }
-        }
-      }
+      // Use the new batch endpoint for efficiency
+      await fetch(`${API_BASE_URL}/api/results/reset-all-to-pending`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          className: selectedClass,
+          term: selectedTerm
+        })
+      });
 
       // Update the local status map immediately
       const updatedStatusMap = {};
@@ -1219,10 +1205,8 @@ const Spreadsheet = () => {
       alert('All results have been reset to pending. You can now edit.');
 
       // Refresh data to reflect changes
-      if (navigator.onLine) {
-        setLoading(true);
-        await fetchData();
-      }
+      setLoading(true);
+      await fetchData();
     } catch (err) {
       console.error('Error resetting to pending:', err);
       alert('An error occurred while resetting results.');
@@ -1230,6 +1214,10 @@ const Spreadsheet = () => {
 
     setResetLoading(false);
   };
+
+  
+
+ 
 
   return (
     <div className="p-4">
@@ -1273,18 +1261,24 @@ const Spreadsheet = () => {
       </h2>
 
       {anyReviewedOrVerified && (
-        <div className="mb-4 p-2 rounded bg-yellow-100 text-yellow-800 font-semibold text-center">
-          You cannot modify results here after review or verification. You can do that individually in the main page.
-          <br />
-          <button
-            className="mt-2 px-4 py-2 bg-red-600 text-white rounded hover:bg-red-700 transition font-semibold"
-            onClick={handleResetToPending}
-            disabled={resetLoading}
-          >
-            {resetLoading ? 'Resetting...' : '🔄 Reset All to Pending (Enable Editing)'}
-          </button>
-        </div>
-      )}
+  <div className="mb-4 p-2 rounded bg-yellow-100 text-yellow-800 font-semibold text-center">
+    You cannot modify results here after review or verification. You can do that individually in the main page.
+    <br />
+    <button
+      className="mt-2 px-4 py-2 bg-red-600 text-white rounded hover:bg-red-700 transition font-semibold"
+      onClick={() => {
+        if (!navigator.onLine) {
+          setShowOfflineResetModal(true);
+        } else {
+          setShowResetModal(true);
+        }
+      }}
+      disabled={resetLoading}
+    >
+      {resetLoading ? 'Resetting...' : '🔄 Reset All to Pending (Enable Editing)'}
+    </button>
+  </div>
+)}
 
       <button
         className="mb-4 px-4 py-2 bg-primary text-white rounded"
@@ -1866,49 +1860,140 @@ const Spreadsheet = () => {
       )}
 
       {showSyncModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40">
-          <div className="bg-white rounded-lg shadow-lg p-6 w-full max-w-sm text-center">
-            <h3 className="font-bold text-lg mb-4">Sync Status</h3>
-            <p className="mb-4">{syncMessage}</p>
-            {syncing && (
-              <div className="flex justify-center mb-4">
-                <svg
-                  style={{ width: 32, height: 32, margin: "auto", display: "block" }}
-                  viewBox="0 0 50 50"
-                >
-                  <circle
-                    cx="25"
-                    cy="25"
-                    r="20"
-                    fill="none"
-                    stroke="#2563eb"
-                    strokeWidth="5"
-                    strokeLinecap="round"
-                    strokeDasharray="31.4 31.4"
-                  >
-                    <animateTransform
-                      attributeName="transform"
-                      type="rotate"
-                      from="0 25 25"
-                      to="360 25 25"
-                      dur="1s"
-                      repeatCount="indefinite"
-                    />
-                  </circle>
-                </svg>
-              </div>
-            )}
-            {!syncing && (
-              <button
-                className="px-4 py-2 bg-primary text-white rounded"
-                onClick={() => setShowSyncModal(false)}
-              >
-                OK
-              </button>
-            )}
+  <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40">
+    <div className="bg-white rounded-lg shadow-lg p-6 w-full max-w-sm text-center">
+      <h3 className="font-bold text-lg mb-4">Sync Status</h3>
+      <p className="mb-4">{syncMessage}</p>
+      {syncing && (
+        <div className="flex flex-col items-center mb-4 w-full">
+          <div className="w-full bg-gray-200 rounded-full h-4 mb-2">
+            <div
+              className="bg-blue-600 h-4 rounded-full transition-all"
+              style={{ width: `${syncProgress}%` }}
+            ></div>
           </div>
+          <span className="text-sm">{syncProgress}%</span>
         </div>
       )}
+      {!syncing && (
+        <button
+          className="px-4 py-2 bg-primary text-white rounded"
+          onClick={() => setShowSyncModal(false)}
+        >
+          OK
+        </button>
+      )}
+    </div>
+  </div>
+)}
+ {/* --- Reset to Pending: First Confirmation Modal --- */}
+  {showResetModal && (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40">
+      <div className="bg-white rounded-lg shadow-lg p-6 w-full max-w-sm text-center">
+        <h3 className="font-bold text-lg mb-4 text-red-600">⚠️ Reset All Results</h3>
+        <p className="mb-4">
+          Are you sure you want to reset <span className="font-bold">all results</span> back to <span className="font-bold text-yellow-600">Pending</span>?
+          <br /><br />
+          This will <span className="font-semibold text-red-600">remove</span> all reviewed and verified statuses for <span className="font-bold">{selectedClass.toUpperCase()}</span>.
+        </p>
+        <div className="flex justify-center gap-4 mt-6">
+          <button
+            className="px-4 py-2 bg-red-600 text-white rounded hover:bg-red-700 transition font-semibold"
+            onClick={() => {
+              setShowResetModal(false);
+              setShowResetConfirmModal(true);
+            }}
+          >
+            Yes, Continue
+          </button>
+          <button
+            className="px-4 py-2 bg-muted text-foreground rounded hover:bg-muted/80 transition"
+            onClick={() => setShowResetModal(false)}
+          >
+            Cancel
+          </button>
+        </div>
+      </div>
+    </div>
+  )}
+
+  {/* --- Reset to Pending: Second (Final) Confirmation Modal --- */}
+  {showResetConfirmModal && (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40">
+      <div className="bg-white rounded-lg shadow-lg p-6 w-full max-w-sm text-center">
+        <h3 className="font-bold text-lg mb-4 text-red-700">🔴 Final Confirmation</h3>
+        <p className="mb-4">
+          This action <span className="font-bold text-red-600">cannot be undone</span>.
+          <br /><br />
+          All <span className="font-bold">reviewed</span> and <span className="font-bold">verified</span> results for <span className="font-bold">{selectedClass.toUpperCase()}</span> will be set back to <span className="font-bold text-yellow-600">Pending</span>.
+          <br /><br />
+          Are you <span className="font-bold text-red-600">absolutely sure</span>?
+        </p>
+        <div className="flex justify-center gap-4 mt-6">
+          <button
+            className="px-4 py-2 bg-red-700 text-white rounded hover:bg-red-800 transition font-semibold"
+            onClick={handleResetToPending}
+            disabled={resetLoading}
+          >
+            {resetLoading ? 'Resetting...' : 'Yes, Reset All to Pending'}
+          </button>
+          <button
+            className="px-4 py-2 bg-muted text-foreground rounded hover:bg-muted/80 transition"
+            onClick={() => setShowResetConfirmModal(false)}
+          >
+            Cancel
+          </button>
+        </div>
+      </div>
+    </div>
+  )}
+
+  {/* --- Reset to Pending: Offline Not Allowed Modal --- */}
+  {showOfflineResetModal && (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40">
+      <div className="bg-white rounded-lg shadow-lg p-6 w-full max-w-sm text-center">
+        <h3 className="font-bold text-lg mb-4 text-red-600">Not Available Offline</h3>
+        <p className="mb-4">
+          Resetting all results to pending is <span className="font-bold text-red-600">only available online</span> for safety and data integrity.
+          <br /><br />
+          Please connect to the internet and try again.
+        </p>
+        <button
+          className="mt-4 px-4 py-2 bg-primary text-white rounded"
+          onClick={() => setShowOfflineResetModal(false)}
+        >
+          OK
+        </button>
+      </div>
+    </div>
+  )}
+  {showSyncRetryModal && (
+  <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40">
+    <div className="bg-white rounded-lg shadow-lg p-6 w-full max-w-sm text-center">
+      <h3 className="font-bold text-lg mb-4 text-red-600">Sync Failed</h3>
+      <p className="mb-4">{syncRetryMessage}</p>
+      <div className="flex flex-col items-center mb-4 w-full">
+        <div className="w-full bg-gray-200 rounded-full h-4 mb-2">
+          <div
+            className="bg-red-600 h-4 rounded-full transition-all"
+            style={{ width: `${syncRetryProgress}%` }}
+          ></div>
+        </div>
+        <span className="text-sm">{syncRetryProgress}%</span>
+      </div>
+      <p className="mb-2 text-gray-700">
+        The sync will retry automatically when your connection improves.
+      </p>
+      <button
+        className="px-4 py-2 bg-primary text-white rounded"
+        onClick={() => setShowSyncRetryModal(false)}
+      >
+        OK
+      </button>
+    </div>
+  </div>
+)}
+
     </div>
   );
 };

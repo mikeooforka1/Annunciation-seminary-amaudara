@@ -44,6 +44,16 @@ const ResultsTable = ({
       groupedResults[baseSubject].cat1 = result; // Only one C.A.T
     } else if (result.subject !== 'Overall') {
       groupedResults[baseSubject].exam = result;
+      // --- PATCH: If no C/A result, use firstCatScore from main subject ---
+      if (
+        !groupedResults[baseSubject].cat1 &&
+        typeof result.firstCatScore === 'number'
+      ) {
+        groupedResults[baseSubject].cat1 = {
+          score: result.firstCatScore
+        };
+      }
+      // --- END PATCH ---
     }
   });
 

@@ -561,22 +561,25 @@ useEffect(() => {
 
     // --- ADDED: Track pushed status for each student ---
     useEffect(() => {
-      if (teacherResults.length && students.length) {
-        const pushedStatus = {};
-        students.forEach(student => {
-          // Only consider results with pending: false
-          const hasPushed = teacherResults
-            .filter(r =>
-              String(r.studentId) === String(student._id) &&
-              r.className === teacherData.className &&
-              r.term === selectedTerm &&
-              r.pending === false // Only pushed results
-            ).length > 0;
-          pushedStatus[student._id] = hasPushed;
-        });
-        setResultsPushed(pushedStatus);
+      if (students.length && teacherData?.className && selectedTerm) {
+        const fetchPushedStatus = async () => {
+          const pushedStatus = {};
+          for (const student of students) {
+            try {
+              const res = await fetch(
+                `${API_BASE_URL}/api/results/student/${student._id}/pushed?className=${encodeURIComponent(teacherData.className)}&term=${encodeURIComponent(selectedTerm)}`
+              );
+              const pushedResults = await res.json();
+              pushedStatus[student._id] = Array.isArray(pushedResults) && pushedResults.length > 0;
+            } catch {
+              pushedStatus[student._id] = false;
+            }
+          }
+          setResultsPushed(prev => ({ ...prev, ...pushedStatus }));
+        };
+        fetchPushedStatus();
       }
-    }, [teacherResults, students, teacherData, selectedTerm]);
+    }, [students, teacherData, selectedTerm]);
     // --- END ADDED ---
 
     // --- ADDED: Track verified status for each student ---
@@ -584,14 +587,12 @@ useEffect(() => {
       if (teacherResults.length && students.length) {
         const verifiedStatus = {};
         students.forEach(student => {
-          // Check if any result for this student is verified by admin
           const isVerified = teacherResults.some(
             r => String(r.studentId) === String(student._id) && r.verified === true && r.pending === false
           );
           verifiedStatus[student._id] = isVerified;
         });
         setResultsPushed(prev => {
-          // If already pushed, keep true, but if verified, force true (read-only)
           const updated = { ...prev };
           Object.keys(verifiedStatus).forEach(id => {
             if (verifiedStatus[id]) updated[id] = true;

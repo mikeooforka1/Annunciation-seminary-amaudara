@@ -1087,7 +1087,36 @@ const safeHandleResultChange = (studentId, field, value) => {
                                   min="0"
                                   max="30"
                                   value={editResults[viewingStudent]?.[subject]?.cat1 ?? ''}
-                                  onChange={e => safeHandleResultChange(viewingStudent, subject, { ...editResults[viewingStudent][subject], cat1: e.target.value })}
+                                  onChange={async e => {
+                                    // Clamp value between 0 and 30
+                                    let value = Math.max(0, Math.min(Number(e.target.value), 30));
+                                    safeHandleResultChange(
+                                      viewingStudent,
+                                      subject,
+                                      { ...editResults[viewingStudent][subject], cat1: value }
+                                    );
+                                    // Instant save logic (like spreadsheet)
+                                    const result = editResults[viewingStudent][subject];
+                                    if (result && result._id) {
+                                      const updateUrl = `${API_BASE_URL}/api/results/update/${result._id}`;
+                                      const subjectPayload = {
+                                        ...result,
+                                        cat1: value,
+                                        firstCatScore: value,
+                                        examScore: Number(result.exam ?? 0),
+                                        grade: getGrade(value + Number(result.exam ?? 0)),
+                                        remark: getRemark(getGrade(value + Number(result.exam ?? 0))),
+                                        reviewed: false,
+                                        pending: true,
+                                        verified: false
+                                      };
+                                      await fetch(updateUrl, {
+                                        method: 'PUT',
+                                        body: JSON.stringify(subjectPayload),
+                                        headers: { 'Content-Type': 'application/json' }
+                                      });
+                                    }
+                                  }}
                                   className="border rounded px-2 py-1 w-16 text-center"
                                 />
                               </td>
@@ -1097,13 +1126,40 @@ const safeHandleResultChange = (studentId, field, value) => {
                                   min="0"
                                   max="70"
                                   value={editResults[viewingStudent]?.[subject]?.exam ?? ''}
-                                  onChange={e => safeHandleResultChange(viewingStudent, subject, { ...editResults[viewingStudent][subject], exam: e.target.value })}
+                                  onChange={async e => {
+                                    // Clamp value between 0 and 70
+                                    let value = Math.max(0, Math.min(Number(e.target.value), 70));
+                                    safeHandleResultChange(
+                                      viewingStudent,
+                                      subject,
+                                      { ...editResults[viewingStudent][subject], exam: value }
+                                    );
+                                    // Instant save logic (like spreadsheet)
+                                    const result = editResults[viewingStudent][subject];
+                                    if (result && result._id) {
+                                      const updateUrl = `${API_BASE_URL}/api/results/update/${result._id}`;
+                                      const subjectPayload = {
+                                        ...result,
+                                        exam: value,
+                                        examScore: value,
+                                        firstCatScore: Number(result.cat1 ?? 0),
+                                        grade: getGrade(Number(result.cat1 ?? 0) + value),
+                                        remark: getRemark(getGrade(Number(result.cat1 ?? 0) + value)),
+                                        reviewed: false,
+                                        pending: true,
+                                        verified: false
+                                      };
+                                      await fetch(updateUrl, {
+                                        method: 'PUT',
+                                        body: JSON.stringify(subjectPayload),
+                                        headers: { 'Content-Type': 'application/json' }
+                                      });
+                                    }
+                                  }}
                                   className="border rounded px-2 py-1 w-16 text-center"
                                 />
                               </td>
                               <td className="px-2 py-2 border-r border-border text-center font-bold text-primary">{total}</td>
-                              {/* Removed Max Score */}
-                              {/* Removed Min Score */}
                               <td className="px-2 py-2 border-r border-border text-center">
                                 <input
                                   type="text"

@@ -794,7 +794,7 @@ const Spreadsheet = () => {
   useEffect(() => {
   async function syncQueuedActions(queue) {
     setSyncProgress(0);
-    // Collect subjects added offline so we can sync their scores after
+   // Collect subjects added offline so we can sync their scores after
     const addedSubjects = [];
     const total = queue.length;
     let done = 0;

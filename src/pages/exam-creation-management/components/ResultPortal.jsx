@@ -948,16 +948,19 @@ const handlePushIndividualResult = async (studentId) => {
         })
         .finally(() => setIsLoadingResults(false));
 
-      // --- ADD THIS: Re-fetch pushed status for the student ---
+            // --- Re-fetch pushed status for the student (only confirm, never undo) ---
       fetch(`${API_BASE_URL}/api/results/student/${studentId}/pushed?className=${encodeURIComponent(teacherData.className)}&term=${encodeURIComponent(selectedTerm)}`, {
         credentials: 'include'
       })
         .then(res => res.json())
         .then(pushedResults => {
-          setResultsPushed(prev => ({
-            ...prev,
-            [studentId]: Array.isArray(pushedResults) && pushedResults.length > 0
-          }));
+          if (Array.isArray(pushedResults) && pushedResults.length > 0) {
+            setResultsPushed(prev => ({
+              ...prev,
+              [studentId]: true
+            }));
+          }
+          // Do NOT set to false here — the optimistic true from line 937 should stick
         });
       // --- END ADD ---
     } else {
@@ -1030,7 +1033,7 @@ useEffect(() => {
 
     // Autosave result data for selected student to backend (debounced)
     useEffect(() => {
-      if (selectedStudent) {
+      if (selectedStudent && !resultsPushed[selectedStudent._id]) {
         const timeout = setTimeout(() => {
           const payload = {
             studentId: selectedStudent._id,
@@ -1058,7 +1061,7 @@ useEffect(() => {
 
         return () => clearTimeout(timeout);
       }
-    }, [results, caScores, overall, subjects, selectedStudent, teacherData, selectedTerm]);
+    }, [results, caScores, overall, subjects, selectedStudent, teacherData, selectedTerm, resultsPushed]);
 
     // Add this helper function near the top of your file
 function isValidObjectId(id) {

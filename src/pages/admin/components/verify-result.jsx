@@ -216,12 +216,12 @@ const VerifyResult = () => {
               if (r.subject && r.subject !== 'Overall') {
                 subjects.push(r.subject);
                 mapped[r.subject] = {
-                  cat1: r.firstCatScore ?? '',
-                  exam: r.examScore ?? '',
-                  maxScore: r.maxScore ?? '',
-                  minScore: r.minScore ?? '',
-                  grade: r.grade ?? '',
-                  remark: r.remark ?? '',
+                  cat1: r.firstCatScore || '',
+                  exam: r.examScore || '',
+                  maxScore: r.maxScore || '',
+                  minScore: r.minScore || '',
+                  grade: r.grade || '',
+                  remark: r.remark || '',
                   _id: r._id,
                   reviewed: r.reviewed,
                   verified: r.verified,
@@ -758,24 +758,12 @@ const safeHandleResultChange = (studentId, field, value) => {
 
     // Check for incomplete students
     const incompleteStudents = [];
-    for (const student of students) {
-      const result = editResults[student._id];
-      if (!result || !result.subjects || result.subjects.length === 0) {
+for (const student of students) {
+    const result = editResults[student._id];
+    if (!result || !result.subjects || result.subjects.length === 0) {
         incompleteStudents.push(student.name);
-        continue;
-      }
-      for (const subject of result.subjects) {
-        const subj = result[subject];
-        if (
-          !subj ||
-          subj.cat1 === '' || subj.cat1 === undefined ||
-          subj.exam === '' || subj.exam === undefined
-        ) {
-          incompleteStudents.push(student.name);
-          break;
-        }
-      }
     }
+}
     if (incompleteStudents.length > 0) {
       setMessage(
         `Cannot review all. The following students have incomplete subject fields: ${incompleteStudents.join(', ')}`
@@ -806,25 +794,12 @@ const safeHandleResultChange = (studentId, field, value) => {
 
   const allResultsPushedAndComplete = students.length > 0 && students.every(student => {
     const result = editResults[student._id];
-    if (!result || !result.subjects || result.subjects.length === 0) return false;
-    // All subject fields must have a value (including 0)
-    return result.subjects.every(subject => {
-      const subj = result[subject];
-      return subj &&
-        (subj.cat1 !== '' && subj.cat1 !== undefined && subj.cat1 !== null) &&
-        (subj.exam !== '' && subj.exam !== undefined && subj.exam !== null);
-    });
+    return result && result.subjects && result.subjects.length > 0;
   });
   const incompleteStudents = students
     .filter(student => {
       const result = editResults[student._id];
-      if (!result || !result.subjects || result.subjects.length === 0) return true;
-      return result.subjects.some(subject => {
-        const subj = result[subject];
-        return !subj ||
-          subj.cat1 === '' || subj.cat1 === undefined || subj.cat1 === null ||
-          subj.exam === '' || subj.exam === undefined || subj.exam === null;
-      });
+      return !result || !result.subjects || result.subjects.length === 0;
     })
     .map(student => student.name);
   return (
@@ -1089,7 +1064,7 @@ const safeHandleResultChange = (studentId, field, value) => {
                                   value={editResults[viewingStudent]?.[subject]?.cat1 ?? ''}
                                   onChange={async e => {
                                     // Clamp value between 0 and 30
-                                    let value = Math.max(0, Math.min(Number(e.target.value), 30));
+                                    let value = e.target.value === "" ? "" : Math.max(0, Math.min(Number(e.target.value), 30));
                                     safeHandleResultChange(
                                       viewingStudent,
                                       subject,
@@ -1128,7 +1103,7 @@ const safeHandleResultChange = (studentId, field, value) => {
                                   value={editResults[viewingStudent]?.[subject]?.exam ?? ''}
                                   onChange={async e => {
                                     // Clamp value between 0 and 70
-                                    let value = Math.max(0, Math.min(Number(e.target.value), 70));
+                                    let value = e.target.value === "" ? "" : Math.max(0, Math.min(Number(e.target.value), 70));
                                     safeHandleResultChange(
                                       viewingStudent,
                                       subject,

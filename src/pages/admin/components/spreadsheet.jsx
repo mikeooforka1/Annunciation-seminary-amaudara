@@ -86,8 +86,8 @@ const Spreadsheet = () => {
               subjects.push(r.subject);
               map[studentId][r.subject] = r;
               editMap[studentId][r.subject] = {
-                cat: r.firstCatScore ?? "",
-                exam: r.examScore ?? "",
+                cat: r.firstCatScore || "",
+                exam: r.examScore || "",
                 grade: r.grade ?? "",
                 remark: r.remark ?? "",
                 _id: r._id,
@@ -246,11 +246,11 @@ const Spreadsheet = () => {
 
       let newValue = value;
       if (field === "cat") {
-        newValue = Math.max(0, Math.min(Number(value), 30));
+        newValue = value === "" ? "" : Math.max(0, Math.min(Number(value), 30));
         updated[studentId][subject][field] = newValue;
         updated[studentId][subject]["cat1"] = newValue;
       } else if (field === "exam") {
-        newValue = Math.max(0, Math.min(Number(value), 70));
+        newValue = value === "" ? "" : Math.max(0, Math.min(Number(value), 70));
         updated[studentId][subject][field] = newValue;
       } else {
         updated[studentId][subject][field] = value;
@@ -653,8 +653,8 @@ const Spreadsheet = () => {
         if (r.subject && r.subject !== "Overall") {
           subjects.push(r.subject);
           studentResult[r.subject] = {
-            cat: r.firstCatScore ?? "",
-            exam: r.examScore ?? "",
+            cat: r.firstCatScore || "",
+            exam: r.examScore || "",
             grade: r.grade ?? "",
             remark: r.remark ?? "",
             _id: r._id,
@@ -1011,9 +1011,6 @@ const Spreadsheet = () => {
 
   return () => window.removeEventListener('online', checkUnsyncedQueue);
 }, []);
-
-// ...existing code...
-
 
 // ...existing code...
 

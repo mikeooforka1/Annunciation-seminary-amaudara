@@ -54,6 +54,7 @@ const VerifyResult = () => {
   const [pendingEditAction, setPendingEditAction] = useState(null);
   const [showDeleteConfirmModal, setShowDeleteConfirmModal] = useState(null);
   const [saveLoading, setSaveLoading] = useState(false);
+  const [showReviewAllConfirmModal, setShowReviewAllConfirmModal] = useState(false);
 
   useEffect(() => {
     // Get admin data from localStorage (adjust key as needed)
@@ -742,6 +743,10 @@ const safeHandleResultChange = (studentId, field, value) => {
   }
 
   // New function to handle reviewing all students
+  const handleReviewAllClick = () => {
+    setShowReviewAllConfirmModal(true);
+  };
+
   const handleReviewAllStudents = async () => {
     setMessage('');
     setReviewLoading(true);
@@ -750,6 +755,7 @@ const safeHandleResultChange = (studentId, field, value) => {
       setReviewLoading(false);
       return;
     }
+    
     if (!selectedClass || !selectedTerm) {
       setMessage('Please select a class and term.');
       setReviewLoading(false);
@@ -871,7 +877,7 @@ for (const student of students) {
           )}
           <button
             className="px-4 py-2 bg-info text-white rounded hover:bg-info/80 transition"
-            onClick={handleReviewAllStudents}
+            onClick={handleReviewAllClick}
             disabled={
               reviewLoading ||
               !allResultsPushedAndComplete ||
@@ -1528,6 +1534,35 @@ for (const student of students) {
                   setShowEditConfirmModal(false);
                   setPendingEditAction(null);
                 }}
+              >
+                Cancel
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+      {/* Review All Confirmation Modal */}
+      {showReviewAllConfirmModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40">
+          <div className="bg-white rounded-lg shadow-lg p-6 w-full max-w-sm text-center">
+            <h3 className="font-bold text-lg mb-4">Confirm Review All Students</h3>
+            <p className="mb-6">
+              Are you sure you want to mark all students as reviewed? This action cannot be undone.
+            </p>
+            <div className="flex justify-center gap-4 mt-6">
+              <button
+                className="px-4 py-2 bg-info text-white rounded hover:bg-info/80 transition"
+                onClick={async () => {
+                  setShowReviewAllConfirmModal(false);
+                  await handleReviewAllStudents();
+                }}
+                disabled={reviewLoading}
+              >
+                {reviewLoading ? 'Reviewing...' : 'Yes, Review All'}
+              </button>
+              <button
+                className="px-4 py-2 bg-muted text-foreground rounded hover:bg-muted/80 transition"
+                onClick={() => setShowReviewAllConfirmModal(false)}
               >
                 Cancel
               </button>

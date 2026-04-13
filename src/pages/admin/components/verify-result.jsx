@@ -1315,7 +1315,7 @@ for (const student of students) {
                         <input
                           type="text"
                           className="border rounded px-2 py-1 w-full"
-                          value="18/01/2026"
+                          value="3/5/2026"
                           readOnly
                           disabled
                           placeholder="Next Term Begins"

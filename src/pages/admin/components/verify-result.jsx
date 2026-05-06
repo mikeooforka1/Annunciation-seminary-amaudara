@@ -90,42 +90,36 @@ const VerifyResult = () => {
   }, [API_BASE_URL]);
 
   // Fetch students and their pushed results when class is selected
-  useEffect(() => {
-    if (selectedClass) {
-      setLoading(true);
-      let studentsUrl = `${API_BASE_URL}/api/user/class/${selectedClass}/all/students`;
-      if (selectedTerm) {
-        studentsUrl += `?term=${selectedTerm}`;
-      }
-      console.log('Fetching students:', studentsUrl);
-      fetch(studentsUrl)
-        .then(res => res.json())
-        .then(data => {
-          // Sort students alphabetically by name
-          const sorted = Array.isArray(data)
-            ? [...data].sort((a, b) =>
-                (a.name || a.fullName || a.username || '').localeCompare(
-                  b.name || b.fullName || b.username || ''
-                )
+ // Fetch students and their pushed results when class is selected
+useEffect(() => {
+  if (selectedClass) {
+    setLoading(true);
+    // ✅ Fetch ALL students in the class (no term filter)
+    let studentsUrl = `${API_BASE_URL}/api/user/class/${selectedClass}/all/students`;
+    
+    console.log('Fetching students:', studentsUrl);
+    fetch(studentsUrl)
+      .then(res => res.json())
+      .then(data => {
+        const sorted = Array.isArray(data)
+          ? [...data].sort((a, b) =>
+              (a.name || a.fullName || a.username || '').localeCompare(
+                b.name || b.fullName || b.username || ''
               )
-            : [];
-          setStudents(sorted);
-          setLoading(false);
-        })
-        .catch(() => {
-          setStudents([]);
-          setLoading(false);
-        });
-    }
-  }, [selectedClass, selectedTerm]);
+            )
+          : [];
+        setStudents(sorted);
+        setLoading(false);
+      })
+      .catch(() => {
+        setStudents([]);
+        setLoading(false);
+      });
+  }
+}, [selectedClass]);  // ✅ Remove selectedTerm from dependencies - only fetch when class changes
 
   // Clear results when term changes so we fetch fresh data
-  useEffect(() => {
-    if (selectedTerm) {
-      setEditResults({});
-      setVerifiedStudents({});
-    }
-  }, [selectedTerm]);
+  
   
   // --- Live position & average calculation for all students (exact teacher logic) ---
   useEffect(() => {

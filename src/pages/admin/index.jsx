@@ -4,8 +4,8 @@ import Icon from "../../components/AppIcon";
 import Button from "../../components/ui/Button";
 import TeachersList from "./components/teachers";
 import FormatorsList from "./components/formators";
-import NonAcademicStaffList from "./components/non-academic staffs"; // <-- Add this import
-import VerifyResult from "./components/verify-result"; // <-- Add this import
+import NonAcademicStaffList from "./components/non-academic staffs";
+import VerifyResult from "./components/verify-result";
 import { useNavigate, useLocation } from "react-router-dom";
 
 const API_BASE_URL = process.env.REACT_APP_API_BASE_URL;
@@ -54,11 +54,14 @@ const AdminDashboard = () => {
   const [search, setSearch] = useState("");
   const [loading, setLoading] = useState(false);
   const [errorMsg, setErrorMsg] = useState("");
+  const [successMsg, setSuccessMsg] = useState("");
   const navigate = useNavigate();
   const location = useLocation();
   const [editingStudentId, setEditingStudentId] = useState(null);
   const [editingStudentName, setEditingStudentName] = useState("");
-  const [savingStudentId, setSavingStudentId] = useState(null); // <-- Add this line
+  const [savingStudentId, setSavingStudentId] = useState(null);
+  const [deletingStudentId, setDeletingStudentId] = useState(null);
+  const [deleteConfirmId, setDeleteConfirmId] = useState(null);
   const inputRef = useRef(null);
 
   useEffect(() => {
@@ -68,7 +71,6 @@ const AdminDashboard = () => {
     fetchNonAcademic();
   }, []);
 
-  // Handle navigation from spreadsheet back to verify page with class/term
   useEffect(() => {
     if (location.state?.showSection === "verify") {
       setShowSection("verify");
@@ -192,12 +194,72 @@ const AdminDashboard = () => {
       );
       setEditingStudentId(null);
       setEditingStudentName("");
+      setSuccessMsg("Student name updated successfully!");
+      setTimeout(() => setSuccessMsg(""), 3000);
     } catch (err) {
-      alert("Failed to update student name.");
+      setErrorMsg("Failed to update student name.");
     } finally {
       setSavingStudentId(null);
     }
   };
+
+  const handleDeleteStudent = async (studentId) => {
+    setDeletingStudentId(studentId);
+    setErrorMsg("");
+    try {
+      await axios.delete(`${API_BASE_URL}/api/user/${studentId}`);
+
+      setStudents((prev) => prev.filter((s) => s._id !== studentId));
+
+      setClasses((prev) =>
+        prev.map((cls) =>
+          cls.className === selectedClass
+            ? { ...cls, studentCount: Math.max(0, cls.studentCount - 1) }
+            : cls
+        )
+      );
+
+      setDeleteConfirmId(null);
+      setSuccessMsg("Student deleted successfully!");
+      setTimeout(() => setSuccessMsg(""), 3000);
+    } catch (err) {
+      setErrorMsg(err.response?.data?.error || "Failed to delete student.");
+    } finally {
+      setDeletingStudentId(null);
+    }
+  };
+
+  const DeleteConfirmationDialog = ({ student, onConfirm, onCancel, isDeleting }) => (
+    <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+      <div className="bg-white rounded-lg p-6 max-w-sm shadow-lg">
+        <h3 className="text-lg font-semibold text-gray-800 mb-2">
+          Delete Student?
+        </h3>
+        <p className="text-gray-600 mb-4">
+          Are you sure you want to delete <strong>{student.name}</strong> from {selectedClass}?
+        </p>
+        <p className="text-red-600 text-sm mb-6 font-semibold">
+          ⚠️ This action cannot be undone.
+        </p>
+        <div className="flex gap-3 justify-end">
+          <Button
+            variant="outline"
+            onClick={onCancel}
+            disabled={isDeleting}
+          >
+            Cancel
+          </Button>
+          <Button
+            variant="destructive"
+            onClick={onConfirm}
+            disabled={isDeleting}
+          >
+            {isDeleting ? "Deleting..." : "Delete"}
+          </Button>
+        </div>
+      </div>
+    </div>
+  );
 
   return (
     <div className="min-h-screen bg-background relative">
@@ -238,6 +300,16 @@ const AdminDashboard = () => {
         {errorMsg && (
           <div className="mb-4 text-center text-red-600 bg-red-50 border border-red-200 rounded p-2">
             {errorMsg}
+          </div>
+        )}
+
+        {/* Success Message */}
+        {successMsg && (
+          <div className="mb-4 text-center text-green-600 bg-green-50 border border-green-200 rounded p-3 flex items-center justify-between">
+            <span>{successMsg}</span>
+            <button onClick={() => setSuccessMsg("")} className="text-green-600 hover:text-green-800">
+              ✕
+            </button>
           </div>
         )}
 
@@ -427,6 +499,16 @@ const AdminDashboard = () => {
                       <Icon name="User" size={16} className="mr-1" />
                       View Profile
                     </Button>
+                    <Button
+                      variant="destructive"
+                      size="sm"
+                      onClick={() => setDeleteConfirmId(student._id)}
+                      disabled={deletingStudentId === student._id}
+                      title="Delete Student"
+                    >
+                      <Icon name="Trash2" size={16} className="mr-1" />
+                      {deletingStudentId === student._id ? "..." : "Delete"}
+                    </Button>
                   </span>
                 </div>
               ))}
@@ -472,11 +554,9 @@ const AdminDashboard = () => {
             >
               &larr; Back to Dashboard
             </Button>
-            {/* Replace the previous list with the full page component */}
             <NonAcademicStaffList />
           </>
         )}
-
 
         {/* Verify Results Section */}
         {showSection === "verify" && (
@@ -495,6 +575,16 @@ const AdminDashboard = () => {
           </>
         )}
       </main>
+
+      {/* Delete Confirmation Dialog */}
+      {deleteConfirmId && (
+        <DeleteConfirmationDialog
+          student={students.find((s) => s._id === deleteConfirmId)}
+          onConfirm={() => handleDeleteStudent(deleteConfirmId)}
+          onCancel={() => setDeleteConfirmId(null)}
+          isDeleting={deletingStudentId === deleteConfirmId}
+        />
+      )}
     </div>
   );
 };

@@ -1347,8 +1347,8 @@ const Spreadsheet = () => {
             <table className="min-w-max border border-gray-300">
               <thead>
                 <tr>
-                  <th className="border px-2 py-1 bg-gray-100">Status</th>
-                  <th className="border px-2 py-1 bg-gray-100">Student Name</th>
+                  <th className="border px-2 py-1 bg-gray-100" style={{ position: "sticky", left: 0, zIndex: 20 }}>Status</th>
+                  <th className="border px-2 py-1 bg-gray-100" style={{ position: "sticky", left: 60, zIndex: 20 }}>Student Name</th>
                   {subjectsOrder.map(subject => (
                     <React.Fragment key={subject}>
                       <th className="border px-2 py-1 bg-gray-100 relative subject-dropdown" style={{ minWidth: 90 }}>
@@ -1470,7 +1470,7 @@ const Spreadsheet = () => {
                   const isLocked = resultStatusMap[student._id] === 'reviewed' || resultStatusMap[student._id] === 'verified';
                   return (
                     <tr key={student._id}>
-                      <td className="border px-2 py-1">
+                      <td className="border px-2 py-1" style={{ position: "sticky", left: 0, zIndex: 19, backgroundColor: "#fff" }}>
                         {resultStatusMap[student._id] === 'verified' ? (
                           <span className="text-success font-semibold">Verified</span>
                         ) : resultStatusMap[student._id] === 'reviewed' ? (
@@ -1479,7 +1479,9 @@ const Spreadsheet = () => {
                           <span className="text-warning font-semibold">Pending</span>
                         )}
                       </td>
-                      <td className="border px-2 py-1">{student.name || student.fullName || student.username}</td>
+                      <td className="border px-2 py-1" style={{ position: "sticky", left: 60, zIndex: 19, backgroundColor: "#fff" }}>
+                        {student.name || student.fullName || student.username}
+                      </td>
                       {subjectsOrder.map(subject => {
                         if (!studentSubjects.includes(subject)) {
                           return (
@@ -1522,10 +1524,10 @@ const Spreadsheet = () => {
                       })}
                       <td className="border px-2 py-1">{editResults[student._id]?._overall?.average ?? ""}</td>
                       <td className="border px-2 py-1">{editResults[student._id]?._overall?.position ?? ""}</td>
-                      {[
+                      {([
                         "handwriting", "punctuality", "initiative", "obedience", "honesty",
                         "neatness", "attentiveness", "respect", "attitude", "creativity"
-                      ].map(key => (
+                      ]).map(key => (
                         <td key={key} className="border px-2 py-1">
                           <div className="flex flex-col items-center">
                             <input

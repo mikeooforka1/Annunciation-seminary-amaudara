@@ -119,6 +119,14 @@ const VerifyResult = () => {
     }
   }, [selectedClass, selectedTerm]);
 
+  // Clear results when term changes so we fetch fresh data
+  useEffect(() => {
+    if (selectedTerm) {
+      setEditResults({});
+      setVerifiedStudents({});
+    }
+  }, [selectedTerm]);
+  
   // --- Live position & average calculation for all students (exact teacher logic) ---
   useEffect(() => {
     if (students.length > 0) {

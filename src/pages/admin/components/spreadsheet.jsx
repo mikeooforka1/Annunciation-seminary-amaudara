@@ -4,6 +4,8 @@ import { TiArrowBackOutline } from "react-icons/ti";
 import { FixedSizeList as List } from 'react-window';
 import { addToQueue, getQueue, clearQueue } from '../../../utils/offlineQueue';
 import { loadOfflineState, saveOfflineState } from '../../../utils/offlineQueue';
+import html2canvas from 'html2canvas';
+import jsPDF from 'jspdf';
 
 const API_BASE_URL = process.env.REACT_APP_API_BASE_URL;
 
@@ -51,103 +53,111 @@ const Spreadsheet = () => {
 
   const [resultStatusMap, setResultStatusMap] = useState(location.state?.verifiedStudents || {});
 
+  // ✅ Fetch students only (term-independent) - triggered when class changes
   const fetchData = async () => {
-      try {
-        const res = await fetch(`${API_BASE_URL}/api/user/class/${selectedClass}/all/students?term=${selectedTerm}`);
-        let studentData = await res.json();
-        studentData = Array.isArray(studentData)
-          ? [...studentData].sort((a, b) =>
-              (a.name || a.fullName || a.username || '').localeCompare(
-                b.name || b.fullName || b.username || ''
-              )
+    try {
+      const res = await fetch(`${API_BASE_URL}/api/user/class/${selectedClass}/all/students`);
+      let studentData = await res.json();
+      studentData = Array.isArray(studentData)
+        ? [...studentData].sort((a, b) =>
+            (a.name || a.fullName || a.username || '').localeCompare(
+              b.name || b.fullName || b.username || ''
             )
-          : [];
-        setStudents(studentData);
+          )
+        : [];
+      setStudents(studentData);
+    } catch (err) {
+      setStudents([]);
+    }
+  };
 
-        const fetches = studentData.map(student =>
-          fetch(`${API_BASE_URL}/api/results/student/${student._id}/pushed?className=${selectedClass}&term=${selectedTerm}`)
-            .then(res => res.json())
-            .then(results => ({ studentId: student._id, results }))
-        );
+  // ✅ Fetch results only (term-dependent) - triggered when term or students change
+  const fetchResults = async (studentList) => {
+    try {
+      const fetches = studentList.map(student =>
+        fetch(`${API_BASE_URL}/api/results/student/${student._id}/pushed?className=${selectedClass}&term=${selectedTerm}`)
+          .then(res => res.json())
+          .then(results => ({ studentId: student._id, results }))
+      );
 
-        const resultsArr = await Promise.all(fetches);
-        const allSubjectsSet = new Set();
-        const allSubjectsOrdered = [];
-        const map = {};
-        const editMap = {};
+      const resultsArr = await Promise.all(fetches);
+      const allSubjectsSet = new Set();
+      const allSubjectsOrdered = [];
+      const map = {};
+      const editMap = {};
 
-        resultsArr.forEach(({ studentId, results }) => {
-          map[studentId] = {};
-          editMap[studentId] = {};
-          const subjects = [];
+      resultsArr.forEach(({ studentId, results }) => {
+        map[studentId] = {};
+        editMap[studentId] = {};
+        const subjects = [];
 
-          results.forEach(r => {
-            if (r.subject && r.subject !== "Overall") {
-              subjects.push(r.subject);
-              map[studentId][r.subject] = r;
-              editMap[studentId][r.subject] = {
-                cat: r.firstCatScore || "",
-                exam: r.examScore || "",
-                grade: r.grade ?? "",
-                remark: r.remark ?? "",
-                _id: r._id,
-                notOffering: false
-              };
-              if (!allSubjectsSet.has(r.subject)) {
-                allSubjectsSet.add(r.subject);
-                allSubjectsOrdered.push(r.subject);
-              }
-            } else if (r.subject === "Overall") {
-              map[studentId]._overall = r;
-              editMap[studentId]._overall = {
-                ...r,
-                handwriting: r.handwriting ?? "",
-                punctuality: r.punctuality ?? "",
-                initiative: r.initiative ?? "",
-                obedience: r.obedience ?? "",
-                honesty: r.honesty ?? "",
-                neatness: r.neatness ?? "",
-                attentiveness: r.attentiveness ?? "",
-                respect: r.respect ?? "",
-                attitude: r.attitude ?? "",
-                creativity: r.creativity ?? ""
-              };
+        results.forEach(r => {
+          if (r.subject && r.subject !== "Overall") {
+            subjects.push(r.subject);
+            map[studentId][r.subject] = r;
+            editMap[studentId][r.subject] = {
+              cat: r.firstCatScore || "",
+              exam: r.examScore || "",
+              grade: r.grade ?? "",
+              remark: r.remark ?? "",
+              _id: r._id,
+              notOffering: false
+            };
+            if (!allSubjectsSet.has(r.subject)) {
+              allSubjectsSet.add(r.subject);
+              allSubjectsOrdered.push(r.subject);
             }
-          });
-
-          editMap[studentId].subjects = subjects;
-
-          allSubjectsOrdered.forEach(subject => {
-            if (!subjects.includes(subject)) {
-              editMap[studentId][subject] = { notOffering: true };
-            }
-          });
+          } else if (r.subject === "Overall") {
+            map[studentId]._overall = r;
+            editMap[studentId]._overall = {
+              ...r,
+              handwriting: r.handwriting ?? "",
+              punctuality: r.punctuality ?? "",
+              initiative: r.initiative ?? "",
+              obedience: r.obedience ?? "",
+              honesty: r.honesty ?? "",
+              neatness: r.neatness ?? "",
+              attentiveness: r.attentiveness ?? "",
+              respect: r.respect ?? "",
+              attitude: r.attitude ?? "",
+              creativity: r.creativity ?? ""
+            };
+          }
         });
 
-        Object.keys(editMap).forEach(studentId => {
-          const studentSubjects = Object.keys(editMap[studentId]).filter(s => s !== "_overall" && s !== "subjects" && editMap[studentId][s] && !editMap[studentId][s].notOffering);
-          allSubjectsOrdered.forEach(subject => {
-            if (!studentSubjects.includes(subject)) {
-              editMap[studentId][subject] = { notOffering: true };
-            }
-          });
+        editMap[studentId].subjects = subjects;
+
+        allSubjectsOrdered.forEach(subject => {
+          if (!subjects.includes(subject)) {
+            editMap[studentId][subject] = { notOffering: true };
+          }
         });
+      });
 
-        setSubjects(allSubjectsOrdered);
-        setSubjectsOrder(allSubjectsOrdered);
-        setResultsMap(map);
-        setEditResults(editMap);
-        setLoading(false);
-      } catch (err) {
-        setStudents([]);
-        setSubjects([]);
-        setSubjectsOrder([]);
-        setResultsMap({});
-        setEditResults({});
-        setLoading(false);
-      }
-    };
+      Object.keys(editMap).forEach(studentId => {
+        const studentSubjects = Object.keys(editMap[studentId]).filter(s => s !== "_overall" && s !== "subjects" && editMap[studentId][s] && !editMap[studentId][s].notOffering);
+        allSubjectsOrdered.forEach(subject => {
+          if (!studentSubjects.includes(subject)) {
+            editMap[studentId][subject] = { notOffering: true };
+          }
+        });
+      });
 
+      setSubjects(allSubjectsOrdered);
+      setSubjectsOrder(allSubjectsOrdered);
+      setResultsMap(map);
+      setEditResults(editMap);
+      setLoading(false);
+    } catch (err) {
+      setSubjects([]);
+      setSubjectsOrder([]);
+      setResultsMap({});
+      setEditResults({});
+      setLoading(false);
+    }
+  };
+
+  // ✅ FIRST useEffect: Fetch students when class changes (no term filter)
   useEffect(() => {
     let didSetFromState = false;
 
@@ -156,6 +166,7 @@ const Spreadsheet = () => {
       location.state?.editResults &&
       location.state?.verifiedStudents
     ) {
+      // Use pre-loaded data from verify page
       setStudents(location.state.students);
 
       const allSubjectsOrdered = [];
@@ -232,11 +243,24 @@ const Spreadsheet = () => {
       return;
     }
 
-    if (!selectedClass || !selectedTerm) return;
-    setLoading(true);
+    if (!selectedClass) return;
 
-    fetchData();
-  }, [selectedClass, selectedTerm, location.state]);
+    // ✅ Only fetch students if not from location.state
+    if (!didSetFromState) {
+      setLoading(true);
+      fetchData();
+    }
+  }, [selectedClass, location.state]);  // ✅ REMOVED selectedTerm - only fetch when class changes
+
+  // ✅ SECOND useEffect: Fetch results when term changes (or students changes)
+  useEffect(() => {
+    if (!navigator.onLine) return;
+    if (!selectedClass || !selectedTerm) return;
+    if (students.length === 0) return;
+
+    setLoading(true);
+    fetchResults(students);
+  }, [selectedClass, selectedTerm, students]);  // ✅ Fetches results when term changes
 
   const handleInputChange = (studentId, subject, field, value) => {
     setEditResults(prev => {
@@ -515,6 +539,168 @@ const Spreadsheet = () => {
     setAddSubjectLoading(false);
   };
 
+
+// Add this function inside the Spreadsheet component
+const handleExportPDF = async () => {
+  try {
+    const element = document.getElementById('printable-table');
+    if (!element) {
+      alert('Table not found');
+      return;
+    }
+
+    // Get the actual scrollable content area (not the outer container)
+    const tableContainer = element.querySelector('div[style*="overflowX"]');
+    const tableElement = tableContainer?.querySelector('table') || element.querySelector('table');
+    
+    if (!tableElement) {
+      alert('Table element not found');
+      return;
+    }
+
+    // Capture ONLY the table with higher scale for clarity
+    const canvas = await html2canvas(tableElement, {
+      scale: 3, // ✅ Increased scale for better clarity
+      logging: false,
+      useCORS: true,
+      backgroundColor: '#ffffff',
+      allowTaint: true,
+      scrollY: -window.scrollY,
+      scrollX: -window.scrollX,
+      windowWidth: tableElement.scrollWidth + 50, // ✅ Capture full width
+      windowHeight: tableElement.scrollHeight + 50 // ✅ Capture full height
+    });
+
+    // ✅ Use A1 format (841 × 1189 mm) for maximum space - supports both wide and tall tables
+    const pdf = new jsPDF({
+      orientation: 'landscape',
+      unit: 'mm',
+      format: 'a1' // ✅ A1 = 841 × 1189 mm (much larger than A3 or A4)
+    });
+
+    const pageWidth = pdf.internal.pageSize.getWidth();
+    const pageHeight = pdf.internal.pageSize.getHeight();
+    const margin = 10; // mm margins
+
+    // Calculate image dimensions to fit page
+    const availableWidth = pageWidth - (margin * 2);
+    const availableHeight = pageHeight - 30 - (margin * 2); // 30mm reserved for header
+
+    // Maintain aspect ratio
+    const canvasAspect = canvas.width / canvas.height;
+    let imgWidth = availableWidth;
+    let imgHeight = imgWidth / canvasAspect;
+
+    // If image is too tall, scale it down
+    if (imgHeight > availableHeight) {
+      imgHeight = availableHeight;
+      imgWidth = imgHeight * canvasAspect;
+    }
+
+    const imgData = canvas.toDataURL('image/png');
+
+    // ✅ Add header on first page
+    pdf.setFontSize(16);
+    pdf.setFont(undefined, 'bold');
+    pdf.text(
+      `${selectedClass.toUpperCase()} - ${selectedTerm ? selectedTerm.charAt(0).toUpperCase() + selectedTerm.slice(1) + ' Term' : 'Term'} Results`,
+      pageWidth / 2,
+      margin + 8,
+      { align: 'center' }
+    );
+    
+    pdf.setFontSize(10);
+    pdf.setFont(undefined, 'normal');
+    pdf.text(
+      `Generated: ${new Date().toLocaleDateString()} | Total Students: ${students.length}`,
+      pageWidth / 2,
+      margin + 15,
+      { align: 'center' }
+    );
+
+    // ✅ Handle pagination - add image if it fits on one page
+    if (imgHeight <= availableHeight) {
+      // Single page - center it
+      pdf.addImage(
+        imgData,
+        'PNG',
+        margin + (availableWidth - imgWidth) / 2,
+        margin + 20,
+        imgWidth,
+        imgHeight
+      );
+    } else {
+      // ✅ Multi-page pagination: split vertically (for height)
+      const numPages = Math.ceil(imgHeight / availableHeight);
+      const canvasPageHeight = canvas.height / numPages;
+
+      for (let pageNum = 0; pageNum < numPages; pageNum++) {
+        // Crop canvas for this page
+        const pageCanvas = document.createElement('canvas');
+        pageCanvas.width = canvas.width;
+        pageCanvas.height = canvasPageHeight;
+
+        const ctx = pageCanvas.getContext('2d');
+        ctx.drawImage(
+          canvas,
+          0, // source x
+          pageNum * canvasPageHeight, // source y (offset for each page)
+          canvas.width, // source width
+          canvasPageHeight, // source height
+          0, 0, // destination position
+          pageCanvas.width, pageCanvas.height // destination size
+        );
+
+        const pageImgData = pageCanvas.toDataURL('image/png');
+
+        // Add page if not first page (first page already has header)
+        if (pageNum > 0) {
+          pdf.addPage();
+          pdf.setFontSize(9);
+          pdf.setFont(undefined, 'normal');
+          pdf.text(
+            `${selectedClass.toUpperCase()} - Continued (Page ${pageNum + 1})`,
+            margin + 10,
+            margin + 8
+          );
+        }
+
+        // Calculate dimensions for this page image
+        const pageImgHeight = Math.min(availableHeight, imgHeight - (pageNum * availableHeight));
+        const pageImgWidth = pageImgHeight * canvasAspect;
+
+        pdf.addImage(
+          pageImgData,
+          'PNG',
+          margin + (availableWidth - pageImgWidth) / 2,
+          pageNum === 0 ? margin + 20 : margin + 15,
+          pageImgWidth,
+          pageImgHeight
+        );
+      }
+    }
+
+    // ✅ Add footer with page numbers
+    const totalPages = pdf.internal.pages.length - 1;
+    for (let i = 1; i <= totalPages; i++) {
+      pdf.setPage(i);
+      pdf.setFontSize(9);
+      pdf.setFont(undefined, 'normal');
+      pdf.text(
+        `Page ${i} of ${totalPages}`,
+        pageWidth / 2,
+        pageHeight - 5,
+        { align: 'center' }
+      );
+    }
+
+    // Save PDF
+    pdf.save(`${selectedClass}_${selectedTerm}_Results.pdf`);
+  } catch (error) {
+    console.error('Error exporting to PDF:', error);
+    alert('Error generating PDF. Please try again.');
+  }
+};
   // --- Add Subject for Individual Student ---
   const handleAddSubjectIndividual = async () => {
     const subject = addSubjectForSubject || newSubjectName.trim();
@@ -1276,7 +1462,14 @@ const Spreadsheet = () => {
     </button>
   </div>
 )}
-
+<button
+  className="mb-4 px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700 transition ml-2"
+  onClick={handleExportPDF}
+  title="Export spreadsheet to PDF"
+  
+>
+  📄 Export to PDF
+</button> 
       <button
         className="mb-4 px-4 py-2 bg-primary text-white rounded"
         onClick={handleSaveAll}
@@ -1284,6 +1477,7 @@ const Spreadsheet = () => {
       >
         {saving ? "Saving..." : "Save Changes"}
       </button>
+      
 
       {loading && (
         <div>
@@ -1332,19 +1526,20 @@ const Spreadsheet = () => {
           <div>Loading students and results...</div>
         </div>
       )}
-      {!loading && selectedClass && (
-        <div
-          style={{
-            width: "100%",
-            minHeight: 300,
-            height: "calc(100vh - 220px)",
-            overflowX: "auto",
-            overflowY: "auto",
-            position: "relative"
-          }}
-        >
-          <div style={{ minWidth: "1200px" }}>
-            <table className="min-w-max border border-gray-300">
+     {!loading && selectedClass && (
+  <div id="printable-table">
+    <div
+      style={{
+        width: "100%",
+        minHeight: 300,
+        height: "calc(100vh - 220px)",
+        overflowX: "auto",
+        overflowY: "auto",
+        position: "relative"
+      }}
+    >
+      <div style={{ minWidth: "1200px" }}>
+        <table className="min-w-max border border-gray-300">
               <thead>
                 <tr>
                   <th className="border px-2 py-1 bg-gray-100" style={{ position: "sticky", left: 0, zIndex: 20 }}>Status</th>
@@ -1564,10 +1759,11 @@ const Spreadsheet = () => {
                   );
                 })}
               </tbody>
-            </table>
-          </div>
-        </div>
-      )}
+                   </table>
+      </div>
+    </div>
+  </div>
+)}
 
       {/* --- Add Subject for All Modal --- */}
       {showAddSubjectAllModal && (

@@ -562,46 +562,46 @@ const handleExportPDF = async () => {
       return;
     }
 
-    // Capture ONLY the table with higher scale for clarity
+    // ✅ FIX: Add strict size limits to prevent canvas overflow
     const canvas = await html2canvas(tableElement, {
-      scale: 2, // ✅ Reduced from 3 for better production performance
+      scale: 1, // ✅ Reduced from 2 to prevent memory overflow
       logging: false,
       useCORS: true,
-      allowTaint: true,  // ✅ Allow external images
+      allowTaint: true,
       backgroundColor: '#ffffff',
       scrollY: -window.scrollY,
       scrollX: -window.scrollX,
-      windowWidth: tableElement.scrollWidth + 50, // ✅ Capture full width
-      windowHeight: tableElement.scrollHeight + 50 // ✅ Capture full height
+      maxWidth: 1500, // ✅ NEW: Limit canvas width
+      maxHeight: 3000, // ✅ NEW: Limit canvas height
+      windowWidth: Math.min(tableElement.scrollWidth + 50, 1500), // ✅ Cap window width
+      windowHeight: Math.min(tableElement.scrollHeight + 50, 3000), // ✅ Cap window height
     });
 
-    // ✅ Use A1 format (841 × 1189 mm) for maximum space - supports both wide and tall tables
+    // ✅ Use A3 format instead of A2 for better compatibility
     const pdf = new jsPDF({
       orientation: 'landscape',
       unit: 'mm',
-      format: 'a2' // ✅ A2 = 420 × 594 mm (half the size of A1, good for very large tables)
+      format: 'a3' // ✅ Changed from A2 to A3 for production stability
     });
 
     const pageWidth = pdf.internal.pageSize.getWidth();
     const pageHeight = pdf.internal.pageSize.getHeight();
-    const margin = 10; // mm margins
+    const margin = 10;
 
-    // Calculate image dimensions to fit page
     const availableWidth = pageWidth - (margin * 2);
-    const availableHeight = pageHeight - 30 - (margin * 2); // 30mm reserved for header
+    const availableHeight = pageHeight - 30 - (margin * 2);
 
-    // Maintain aspect ratio
     const canvasAspect = canvas.width / canvas.height;
     let imgWidth = availableWidth;
     let imgHeight = imgWidth / canvasAspect;
 
-    // If image is too tall, scale it down
     if (imgHeight > availableHeight) {
       imgHeight = availableHeight;
       imgWidth = imgHeight * canvasAspect;
     }
 
-    const imgData = canvas.toDataURL('image/png');
+    // ✅ FIX: Convert to JPEG instead of PNG (smaller file size)
+    const imgData = canvas.toDataURL('image/jpeg', 0.85); // 85% quality
 
     // ✅ Add header on first page
     pdf.setFontSize(16);
@@ -622,24 +622,21 @@ const handleExportPDF = async () => {
       { align: 'center' }
     );
 
-    // ✅ Handle pagination - add image if it fits on one page
+    // ✅ Handle pagination
     if (imgHeight <= availableHeight) {
-      // Single page - center it
       pdf.addImage(
         imgData,
-        'PNG',
+        'JPEG',
         margin + (availableWidth - imgWidth) / 2,
         margin + 20,
         imgWidth,
         imgHeight
       );
     } else {
-      // ✅ Multi-page pagination: split vertically (for height)
       const numPages = Math.ceil(imgHeight / availableHeight);
       const canvasPageHeight = canvas.height / numPages;
 
       for (let pageNum = 0; pageNum < numPages; pageNum++) {
-        // Crop canvas for this page
         const pageCanvas = document.createElement('canvas');
         pageCanvas.width = canvas.width;
         pageCanvas.height = canvasPageHeight;
@@ -647,17 +644,18 @@ const handleExportPDF = async () => {
         const ctx = pageCanvas.getContext('2d');
         ctx.drawImage(
           canvas,
-          0, // source x
-          pageNum * canvasPageHeight, // source y (offset for each page)
-          canvas.width, // source width
-          canvasPageHeight, // source height
-          0, 0, // destination position
-          pageCanvas.width, pageCanvas.height // destination size
+          0,
+          pageNum * canvasPageHeight,
+          canvas.width,
+          canvasPageHeight,
+          0, 0,
+          pageCanvas.width,
+          pageCanvas.height
         );
 
-        const pageImgData = pageCanvas.toDataURL('image/png');
+        // ✅ FIX: Convert chunks to JPEG (smaller than PNG)
+        const pageImgData = pageCanvas.toDataURL('image/jpeg', 0.85);
 
-        // Add page if not first page (first page already has header)
         if (pageNum > 0) {
           pdf.addPage();
           pdf.setFontSize(9);
@@ -669,13 +667,12 @@ const handleExportPDF = async () => {
           );
         }
 
-        // Calculate dimensions for this page image
         const pageImgHeight = Math.min(availableHeight, imgHeight - (pageNum * availableHeight));
         const pageImgWidth = pageImgHeight * canvasAspect;
 
         pdf.addImage(
           pageImgData,
-          'PNG',
+          'JPEG', // ✅ Changed from PNG to JPEG
           margin + (availableWidth - pageImgWidth) / 2,
           pageNum === 0 ? margin + 20 : margin + 15,
           pageImgWidth,
@@ -698,12 +695,20 @@ const handleExportPDF = async () => {
       );
     }
 
-    // Save PDF
     pdf.save(`${selectedClass}_${selectedTerm}_Results.pdf`);
     setIsExportingPDF(false);
   } catch (error) {
     console.error('Error exporting to PDF:', error);
-    alert('Error generating PDF. Please try again.');
+    
+    // ✅ Better error messaging
+    if (error.message.includes('Invalid string length')) {
+      alert('Table is too large. Try:\n1. Exporting fewer students\n2. Closing other browser tabs\n3. Refreshing the page');
+    } else if (error.message.includes('tainted canvas')) {
+      alert('Unable to export due to image loading issues. Ensure all images are accessible.');
+    } else {
+      alert('Error generating PDF. Please try again.');
+    }
+    
     setIsExportingPDF(false);
   }
 };

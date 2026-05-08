@@ -1397,8 +1397,6 @@ const handleExportPDF = async () => {
 
     setResetLoading(false);
   };
-
-
   return (
     <div className="p-4">
       {/* Online/Offline Status Indicator */}

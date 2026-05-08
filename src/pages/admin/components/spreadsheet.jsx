@@ -1398,9 +1398,6 @@ const handleExportPDF = async () => {
     setResetLoading(false);
   };
 
-  
-
- 
 
   return (
     <div className="p-4">

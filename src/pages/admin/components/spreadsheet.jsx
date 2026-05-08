@@ -50,6 +50,7 @@ const Spreadsheet = () => {
   const [showAddSubjectIndividualConfirm, setShowAddSubjectIndividualConfirm] = useState(false);
   const [addSubjectLoading, setAddSubjectLoading] = useState(false);
   const [addSubjectForSubject, setAddSubjectForSubject] = useState(null);
+  const [isExportingPDF, setIsExportingPDF] = useState(false);
 
   const [resultStatusMap, setResultStatusMap] = useState(location.state?.verifiedStudents || {});
 
@@ -542,10 +543,12 @@ const Spreadsheet = () => {
 
 // Add this function inside the Spreadsheet component
 const handleExportPDF = async () => {
+  setIsExportingPDF(true);
   try {
     const element = document.getElementById('printable-table');
     if (!element) {
       alert('Table not found');
+      setIsExportingPDF(false);
       return;
     }
 
@@ -555,16 +558,17 @@ const handleExportPDF = async () => {
     
     if (!tableElement) {
       alert('Table element not found');
+      setIsExportingPDF(false);
       return;
     }
 
     // Capture ONLY the table with higher scale for clarity
     const canvas = await html2canvas(tableElement, {
-      scale: 3, // ✅ Increased scale for better clarity
+      scale: 2, // ✅ Reduced from 3 for better production performance
       logging: false,
       useCORS: true,
+      allowTaint: true,  // ✅ Allow external images
       backgroundColor: '#ffffff',
-      allowTaint: true,
       scrollY: -window.scrollY,
       scrollX: -window.scrollX,
       windowWidth: tableElement.scrollWidth + 50, // ✅ Capture full width
@@ -575,7 +579,7 @@ const handleExportPDF = async () => {
     const pdf = new jsPDF({
       orientation: 'landscape',
       unit: 'mm',
-      format: 'a1' // ✅ A1 = 841 × 1189 mm (much larger than A3 or A4)
+      format: 'a2' // ✅ A2 = 420 × 594 mm (half the size of A1, good for very large tables)
     });
 
     const pageWidth = pdf.internal.pageSize.getWidth();
@@ -696,9 +700,11 @@ const handleExportPDF = async () => {
 
     // Save PDF
     pdf.save(`${selectedClass}_${selectedTerm}_Results.pdf`);
+    setIsExportingPDF(false);
   } catch (error) {
     console.error('Error exporting to PDF:', error);
     alert('Error generating PDF. Please try again.');
+    setIsExportingPDF(false);
   }
 };
   // --- Add Subject for Individual Student ---
@@ -1457,13 +1463,22 @@ const handleExportPDF = async () => {
     </button>
   </div>
 )}
+
+{/* Updated button code */}
 <button
-  className="mb-4 px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700 transition ml-2"
+  className="mb-4 px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700 transition ml-2 disabled:bg-gray-400 disabled:cursor-not-allowed"
   onClick={handleExportPDF}
-  title="Export spreadsheet to PDF"
-  
+  disabled={isExportingPDF || loading}
+  title={isExportingPDF ? "Exporting PDF..." : "Export spreadsheet to PDF"}
 >
-  📄 Export to PDF
+  {isExportingPDF ? (
+    <>
+      <span className="inline-block animate-spin mr-2">⏳</span>
+      Exporting...
+    </>
+  ) : (
+    "📄 Export to PDF"
+  )}
 </button> 
       <button
         className="mb-4 px-4 py-2 bg-primary text-white rounded"

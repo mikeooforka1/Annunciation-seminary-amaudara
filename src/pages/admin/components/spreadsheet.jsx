@@ -1650,7 +1650,7 @@ const handleExportPDF = async () => {
     >
       <div style={{ minWidth: "1200px" }}>
         <table className="min-w-max border border-gray-300">
-              <thead>
+                           <thead style={{ position: "sticky", top: 0, zIndex: 10 }}>
                 <tr>
                   <th className="border px-2 py-1 bg-gray-100" style={{ position: "sticky", left: 0, zIndex: 20 }}>Status</th>
                   <th className="border px-2 py-1 bg-gray-100" style={{ position: "sticky", left: 60, zIndex: 20 }}>Student Name</th>

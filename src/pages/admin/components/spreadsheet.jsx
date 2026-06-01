@@ -86,6 +86,7 @@ const Spreadsheet = () => {
       const allSubjectsOrdered = [];
       const map = {};
       const editMap = {};
+      const statusMap = {};
 
       resultsArr.forEach(({ studentId, results }) => {
         map[studentId] = {};
@@ -133,6 +134,26 @@ const Spreadsheet = () => {
             editMap[studentId][subject] = { notOffering: true };
           }
         });
+
+        // Build status map from the fetched results
+        const subjectResults = results.filter(r => r.subject && r.subject !== "Overall");
+        let isReviewed = false;
+        let isVerified = false;
+        let isPending = false;
+
+        if (subjectResults.length > 0) {
+          isReviewed = subjectResults.every(r => r.reviewed === true && r.pending === false);
+          isVerified = subjectResults.every(r => r.verified === true && r.pending === false);
+          isPending = subjectResults.some(r => r.pending === true);
+        }
+
+        if (isVerified) {
+          statusMap[studentId] = 'verified';
+        } else if (isReviewed) {
+          statusMap[studentId] = 'reviewed';
+        } else {
+          statusMap[studentId] = 'pending';
+        }
       });
 
       Object.keys(editMap).forEach(studentId => {
@@ -148,12 +169,14 @@ const Spreadsheet = () => {
       setSubjectsOrder(allSubjectsOrdered);
       setResultsMap(map);
       setEditResults(editMap);
+      setResultStatusMap(statusMap);
       setLoading(false);
     } catch (err) {
       setSubjects([]);
       setSubjectsOrder([]);
       setResultsMap({});
       setEditResults({});
+      setResultStatusMap({});
       setLoading(false);
     }
   };
@@ -545,265 +568,27 @@ const Spreadsheet = () => {
 const handleExportPDF = async () => {
   setIsExportingPDF(true);
   try {
-    const element = document.getElementById('printable-table');
-    if (!element) {
-      alert('Table not found');
-      setIsExportingPDF(false);
-      return;
-    }
-
-    const tableContainer = element.querySelector('div[style*="overflowX"]');
-    const tableElement = tableContainer?.querySelector('table') || element.querySelector('table');
+    const response = await fetch(`${API_BASE_URL}/api/results/export-results-pdf`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        className: selectedClass,
+        term: selectedTerm,
+        studentIds: students.map(s => s._id)
+      })
+    });
     
-    if (!tableElement) {
-      alert('Table element not found');
-      setIsExportingPDF(false);
-      return;
-    }
-
-    // ✅ IMPROVED: Temporarily make table content MUCH LARGER AND BOLDER
-    const originalStyles = {
-      fontSize: tableElement.style.fontSize,
-      fontWeight: tableElement.style.fontWeight,
-      padding: tableElement.style.padding,
-      lineHeight: tableElement.style.lineHeight
-    };
-
-    // ✅ Apply temporary styles to make content bigger and bolder
-    tableElement.style.fontSize = '14px'; // Much larger base font
-    tableElement.style.fontWeight = '600'; // Bolder text
-    tableElement.style.lineHeight = '1.6'; // More space between lines
-
-    // ✅ Make all td and th elements larger
-    const cells = tableElement.querySelectorAll('td, th');
-    cells.forEach(cell => {
-      cell.style.padding = '8px 6px'; // ✅ More padding
-      cell.style.fontSize = '13px'; // ✅ Larger cell text
-      cell.style.fontWeight = '500'; // ✅ Medium-bold
-    });
-
-    // ✅ Make header text even bolder
-    const headers = tableElement.querySelectorAll('th');
-    headers.forEach(header => {
-      header.style.fontSize = '14px';
-      header.style.fontWeight = '700'; // ✅ Bold headers
-    });
-
-    // ✅ IMPROVED: Higher scale for better clarity (trade off with compression)
-    const canvas = await html2canvas(tableElement, {
-      scale: 1.5, // ✅ INCREASED from 0.75 - much clearer
-      logging: false,
-      useCORS: true,
-      allowTaint: true,
-      backgroundColor: '#ffffff',
-      scrollY: -window.scrollY,
-      scrollX: -window.scrollX,
-      maxWidth: 1600, // ✅ Increased for better resolution
-      maxHeight: 2400, // ✅ Increased for better resolution
-      windowWidth: Math.min(tableElement.scrollWidth + 50, 1600),
-      windowHeight: Math.min(tableElement.scrollHeight + 50, 2400),
-    });
-
-    // ✅ Restore original styles
-    tableElement.style.fontSize = originalStyles.fontSize;
-    tableElement.style.fontWeight = originalStyles.fontWeight;
-    tableElement.style.padding = originalStyles.padding;
-    tableElement.style.lineHeight = originalStyles.lineHeight;
+    const blob = await response.blob();
+    const url = window.URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `${selectedClass}_${selectedTerm}_Results.pdf`;
+    a.click();
     
-    cells.forEach(cell => {
-      cell.style.padding = '';
-      cell.style.fontSize = '';
-      cell.style.fontWeight = '';
-    });
-
-    // ✅ A4 landscape for better print compatibility
-    const pdf = new jsPDF({
-      orientation: 'landscape',
-      unit: 'mm',
-      format: 'a4'
-    });
-
-    const pageWidth = pdf.internal.pageSize.getWidth(); // 297mm
-    const pageHeight = pdf.internal.pageSize.getHeight(); // 210mm
-    const margin = 8; // ✅ Reduced margins to use more space
-    const headerHeight = 22;
-    const footerHeight = 10;
-
-    const availableWidth = pageWidth - (margin * 2);
-    const availableHeight = pageHeight - headerHeight - footerHeight - (margin * 2);
-
-    const canvasAspect = canvas.width / canvas.height;
-    let imgWidth = availableWidth;
-    let imgHeight = imgWidth / canvasAspect;
-
-    if (imgHeight > availableHeight) {
-      imgHeight = availableHeight;
-      imgWidth = imgHeight * canvasAspect;
-    }
-
-    // ✅ IMPROVED: Better quality JPEG (higher than 0.4)
-    const imgData = canvas.toDataURL('image/jpeg', 0.85); // ✅ Increased from 0.4 for clarity
-
-    const MAX_DATA_URL_LENGTH = 3000000; // ✅ Increased limit for higher quality
-    
-    if (imgData.length > MAX_DATA_URL_LENGTH) {
-      alert('⚠️ Content is too large!\n\nSolution:\n• Export 8-12 students per batch\n• Reduce visible subjects\n• Close browser tabs');
-      setIsExportingPDF(false);
-      return;
-    }
-
-    // ✅ Add professional header
-    const addHeader = (pageNum, totalPages) => {
-      pdf.setFontSize(16); // ✅ Larger header
-      pdf.setFont(undefined, 'bold');
-      pdf.setTextColor(20, 100, 180);
-      pdf.text(
-        `${selectedClass.toUpperCase()} - ${selectedTerm ? selectedTerm.charAt(0).toUpperCase() + selectedTerm.slice(1) + ' Term' : 'Term'} Results`,
-        pageWidth / 2,
-        margin + 6,
-        { align: 'center' }
-      );
-      
-      pdf.setFontSize(11); // ✅ Larger detail text
-      pdf.setFont(undefined, 'normal');
-      pdf.setTextColor(100, 100, 100);
-      pdf.text(
-        `Generated: ${new Date().toLocaleDateString()} | Students: ${students.length} | Page ${pageNum}/${totalPages}`,
-        pageWidth / 2,
-        margin + 13,
-        { align: 'center' }
-      );
-
-      pdf.setDrawColor(200, 200, 200);
-      pdf.line(margin, margin + 15, pageWidth - margin, margin + 15);
-    };
-
-    // ✅ Add footer with page info
-    const addFooter = (pageNum, totalPages) => {
-      pdf.setFontSize(10); // ✅ Larger footer
-      pdf.setFont(undefined, 'normal');
-      pdf.setTextColor(150, 150, 150);
-      
-      pdf.text('Results Report', margin, pageHeight - 4);
-      
-      pdf.text(
-        `Page ${pageNum} of ${totalPages}`,
-        pageWidth / 2,
-        pageHeight - 4,
-        { align: 'center' }
-      );
-      
-      pdf.text(
-        `${new Date().toLocaleTimeString()}`,
-        pageWidth - margin,
-        pageHeight - 4,
-        { align: 'right' }
-      );
-
-      pdf.setDrawColor(200, 200, 200);
-      pdf.line(margin, pageHeight - 7, pageWidth - margin, pageHeight - 7);
-    };
-
-    // ✅ Better pagination
-    if (imgHeight <= availableHeight) {
-      // Single page - maximize content size
-      addHeader(1, 1);
-      pdf.addImage(
-        imgData,
-        'JPEG',
-        margin + (availableWidth - imgWidth) / 2,
-        margin + headerHeight,
-        imgWidth,
-        imgHeight
-      );
-      addFooter(1, 1);
-    } else {
-      // Multi-page with smart splitting
-      const numPages = Math.ceil(imgHeight / availableHeight);
-      const canvasPageHeight = canvas.height / numPages;
-      let pageNum = 0;
-
-      for (let page = 0; page < numPages; page++) {
-        pageNum = page + 1;
-
-        if (page > 0) {
-          pdf.addPage();
-        }
-
-        addHeader(pageNum, numPages);
-
-        const pageCanvas = document.createElement('canvas');
-        pageCanvas.width = canvas.width;
-        pageCanvas.height = canvasPageHeight;
-
-        const ctx = pageCanvas.getContext('2d');
-        ctx.fillStyle = '#ffffff';
-        ctx.fillRect(0, 0, pageCanvas.width, pageCanvas.height);
-
-        ctx.drawImage(
-          canvas,
-          0,
-          page * canvasPageHeight,
-          canvas.width,
-          canvasPageHeight,
-          0, 0,
-          pageCanvas.width,
-          pageCanvas.height
-        );
-
-        // ✅ Higher quality per chunk
-        const pageImgData = pageCanvas.toDataURL('image/jpeg', 0.85);
-
-        if (pageImgData.length > MAX_DATA_URL_LENGTH) {
-          console.warn(`Chunk ${pageNum} exceeded size, reducing...`);
-          continue;
-        }
-
-        const pageImgHeight = Math.min(availableHeight, imgHeight - (page * availableHeight));
-        const pageImgWidth = pageImgHeight * canvasAspect;
-
-        pdf.addImage(
-          pageImgData,
-          'JPEG',
-          margin + (availableWidth - pageImgWidth) / 2,
-          margin + headerHeight,
-          pageImgWidth,
-          pageImgHeight
-        );
-
-        addFooter(pageNum, numPages);
-      }
-    }
-
-    const filename = `${selectedClass.toUpperCase()}_${selectedTerm}_Results_${new Date().toLocaleDateString().replace(/\//g, '-')}.pdf`;
-    pdf.save(filename);
     setIsExportingPDF(false);
-    
-    alert(`✅ PDF exported successfully!\n\nFile: ${filename}\n\n📌 spreadsheet exported successfully!`);
   } catch (error) {
-    console.error('Error exporting to PDF:', error);
-    
-    // ✅ Restore styles even if error occurs
-    const tableElement = document.getElementById('printable-table')?.querySelector('table');
-    if (tableElement) {
-      tableElement.style.fontSize = '';
-      tableElement.style.fontWeight = '';
-      const cells = tableElement.querySelectorAll('td, th');
-      cells.forEach(cell => {
-        cell.style.padding = '';
-        cell.style.fontSize = '';
-        cell.style.fontWeight = '';
-      });
-    }
-    
-    if (error.message.includes('Invalid string length')) {
-      alert('⚠️ Table is too large!\n\n✓ Solution:\n1. Export 8-12 students per batch\n2. Reduce number of subjects\n3. Close other browser tabs');
-    } else if (error.message.includes('tainted canvas')) {
-      alert('⚠️ Image loading issue.\n\nTry:\n• Check image paths\n• Ensure images are accessible');
-    } else {
-      alert('❌ PDF Export Error:\n' + error.message);
-    }
-    
+    console.error('Export failed:', error);
+    alert('Failed to export PDF');
     setIsExportingPDF(false);
   }
 };
@@ -1493,9 +1278,10 @@ const handleExportPDF = async () => {
 
       alert('All results have been reset to pending. You can now edit.');
 
-      // Refresh data to reflect changes
+      // Refresh data to reflect changes - reload editResults from backend
       setLoading(true);
       await fetchData();
+      await fetchResults(students);
     } catch (err) {
       console.error('Error resetting to pending:', err);
       alert('An error occurred while resetting results.');

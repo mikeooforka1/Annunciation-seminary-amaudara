@@ -55,6 +55,7 @@ const VerifyResult = () => {
   const [showDeleteConfirmModal, setShowDeleteConfirmModal] = useState(null);
   const [saveLoading, setSaveLoading] = useState(false);
   const [showReviewAllConfirmModal, setShowReviewAllConfirmModal] = useState(false);
+  const [unpushedSubjectsMap, setUnpushedSubjectsMap] = useState({}); // Track unpushed subjects per student
 
   useEffect(() => {
     // Get admin data from localStorage (adjust key as needed)
@@ -255,8 +256,12 @@ useEffect(() => {
                 mapped.creativity = r.creativity ?? '';
               }
             });
-            mapped.subjects = subjects;
-
+            // Sort subjects in a consistent (alphabetical) order so every
+            // student displays the same subject order instead of scattering
+            // based on the backend's return order.
+            mapped.subjects = subjects.sort((a, b) =>
+              a.localeCompare(b, undefined, { sensitivity: 'base' })
+            );
             // Calculate status for this student
             isReviewed = subjectResults.length > 0 && subjectResults.every(r => r.reviewed === true && r.pending === false);
             isVerified = subjectResults.length > 0 && subjectResults.every(r => r.verified === true && r.pending === false);
@@ -425,6 +430,17 @@ useEffect(() => {
         return updatedResults;
       });
 
+ // Remove from unpushedSubjectsMap for all students
+      setUnpushedSubjectsMap(prev => {
+        const updated = { ...prev };
+        Object.keys(updated).forEach(studentId => {
+          if (updated[studentId]?.unpushedSubjects) {
+            updated[studentId].unpushedSubjects = updated[studentId].unpushedSubjects.filter(s => s !== subject);
+          }
+        });
+        return updated;
+      });
+
       for (const resultId of subjectResultIds) {
         try {
           await fetch(`${API_BASE_URL}/api/results/delete/${resultId}`, {
@@ -453,6 +469,16 @@ useEffect(() => {
         }
         return updatedResults;
       });
+
+         // 2. Remove from unpushedSubjectsMap for this student
+      setUnpushedSubjectsMap(prev => {
+        const updated = { ...prev };
+        if (updated[studentId]?.unpushedSubjects) {
+          updated[studentId].unpushedSubjects = updated[studentId].unpushedSubjects.filter(s => s !== subject);
+        }
+        return updated;
+      });
+
       // 2. Delete from backend for just this student
       if (subjObj && subjObj._id) {
         try {

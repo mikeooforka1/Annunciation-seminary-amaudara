@@ -71,11 +71,16 @@ const AdminDashboard = () => {
     fetchNonAcademic();
   }, []);
 
-  useEffect(() => {
-    if (location.state?.showSection === "verify") {
-      setShowSection("verify");
-    }
-  }, []);
+ useEffect(() => {
+  if (location.state?.showSection === "verify") {
+    setShowSection("verify");
+
+    navigate("/admin", {
+      replace: true,
+      state: {},
+    });
+  }
+}, [location.state, navigate]);
 
   const fetchClasses = async () => {
     setLoading(true);
@@ -262,52 +267,78 @@ const AdminDashboard = () => {
   );
 
   return (
-    <div className="min-h-screen bg-background relative">
-      {/* Admin Dashboard Header */}
-      <div className="w-full flex flex-col sm:flex-row justify-between items-center px-4 py-4 bg-white shadow-sm border-b border-border">
-        <h1 className="text-2xl font-heading font-bold text-primary mb-2 sm:mb-0">
-          Admin Dashboard
-        </h1>
-        <Button variant="destructive" size="sm" onClick={handleLogout}>
-          Logout
-        </Button>
+    <div className="min-h-screen bg-gradient-to-br from-slate-50 via-blue-50 to-slate-100 relative">
+      {/* Premium Admin Dashboard Header */}
+      <div className="w-full bg-gradient-to-r from-primary/95 via-primary to-accent/90 shadow-lg border-b border-primary/10">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6 sm:py-8 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
+          <div className="flex items-center gap-3">
+            <div className="p-3 bg-white/20 backdrop-blur rounded-xl">
+              <Icon name="BarChart3" size={32} className="text-white" />
+            </div>
+            <div>
+              <h1 className="text-3xl sm:text-4xl font-heading font-bold text-white">
+                Admin Dashboard
+              </h1>
+              <p className="text-white/80 text-sm mt-1">School Management Control Panel</p>
+            </div>
+          </div>
+          <Button 
+            variant="secondary" 
+            size="sm" 
+            onClick={handleLogout}
+            className="bg-white/20 hover:bg-white/30 text-white border-white/30"
+          >
+            <Icon name="LogOut" size={16} className="mr-2" />
+            Logout
+          </Button>
+        </div>
       </div>
 
-      {/* Horizontal Cards Section (Only on main dashboard) */}
+      {/* Premium Navigation Cards Section */}
       {!showSection && (
-        <div className="w-full bg-white shadow-sm border-b border-border py-4 px-2 flex flex-wrap justify-center gap-4 max-w-5xl mx-auto">
-          {adminCards.map((card) => (
-            <div
-              key={card.key}
-              className="min-w-[180px] max-w-xs flex-shrink-0 bg-card border border-border rounded-xl p-4 flex flex-col items-center cursor-pointer hover:shadow-lg transition"
-              onClick={() =>
-                card.key === "teachers"
-                  ? setShowSection("teachers")
-                  : handleSection(card.key)
-              }
-            >
-              {card.icon}
-              <h2 className="font-heading font-bold text-base mb-1">{card.title}</h2>
-              <p className="text-muted-foreground text-xs text-center">{card.desc}</p>
-            </div>
-          ))}
+        <div className="w-full bg-white/40 backdrop-blur-md border-b border-white/20 py-6 px-4">
+          <div className="max-w-7xl mx-auto grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-4">
+            {adminCards.map((card) => (
+              <div
+                key={card.key}
+                className="group relative bg-white border border-slate-200 rounded-2xl p-4 sm:p-5 flex flex-col items-center cursor-pointer shadow-md hover:shadow-2xl hover:border-primary/50 transition-all duration-300 overflow-hidden"
+                onClick={() =>
+                  card.key === "teachers"
+                    ? setShowSection("teachers")
+                    : handleSection(card.key)
+                }
+              >
+                <div className="absolute inset-0 bg-gradient-to-br from-primary/5 to-accent/5 opacity-0 group-hover:opacity-100 transition-opacity duration-300" />
+                <div className="relative z-10 w-12 h-12 rounded-xl bg-gradient-to-br from-primary/20 to-accent/20 flex items-center justify-center mb-3 group-hover:scale-110 transition-transform duration-300">
+                  {card.icon}
+                </div>
+                <h2 className="font-heading font-bold text-base sm:text-lg mb-1 text-slate-800 text-center relative z-10">{card.title}</h2>
+                <p className="text-muted-foreground text-xs sm:text-sm text-center relative z-10 line-clamp-2">{card.desc}</p>
+              </div>
+            ))}
+          </div>
         </div>
       )}
 
       {/* Main Content */}
-      <main className="max-w-7xl mx-auto p-2 sm:p-4 transition-all duration-200">
+      <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6 sm:py-8 transition-all duration-200">
         {/* Error Message */}
         {errorMsg && (
-          <div className="mb-4 text-center text-red-600 bg-red-50 border border-red-200 rounded p-2">
-            {errorMsg}
+          <div className="mb-6 p-4 rounded-xl bg-red-50 border border-red-200 shadow-sm flex items-center gap-3">
+            <Icon name="AlertCircle" size={20} className="text-red-600 flex-shrink-0" />
+            <span className="text-red-700 font-medium flex-1">{errorMsg}</span>
+            <button onClick={() => setErrorMsg("")} className="text-red-600 hover:text-red-800 transition">
+              ✕
+            </button>
           </div>
         )}
 
         {/* Success Message */}
         {successMsg && (
-          <div className="mb-4 text-center text-green-600 bg-green-50 border border-green-200 rounded p-3 flex items-center justify-between">
-            <span>{successMsg}</span>
-            <button onClick={() => setSuccessMsg("")} className="text-green-600 hover:text-green-800">
+          <div className="mb-6 p-4 rounded-xl bg-green-50 border border-green-200 shadow-sm flex items-center gap-3">
+            <Icon name="CheckCircle" size={20} className="text-green-600 flex-shrink-0" />
+            <span className="text-green-700 font-medium flex-1">{successMsg}</span>
+            <button onClick={() => setSuccessMsg("")} className="text-green-600 hover:text-green-800 transition">
               ✕
             </button>
           </div>
@@ -315,65 +346,98 @@ const AdminDashboard = () => {
 
         {/* Admin Quick Stats */}
         {!showSection && (
-          <div className="mt-6">
-            <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-6 mb-8">
-              <div className="bg-primary/10 border border-primary/20 rounded-lg p-4 flex flex-col items-center">
-                <Icon name="Users" size={28} className="text-primary mb-2" />
-                <div className="text-lg font-bold text-primary">
-                  {classes.reduce((acc, cls) => acc + (cls.studentCount || 0), 0)}
+          <div className="space-y-8">
+            {/* Stats Cards Grid */}
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
+              {/* Total Students Card */}
+              <div className="group relative bg-white rounded-2xl p-6 sm:p-8 shadow-md border border-slate-200 overflow-hidden hover:shadow-xl transition-shadow duration-300">
+                <div className="absolute inset-0 bg-gradient-to-br from-blue-50 to-transparent opacity-50" />
+                <div className="relative z-10">
+                  <div className="flex items-center justify-between mb-4">
+                    <div className="p-3 bg-gradient-to-br from-blue-500 to-blue-600 rounded-xl shadow-lg">
+                      <Icon name="Users" size={32} className="text-white" />
+                    </div>
+                    <div className="text-xs font-semibold text-blue-600 bg-blue-100 px-3 py-1 rounded-full">
+                      Total
+                    </div>
+                  </div>
+                  <div className="mb-2">
+                    <div className="text-4xl sm:text-5xl font-bold text-slate-900">
+                      {classes.reduce((acc, cls) => acc + (cls.studentCount || 0), 0)}
+                    </div>
+                    <div className="text-slate-600 font-medium mt-2">Students Enrolled</div>
+                  </div>
+                  <div className="pt-4 border-t border-slate-200 mt-4">
+                    <p className="text-sm text-slate-500">Across all classes in the school</p>
+                  </div>
                 </div>
-                <div className="text-xs text-muted-foreground">Total Students</div>
               </div>
-              <div className="bg-accent/10 border border-accent/20 rounded-lg p-4 flex flex-col items-center">
-                <Icon name="UserCheck" size={28} className="text-accent mb-2" />
-                <div className="text-lg font-bold text-accent">
-                  {teachers.length}
+
+              {/* Total Teachers Card */}
+              <div className="group relative bg-white rounded-2xl p-6 sm:p-8 shadow-md border border-slate-200 overflow-hidden hover:shadow-xl transition-shadow duration-300">
+                <div className="absolute inset-0 bg-gradient-to-br from-green-50 to-transparent opacity-50" />
+                <div className="relative z-10">
+                  <div className="flex items-center justify-between mb-4">
+                    <div className="p-3 bg-gradient-to-br from-green-500 to-green-600 rounded-xl shadow-lg">
+                      <Icon name="UserCheck" size={32} className="text-white" />
+                    </div>
+                    <div className="text-xs font-semibold text-green-600 bg-green-100 px-3 py-1 rounded-full">
+                      Active
+                    </div>
+                  </div>
+                  <div className="mb-2">
+                    <div className="text-4xl sm:text-5xl font-bold text-slate-900">
+                      {teachers.length}
+                    </div>
+                    <div className="text-slate-600 font-medium mt-2">Teachers on Staff</div>
+                  </div>
+                  <div className="pt-4 border-t border-slate-200 mt-4">
+                    <p className="text-sm text-slate-500">Quality educators and mentors</p>
+                  </div>
                 </div>
-                <div className="text-xs text-muted-foreground">Total Teachers</div>
-              </div>
-              <div className="bg-primary/10 border border-primary/20 rounded-lg p-4 flex flex-col items-center">
-                <Icon name="Award" size={28} className="text-primary mb-2" />
-                <div className="text-lg font-bold text-primary">
-                  {formators.length}
-                </div>
-                <div className="text-xs text-muted-foreground">Total Formators</div>
-              </div>
-              <div className="bg-accent/10 border border-accent/20 rounded-lg p-4 flex flex-col items-center">
-                <Icon name="Briefcase" size={28} className="text-accent mb-2" />
-                <div className="text-lg font-bold text-accent">
-                  {nonAcademic.length}
-                </div>
-                <div className="text-xs text-muted-foreground">Non-Academic Staff</div>
               </div>
             </div>
-            {/* Professional Admin Notices */}
-            <div className="bg-gradient-to-br from-blue-50 via-white to-blue-100 border border-blue-200 rounded-lg p-6 mb-8 shadow">
-              <h2 className="font-heading font-bold text-lg mb-3 text-primary flex items-center gap-2">
-                <Icon name="Info" size={22} className="text-primary" />
-                Admin Notices
-              </h2>
-              <ul className="list-none space-y-3 text-base text-blue-900 font-medium">
-                <li className="flex items-center gap-2">
-                  <Icon name="Database" size={18} className="text-blue-500" />
-                  Regularly back up the database to prevent data loss.
-                </li>
-                <li className="flex items-center gap-2">
-                  <Icon name="CheckCircle" size={18} className="text-green-500" />
-                  Review and approve pending result verifications promptly.
-                </li>
-                <li className="flex items-center gap-2">
-                  <Icon name="Eye" size={18} className="text-indigo-500" />
-                  Monitor user activity for unusual behavior.
-                </li>
-                <li className="flex items-center gap-2">
-                  <Icon name="Edit" size={18} className="text-yellow-500" />
-                  Update staff and student records as needed.
-                </li>
-                <li className="flex items-center gap-2">
-                  <Icon name="Bell" size={18} className="text-red-500" />
-                  Check for new announcements to post.
-                </li>
-              </ul>
+            {/* Premium Admin Notices Section */}
+            <div className="relative bg-white rounded-2xl shadow-md border border-slate-200 overflow-hidden">
+              <div className="absolute top-0 right-0 w-40 h-40 bg-gradient-to-br from-indigo-100 to-blue-100 rounded-full blur-3xl opacity-30 -mr-20 -mt-20" />
+              <div className="relative z-10 p-6 sm:p-8">
+                <h2 className="font-heading font-bold text-2xl mb-6 text-slate-900 flex items-center gap-3">
+                  <div className="p-2 bg-indigo-100 rounded-lg">
+                    <Icon name="AlertTriangle" size={24} className="text-indigo-600" />
+                  </div>
+                  Important Admin Notices
+                </h2>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div className="flex gap-3 p-4 bg-blue-50 border border-blue-200 rounded-xl hover:shadow-md transition-shadow">
+                    <Icon name="Database" size={20} className="text-blue-600 flex-shrink-0 mt-0.5" />
+                    <div>
+                      <p className="font-semibold text-blue-900">Database Backups</p>
+                      <p className="text-sm text-blue-700 mt-1">Regularly back up the database to prevent data loss.</p>
+                    </div>
+                  </div>
+                  <div className="flex gap-3 p-4 bg-green-50 border border-green-200 rounded-xl hover:shadow-md transition-shadow">
+                    <Icon name="CheckCircle" size={20} className="text-green-600 flex-shrink-0 mt-0.5" />
+                    <div>
+                      <p className="font-semibold text-green-900">Result Verification</p>
+                      <p className="text-sm text-green-700 mt-1">Review and approve pending result verifications promptly.</p>
+                    </div>
+                  </div>
+                  <div className="flex gap-3 p-4 bg-purple-50 border border-purple-200 rounded-xl hover:shadow-md transition-shadow">
+                    <Icon name="Eye" size={20} className="text-purple-600 flex-shrink-0 mt-0.5" />
+                    <div>
+                      <p className="font-semibold text-purple-900">User Activity Monitoring</p>
+                      <p className="text-sm text-purple-700 mt-1">Monitor user activity for unusual behavior and security threats.</p>
+                    </div>
+                  </div>
+                  <div className="flex gap-3 p-4 bg-amber-50 border border-amber-200 rounded-xl hover:shadow-md transition-shadow">
+                    <Icon name="Edit" size={20} className="text-amber-600 flex-shrink-0 mt-0.5" />
+                    <div>
+                      <p className="font-semibold text-amber-900">Record Management</p>
+                      <p className="text-sm text-amber-700 mt-1">Update staff and student records as needed to maintain accuracy.</p>
+                    </div>
+                  </div>
+                </div>
+              </div>
             </div>
           </div>
         )}

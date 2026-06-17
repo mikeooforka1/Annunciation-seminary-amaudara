@@ -25,7 +25,6 @@
     "jspdf": "^4.2.1",
     "lucide-react": "^0.484.0",
     "print-js": "^1.6.0",
-    "puppeteer": "^24.34.0",
     "react": "^18.2.0",
     "react-dom": "^18.2.0",
     "react-helmet": "^6.1.0",
@@ -43,7 +42,8 @@
     "tailwindcss-animate": "^1.0.7",
     "tailwindcss-elevation": "^2.0.0",
     "tailwindcss-fluid-type": "^2.0.7",
-    "workbox-cli": "^7.4.0"
+    "workbox-cli": "^7.4.0",
+    "xlsx": "^0.18.5"
   },
   "scripts": {
     "start": "react-scripts start",

@@ -27,6 +27,7 @@ import Spreadsheet from './pages/admin/components/spreadsheet.jsx'; // <-- Add t
 import CBTResultPortal from './pages/exam-creation-management/components/CBT-result-portal.jsx';// <-- Add this import
 import CBTResult from './pages/results-analytics-portal/components/cbt-result.jsx';
 import PrintAllResults from './pages/teacher-portal/PrintAllResults.jsx'; // Add this import
+import AddStudentsForm from './pages/admin/components/add-students.jsx';
 
 const AppWrapper = ({ children }) => {
   const navigate = useNavigate();
@@ -185,6 +186,7 @@ const Routes = () => {
                   <Route path="/admin" element={<AdminDashboard />} />
                   <Route path="/admin/student/:studentId" element={<StudentProfilePage />} />
                   <Route path="/admin/spreadsheet" element={<Spreadsheet />} />
+                  <Route path="/admin/add-students" element={<AddStudentsForm />} />
                   <Route
   path="/result-portal"
   element={

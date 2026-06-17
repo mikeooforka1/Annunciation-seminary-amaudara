@@ -9,6 +9,41 @@ import jsPDF from 'jspdf';
 
 const API_BASE_URL = process.env.REACT_APP_API_BASE_URL;
 
+// ✅ localStorage utility functions for persisting subject order
+const STORAGE_KEY_PREFIX = 'spreadsheet_subject_order_';
+
+const saveSubjectOrderToStorage = (classId, term, order) => {
+  if (!classId || !term) return;
+  const key = `${STORAGE_KEY_PREFIX}${classId}_${term}`;
+  try {
+    localStorage.setItem(key, JSON.stringify(order));
+  } catch (err) {
+    console.error('Failed to save subject order to localStorage:', err);
+  }
+};
+
+const getSubjectOrderFromStorage = (classId, term) => {
+  if (!classId || !term) return null;
+  const key = `${STORAGE_KEY_PREFIX}${classId}_${term}`;
+  try {
+    const stored = localStorage.getItem(key);
+    return stored ? JSON.parse(stored) : null;
+  } catch (err) {
+    console.error('Failed to load subject order from localStorage:', err);
+    return null;
+  }
+};
+
+const clearSubjectOrderFromStorage = (classId, term) => {
+  if (!classId || !term) return;
+  const key = `${STORAGE_KEY_PREFIX}${classId}_${term}`;
+  try {
+    localStorage.removeItem(key);
+  } catch (err) {
+    console.error('Failed to clear subject order from localStorage:', err);
+  }
+};
+
 const Spreadsheet = () => {
   const location = useLocation();
   const navigate = useNavigate();
@@ -53,6 +88,10 @@ const Spreadsheet = () => {
   const [isExportingPDF, setIsExportingPDF] = useState(false);
 
   const [resultStatusMap, setResultStatusMap] = useState(location.state?.verifiedStudents || {});
+
+  // ✅ Drag & Drop states for subject reordering
+  const [draggedSubject, setDraggedSubject] = useState(null);
+  const [dragOverSubject, setDragOverSubject] = useState(null);
 
   // ✅ Fetch students only (term-independent) - triggered when class changes
   const fetchData = async () => {
@@ -165,8 +204,35 @@ const Spreadsheet = () => {
         });
       });
 
+      // ✅ Load saved subject order from localStorage and apply it
+      const savedOrder = getSubjectOrderFromStorage(selectedClass, selectedTerm);
+      let finalOrder = allSubjectsOrdered;
+
+      if (savedOrder && savedOrder.length > 0) {
+        // Merge: keep saved order for existing subjects, add new subjects at the end
+        const orderedSubjects = [];
+        const addedSubjects = new Set();
+
+        // First, add subjects in the saved order (if they still exist)
+        savedOrder.forEach(subject => {
+          if (allSubjectsOrdered.includes(subject)) {
+            orderedSubjects.push(subject);
+            addedSubjects.add(subject);
+          }
+        });
+
+        // Then, add any new subjects that weren't in the saved order
+        allSubjectsOrdered.forEach(subject => {
+          if (!addedSubjects.has(subject)) {
+            orderedSubjects.push(subject);
+          }
+        });
+
+        finalOrder = orderedSubjects;
+      }
+
       setSubjects(allSubjectsOrdered);
-      setSubjectsOrder(allSubjectsOrdered);
+      setSubjectsOrder(finalOrder);
       setResultsMap(map);
       setEditResults(editMap);
       setResultStatusMap(statusMap);
@@ -204,8 +270,36 @@ const Spreadsheet = () => {
           }
         });
       });
+
+      // ✅ Load saved subject order from localStorage and apply it
+      const savedOrder = getSubjectOrderFromStorage(selectedClass, selectedTerm);
+      let finalSubjectsOrder = allSubjectsOrdered;
+
+      if (savedOrder && savedOrder.length > 0) {
+        // Merge: keep saved order for existing subjects, add new subjects at the end
+        const orderedSubjects = [];
+        const addedSubjects = new Set();
+
+        // First, add subjects in the saved order (if they still exist)
+        savedOrder.forEach(subject => {
+          if (allSubjectsOrdered.includes(subject)) {
+            orderedSubjects.push(subject);
+            addedSubjects.add(subject);
+          }
+        });
+
+        // Then, add any new subjects that weren't in the saved order
+        allSubjectsOrdered.forEach(subject => {
+          if (!addedSubjects.has(subject)) {
+            orderedSubjects.push(subject);
+          }
+        });
+
+        finalSubjectsOrder = orderedSubjects;
+      }
+
       setSubjects(allSubjectsOrdered);
-      setSubjectsOrder(allSubjectsOrdered);
+      setSubjectsOrder(finalSubjectsOrder);
 
       const fixedEditResults = {};
       location.state.students.forEach(student => {
@@ -388,6 +482,9 @@ const Spreadsheet = () => {
     setSubjects(newSubjects);
     setSubjectsOrder(newSubjectsOrder);
 
+    // ✅ Save to localStorage when subject is removed
+    saveSubjectOrderToStorage(selectedClass, selectedTerm, newSubjectsOrder);
+
     if (navigator.onLine) {
       for (const resultId of subjectResultIds) {
         try {
@@ -495,6 +592,9 @@ const Spreadsheet = () => {
 
     setSubjects(updatedSubjects);
     setSubjectsOrder(updatedSubjectsOrder);
+
+    // ✅ Save to localStorage when subject is added
+    saveSubjectOrderToStorage(selectedClass, selectedTerm, updatedSubjectsOrder);
 
     if (navigator.onLine) {
       try {
@@ -650,6 +750,8 @@ const handleExportPDF = async () => {
     if (needsNewSubjectColumn) {
       setSubjects(updatedSubjects);
       setSubjectsOrder(updatedSubjectsOrder);
+      // ✅ Save to localStorage when new subject is added for individual
+      saveSubjectOrderToStorage(selectedClass, selectedTerm, updatedSubjectsOrder);
     }
 
     if (navigator.onLine) {
@@ -1210,6 +1312,63 @@ const handleExportPDF = async () => {
     if (score >= 40 && score < 45) return "E8";
     return "F9";
   }
+
+  // ✅ Drag & Drop Handlers for Subject Reordering
+  const handleDragStart = (subject) => {
+    setDraggedSubject(subject);
+  };
+
+  const handleDragOver = (e) => {
+    e.preventDefault();
+    e.stopPropagation();
+  };
+
+  const handleDragEnter = (subject) => {
+    if (draggedSubject && draggedSubject !== subject) {
+      setDragOverSubject(subject);
+    }
+  };
+
+  const handleDragLeave = () => {
+    setDragOverSubject(null);
+  };
+
+  const handleDropSubject = (targetSubject) => {
+    if (!draggedSubject || draggedSubject === targetSubject) {
+      setDraggedSubject(null);
+      setDragOverSubject(null);
+      return;
+    }
+
+    // Reorder subjects in subjectsOrder
+    const draggedIndex = subjectsOrder.indexOf(draggedSubject);
+    const targetIndex = subjectsOrder.indexOf(targetSubject);
+
+    if (draggedIndex === -1 || targetIndex === -1) {
+      setDraggedSubject(null);
+      setDragOverSubject(null);
+      return;
+    }
+
+    const newOrder = [...subjectsOrder];
+    newOrder.splice(draggedIndex, 1);
+    newOrder.splice(targetIndex, 0, draggedSubject);
+
+    setSubjectsOrder(newOrder);
+    setDraggedSubject(null);
+    setDragOverSubject(null);
+
+    // ✅ Save to localStorage for persistence across page refresh/navigation
+    saveSubjectOrderToStorage(selectedClass, selectedTerm, newOrder);
+
+    // Also save to offline state
+    saveOfflineState({
+      students,
+      editResults,
+      subjects,
+      subjectsOrder: newOrder
+    });
+  };
   function getRemark(grade) {
     if (grade === "A1") return "Excellent";
     if (grade === "B2" || grade === "B3") return "Very Good";
@@ -1442,7 +1601,19 @@ const handleExportPDF = async () => {
                   <th className="border px-2 py-1 bg-gray-100" style={{ position: "sticky", left: 60, zIndex: 20 }}>Student Name</th>
                   {subjectsOrder.map(subject => (
                     <React.Fragment key={subject}>
-                      <th className="border px-2 py-1 bg-gray-100 relative subject-dropdown" style={{ minWidth: 90 }}>
+                      <th 
+                        className={`border px-2 py-1 bg-gray-100 relative subject-dropdown cursor-move transition-all ${
+                          dragOverSubject === subject ? 'border-l-4 border-l-blue-500' : ''
+                        }`}
+                        style={{ minWidth: 90 }}
+                        draggable
+                        onDragStart={() => handleDragStart(subject)}
+                        onDragOver={handleDragOver}
+                        onDragEnter={() => handleDragEnter(subject)}
+                        onDragLeave={handleDragLeave}
+                        onDrop={() => handleDropSubject(subject)}
+                        title="Drag to reorder subjects"
+                      >
                         <span style={{ display: "inline-flex", alignItems: "center", gap: 4 }}>
                           {subject} CAT
                           <button

@@ -452,11 +452,22 @@ const AdminDashboard = () => {
             >
               &larr; Back to Dashboard
             </Button>
-            <div className="mb-4 text-lg font-semibold text-primary">
-              Total Students in School:{" "}
-              {classes.reduce((acc, cls) => acc + (cls.studentCount || 0), 0)}
+            <div className="mb-6 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+              <div className="flex-1">
+                <div className="mb-2 text-lg font-semibold text-primary">
+                  Total Students in School:{" "}
+                  {classes.reduce((acc, cls) => acc + (cls.studentCount || 0), 0)}
+                </div>
+                <h2 className="font-heading text-xl">All Classes</h2>
+              </div>
+              <Button
+                onClick={() => navigate("/admin/add-students")}
+                className="bg-gradient-to-r from-primary to-accent hover:shadow-lg w-full sm:w-auto"
+              >
+                <Icon name="Plus" size={18} className="mr-2" />
+                Add Student
+              </Button>
             </div>
-            <h2 className="font-heading text-xl mb-4">All Classes</h2>
             <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4">
               {classes.map((cls) => (
                 <div

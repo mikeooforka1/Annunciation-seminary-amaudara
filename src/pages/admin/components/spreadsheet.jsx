@@ -33,6 +33,37 @@ const getPromotionStatus = overallScore => {
   return overall < 50 ? 'No' : 'Yes';
 };
 
+const formatOrdinalPosition = position => {
+  if (!position) return '';
+  const mod100 = position % 100;
+  if (mod100 >= 11 && mod100 <= 13) return `${position}th`;
+  const suffix = position % 10 === 1 ? 'st' : position % 10 === 2 ? 'nd' : position % 10 === 3 ? 'rd' : 'th';
+  return `${position}${suffix}`;
+};
+
+const calculateCumulativePositionMap = entries => {
+  const ranked = entries
+    .map(entry => {
+      const hasScore = entry.overallScore !== '' && entry.overallScore !== null && entry.overallScore !== undefined;
+      return { ...entry, overallScore: hasScore ? Number(entry.overallScore) : null };
+    })
+    .filter(entry => entry.overallScore !== null && Number.isFinite(entry.overallScore))
+    .sort((a, b) => b.overallScore - a.overallScore);
+
+  const positionMap = {};
+  let lastScore = null;
+  let lastPosition = 0;
+  ranked.forEach((entry, index) => {
+    const position = lastScore !== null && entry.overallScore === lastScore
+      ? lastPosition
+      : index + 1;
+    positionMap[entry.studentId] = formatOrdinalPosition(position);
+    lastScore = entry.overallScore;
+    lastPosition = position;
+  });
+  return positionMap;
+};
+
 // ✅ localStorage utility functions for persisting subject order
 const STORAGE_KEY_PREFIX = 'spreadsheet_subject_order_';
 
@@ -195,6 +226,7 @@ const Spreadsheet = () => {
               secondTermCumulative: r.secondTermCumulative ?? "",
               thirdTermCumulative: r.thirdTermCumulative ?? "",
               overallScore: r.overallScore ?? "",
+              cumulativePosition: r.cumulativePosition ?? "",
               promoted: r.promoted ?? getPromotionStatus(r.overallScore)
             };
           }
@@ -217,6 +249,9 @@ const Spreadsheet = () => {
             editMap[studentId]._overall.thirdTermCumulative
           );
           editMap[studentId]._overall.promoted = getPromotionStatus(editMap[studentId]._overall.overallScore);
+          editMap[studentId]._overall.cumulativePosition = cumulative?.cumulativePosition
+            ?? editMap[studentId]._overall.cumulativePosition
+            ?? "";
         }
 
         editMap[studentId].subjects = subjects;
@@ -284,11 +319,31 @@ const Spreadsheet = () => {
         finalOrder = orderedSubjects;
       }
 
+      if (isThirdTerm) {
+        const cumulativePositionMap = calculateCumulativePositionMap(
+          Object.keys(editMap).map(studentId => ({
+            studentId,
+            overallScore: editMap[studentId]?._overall?.overallScore
+          }))
+        );
+        Object.keys(editMap).forEach(studentId => {
+          if (!editMap[studentId]._overall) editMap[studentId]._overall = {};
+          editMap[studentId]._overall.cumulativePosition = cumulativePositionMap[studentId] || "";
+        });
+      }
+
       setSubjects(allSubjectsOrdered);
       setSubjectsOrder(finalOrder);
       setResultsMap(map);
       setEditResults(editMap);
       setResultStatusMap(statusMap);
+      if (isThirdTerm) {
+        fetch(`${API_BASE_URL}/api/results/update-cumulative-positions`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ className: selectedClass })
+        }).catch(() => {});
+      }
       setLoading(false);
     } catch (err) {
       setSubjects([]);
@@ -369,7 +424,7 @@ const Spreadsheet = () => {
         [
           "_overallId", "position", "average", "schoolOpened", "present", "absent",
           "teacherComment", "headTeacherRemark", "academicYear", "nextTerm",
-          "firstTermCumulative", "secondTermCumulative", "thirdTermCumulative", "overallScore", "promoted",
+          "firstTermCumulative", "secondTermCumulative", "thirdTermCumulative", "overallScore", "cumulativePosition", "promoted",
           "handwriting", "punctuality", "initiative", "obedience", "honesty",
           "neatness", "attentiveness", "respect", "attitude", "creativity"
         ].forEach(field => {
@@ -399,6 +454,7 @@ const Spreadsheet = () => {
           secondTermCumulative: result.secondTermCumulative ?? "",
           thirdTermCumulative: result.thirdTermCumulative ?? "",
           overallScore: result.overallScore ?? "",
+          cumulativePosition: result.cumulativePosition ?? "",
           promoted: result.promoted ?? getPromotionStatus(result.overallScore),
           _id: result._overallId ?? ""
         };
@@ -999,6 +1055,7 @@ const handleExportPDF = async () => {
               secondTermCumulative: overall.secondTermCumulative,
               thirdTermCumulative: overall.thirdTermCumulative,
               overallScore: overall.overallScore,
+              cumulativePosition: overall.cumulativePosition || undefined,
               promoted: overall.promoted || undefined
             } : {}),
             reviewed: false,
@@ -1053,6 +1110,7 @@ const handleExportPDF = async () => {
               secondTermCumulative: overall.secondTermCumulative,
               thirdTermCumulative: overall.thirdTermCumulative,
               overallScore: overall.overallScore,
+              cumulativePosition: overall.cumulativePosition || undefined,
               promoted: overall.promoted || undefined
             } : {}),
             reviewed: false,
@@ -1119,6 +1177,7 @@ const handleExportPDF = async () => {
                   secondTermCumulative: overall.secondTermCumulative,
                   thirdTermCumulative: overall.thirdTermCumulative,
                   overallScore: overall.overallScore,
+                  cumulativePosition: overall.cumulativePosition || undefined,
                   promoted: overall.promoted || undefined
                 } : {}),
                 reviewed: false,
@@ -1379,6 +1438,22 @@ const handleExportPDF = async () => {
         actualPosition++;
       });
 
+      const cumulativePositionMap = isThirdTerm
+        ? calculateCumulativePositionMap(students.map(student => {
+            const studentId = student._id;
+            const currentOverall = editResults[studentId]?._overall || {};
+            const thirdTermAverage = studentTotals.find(item => item.studentId === studentId)?.average ?? '';
+            return {
+              studentId,
+              overallScore: calculateCumulativeOverall(
+                currentOverall.firstTermCumulative,
+                currentOverall.secondTermCumulative,
+                thirdTermAverage
+              )
+            };
+          }))
+        : {};
+
       setEditResults(prev => {
         let changed = false;
         const updated = { ...prev };
@@ -1409,6 +1484,7 @@ const handleExportPDF = async () => {
               updated[studentId]._overall.promoted = getPromotionStatus(
                 updated[studentId]._overall.overallScore
               );
+              updated[studentId]._overall.cumulativePosition = cumulativePositionMap[studentId] || '';
             }
             changed = true;
           }
@@ -1830,6 +1906,7 @@ const handleExportPDF = async () => {
                       <th className="border px-2 py-1 bg-gray-100">Second Term Average</th>
                       <th className="border px-2 py-1 bg-gray-100">Third Term Average</th>
                       <th className="border px-2 py-1 bg-gray-100">Cumulative Average</th>
+                      <th className="border px-2 py-1 bg-gray-100">Cumulative Position</th>
                       <th className="border px-2 py-1 bg-gray-100">Promoted</th>
                     </>
                   )}
@@ -1953,6 +2030,9 @@ const handleExportPDF = async () => {
                               readOnly
                               disabled
                             />
+                          </td>
+                          <td className="border px-2 py-1 text-center font-semibold">
+                            {editResults[student._id]?._overall?.cumulativePosition ?? ""}
                           </td>
                           <td className="border px-2 py-1 text-center font-semibold">
                             {editResults[student._id]?._overall?.promoted ?? ""}

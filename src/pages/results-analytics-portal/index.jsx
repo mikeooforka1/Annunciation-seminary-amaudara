@@ -35,6 +35,7 @@ const ResultsAnalyticsPortal = () => {
     secondTermCumulative: null,
     thirdTermCumulative: null,
     overallScore: null,
+    cumulativePosition: null,
     promoted: null
   });
   const [isLoadingCumulative, setIsLoadingCumulative] = useState(false);
@@ -153,6 +154,7 @@ const ResultsAnalyticsPortal = () => {
         secondTermCumulative: null,
         thirdTermCumulative: null,
         overallScore: null,
+        cumulativePosition: null,
         promoted: null
       });
       setIsLoadingCumulative(false);
@@ -183,6 +185,7 @@ const ResultsAnalyticsPortal = () => {
           secondTermCumulative: data?.secondTermCumulative ?? null,
           thirdTermCumulative: data?.thirdTermCumulative ?? null,
           overallScore: data?.overallScore ?? null,
+          cumulativePosition: data?.cumulativePosition ?? null,
           promoted: data?.promoted ?? null
         });
         setIsLoadingCumulative(false);
@@ -356,6 +359,7 @@ const ResultsAnalyticsPortal = () => {
     secondTermCumulative: cumulativeSummary.secondTermCumulative ?? overallResult?.secondTermCumulative ?? null,
     thirdTermCumulative: cumulativeSummary.thirdTermCumulative ?? overallResult?.thirdTermCumulative ?? null,
     overallScore: cumulativeSummary.overallScore ?? overallResult?.overallScore ?? null,
+    cumulativePosition: cumulativeSummary.cumulativePosition ?? overallResult?.cumulativePosition ?? null,
     promoted: cumulativeSummary.promoted ?? overallResult?.promoted ?? null
   };
   const formatCumulativeAverage = value => {
@@ -367,7 +371,8 @@ const ResultsAnalyticsPortal = () => {
     displayedCumulativeSummary.firstTermCumulative,
     displayedCumulativeSummary.secondTermCumulative,
     displayedCumulativeSummary.thirdTermCumulative,
-    displayedCumulativeSummary.overallScore
+    displayedCumulativeSummary.overallScore,
+    displayedCumulativeSummary.cumulativePosition
   ].some(value => value !== null && value !== undefined && value !== '');
   
 
@@ -690,7 +695,7 @@ const [showMobilePrintWarning, setShowMobilePrintWarning] = useState(false);
                     </div>
                   </div>
 
-                  <div className="grid grid-cols-2 gap-2 p-3 sm:grid-cols-3 lg:grid-cols-5">
+                  <div className="grid grid-cols-2 gap-2 p-3 sm:grid-cols-3 lg:grid-cols-6">
                     {[
                       ['First Term Average', displayedCumulativeSummary.firstTermCumulative],
                       ['Second Term Average', displayedCumulativeSummary.secondTermCumulative],
@@ -704,6 +709,18 @@ const [showMobilePrintWarning, setShowMobilePrintWarning] = useState(false);
                         </div>
                       </div>
                     ))}
+
+                    <div
+                      className="col-span-2 rounded-xl border border-amber-200 px-3 py-3 text-center shadow-sm sm:col-span-1"
+                      style={{ background: 'linear-gradient(135deg, #fffbeb 0%, #fef3c7 100%)' }}
+                    >
+                      <div className="text-xs font-semibold uppercase tracking-wide text-amber-700">Cumulative Position</div>
+                      <div className="mt-1 flex justify-center">
+                        <span className="inline-flex min-w-[72px] items-center justify-center rounded-full border border-amber-300 bg-white px-3 py-1 text-lg font-black tracking-wide text-amber-800 shadow-sm">
+                          {isLoadingCumulative ? '...' : (displayedCumulativeSummary.cumulativePosition || '—')}
+                        </span>
+                      </div>
+                    </div>
 
                     <div className="col-span-2 rounded-xl border border-white bg-white bg-opacity-90 px-3 py-3 text-center shadow-sm sm:col-span-1">
                       <div className="text-xs font-semibold uppercase tracking-wide text-slate-500">Promoted</div>

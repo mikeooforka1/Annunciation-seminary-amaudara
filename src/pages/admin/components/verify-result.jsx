@@ -45,6 +45,37 @@ const getPromotionStatus = overallScore => {
   return overall < 50 ? 'No' : 'Yes';
 };
 
+const formatOrdinalPosition = position => {
+  if (!position) return '';
+  const mod100 = position % 100;
+  if (mod100 >= 11 && mod100 <= 13) return `${position}th`;
+  const suffix = position % 10 === 1 ? 'st' : position % 10 === 2 ? 'nd' : position % 10 === 3 ? 'rd' : 'th';
+  return `${position}${suffix}`;
+};
+
+const calculateCumulativePositionMap = entries => {
+  const ranked = entries
+    .map(entry => {
+      const hasScore = entry.overallScore !== '' && entry.overallScore !== null && entry.overallScore !== undefined;
+      return { ...entry, overallScore: hasScore ? Number(entry.overallScore) : null };
+    })
+    .filter(entry => entry.overallScore !== null && Number.isFinite(entry.overallScore))
+    .sort((a, b) => b.overallScore - a.overallScore);
+
+  const positionMap = {};
+  let lastScore = null;
+  let lastPosition = 0;
+  ranked.forEach((entry, index) => {
+    const position = lastScore !== null && entry.overallScore === lastScore
+      ? lastPosition
+      : index + 1;
+    positionMap[entry.studentId] = formatOrdinalPosition(position);
+    lastScore = entry.overallScore;
+    lastPosition = position;
+  });
+  return positionMap;
+};
+
 // Add this helper function:
 async function updateAllPositions(className, term, positionsMap) {
   await fetch(`${API_BASE_URL}/api/results/update-positions`, {
@@ -197,6 +228,22 @@ useEffect(() => {
         actualPosition++;
       });
 
+      const cumulativePositionMap = selectedTerm.toLowerCase() === 'third'
+        ? calculateCumulativePositionMap(students.map(student => {
+            const studentId = student._id;
+            const currentResult = editResults[studentId] || {};
+            const thirdTermAverage = studentTotals.find(item => item.studentId === studentId)?.average ?? '';
+            return {
+              studentId,
+              overallScore: calculateCumulativeOverall(
+                currentResult.firstTermCumulative,
+                currentResult.secondTermCumulative,
+                thirdTermAverage
+              )
+            };
+          }))
+        : {};
+
       // 4. Update position and average for each student (unless manually set)
       setEditResults(prev => {
         // Only update if values actually changed
@@ -226,6 +273,7 @@ useEffect(() => {
                 nextStudent.thirdTermCumulative
               );
               nextStudent.promoted = getPromotionStatus(nextStudent.overallScore);
+              nextStudent.cumulativePosition = cumulativePositionMap[studentId] || '';
             }
             updated[studentId] = nextStudent;
             changed = true;
@@ -285,6 +333,7 @@ useEffect(() => {
                 mapped.thirdTermCumulative = r.thirdTermCumulative ?? '';
                 mapped.overallScore = r.overallScore ?? '';
                 mapped.promoted = r.promoted ?? getPromotionStatus(r.overallScore);
+                mapped.cumulativePosition = r.cumulativePosition ?? '';
                 mapped.nextTerm = r.nextTerm ?? '';
                 mapped.teacherComment = r.teacherComment ?? '';
                 mapped.headTeacherRemark = r.headTeacherRemark ?? '';
@@ -317,6 +366,7 @@ useEffect(() => {
                 mapped.thirdTermCumulative
               );
               mapped.promoted = getPromotionStatus(mapped.overallScore);
+              mapped.cumulativePosition = cumulative?.cumulativePosition ?? mapped.cumulativePosition ?? '';
             }
 
             // Sort subjects in a consistent (alphabetical) order so every
@@ -337,7 +387,16 @@ useEffect(() => {
         .then(resultsArray => {
           const newEditResults = {};
           const newVerifiedStudents = {};
+          const cumulativePositionMap = normalizedTerm === 'third'
+            ? calculateCumulativePositionMap(resultsArray.map(({ studentId, resultObj }) => ({
+                studentId,
+                overallScore: resultObj.overallScore
+              })))
+            : {};
           resultsArray.forEach(({ studentId, resultObj }) => {
+            if (normalizedTerm === 'third') {
+              resultObj.cumulativePosition = cumulativePositionMap[studentId] || '';
+            }
             newEditResults[studentId] = resultObj;
             // Use backend status fields for display
             if (resultObj._status?.verified) {
@@ -350,6 +409,13 @@ useEffect(() => {
           });
           setEditResults(newEditResults);
           setVerifiedStudents(newVerifiedStudents);
+          if (normalizedTerm === 'third') {
+            fetch(`${API_BASE_URL}/api/results/update-cumulative-positions`, {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ className: normalizedClassName })
+            }).catch(() => {});
+          }
           setLoading(false);
         })
         .catch(() => {
@@ -450,7 +516,7 @@ useEffect(() => {
     const overallFields = {};
     [
       'position', 'average',
-      ...(isThirdTerm ? ['firstTermCumulative', 'secondTermCumulative', 'thirdTermCumulative', 'overallScore', 'promoted'] : []),
+      ...(isThirdTerm ? ['firstTermCumulative', 'secondTermCumulative', 'thirdTermCumulative', 'overallScore', 'cumulativePosition', 'promoted'] : []),
       'handwriting', 'punctuality', 'initiative', 'obedience', 'honesty', 'neatness',
       'attentiveness', 'respect', 'attitude', 'creativity'
     ].forEach(field => {
@@ -664,7 +730,7 @@ useEffect(() => {
       const overallFields = {};
       [
         'position', 'average',
-        ...(isThirdTerm ? ['firstTermCumulative', 'secondTermCumulative', 'thirdTermCumulative', 'overallScore', 'promoted'] : []),
+        ...(isThirdTerm ? ['firstTermCumulative', 'secondTermCumulative', 'thirdTermCumulative', 'overallScore', 'cumulativePosition', 'promoted'] : []),
         'handwriting', 'punctuality', 'initiative', 'obedience', 'honesty', 'neatness',
         'attentiveness', 'respect', 'attitude', 'creativity'
       ].forEach(field => {
@@ -1282,7 +1348,7 @@ for (const student of students) {
                     {isThirdTerm && (
                       <div className="mb-4">
                         <h3 className="font-bold text-md mb-2">Cumulative Scores</h3>
-                        <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-5 gap-3">
+                        <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-3">
                           {[
                             ['firstTermCumulative', 'First Term Average'],
                             ['secondTermCumulative', 'Second Term Average'],
@@ -1315,6 +1381,17 @@ for (const student of students) {
                               readOnly
                               disabled
                               placeholder="Waiting for all terms"
+                            />
+                          </div>
+                          <div>
+                            <label className="font-semibold text-sm">Cumulative Position:</label>
+                            <input
+                              type="text"
+                              className="border rounded px-2 py-1 w-full bg-gray-100 font-semibold"
+                              value={editResults[viewingStudent]?.cumulativePosition ?? ''}
+                              readOnly
+                              disabled
+                              placeholder="Position"
                             />
                           </div>
                           <div>
@@ -1460,7 +1537,7 @@ for (const student of students) {
                         <input
                           type="text"
                           className="border rounded px-2 py-1 w-full"
-                          value="2025/2026"
+                          value="2026/2027"
                           readOnly
                           disabled
                           placeholder="Academic Session"
@@ -1472,7 +1549,7 @@ for (const student of students) {
                         <input
                           type="text"
                           className="border rounded px-2 py-1 w-full"
-                          value="3/5/2026"
+                          value="25/09/2026"
                           readOnly
                           disabled
                           placeholder="Next Term Begins"

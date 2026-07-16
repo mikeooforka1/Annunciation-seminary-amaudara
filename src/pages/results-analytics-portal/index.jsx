@@ -30,6 +30,15 @@ const ResultsAnalyticsPortal = () => {
   const [subjects, setSubjects] = useState([]);
   const [examTypes, setExamTypes] = useState([]);
   const [totalStudentsInClass, setTotalStudentsInClass] = useState(null);
+  const [cumulativeSummary, setCumulativeSummary] = useState({
+    firstTermCumulative: null,
+    secondTermCumulative: null,
+    thirdTermCumulative: null,
+    overallScore: null,
+    promoted: null
+  });
+  const [isLoadingCumulative, setIsLoadingCumulative] = useState(false);
+  const [cumulativeError, setCumulativeError] = useState('');
 
   useEffect(() => {
     const storedData = localStorage.getItem('studentData');
@@ -132,6 +141,62 @@ const ResultsAnalyticsPortal = () => {
           console.error('Error fetching results:', err);
         });
     }
+  }, [studentData, selectedTerm, selectedClass, API_BASE_URL, hasSelected]);
+
+  // Fetch the published cumulative summary only when the student selects Third Term.
+  useEffect(() => {
+    const isThirdTerm = String(selectedTerm).toLowerCase() === 'third';
+
+    if (!isThirdTerm || !hasSelected || !studentData?._id || !selectedClass) {
+      setCumulativeSummary({
+        firstTermCumulative: null,
+        secondTermCumulative: null,
+        thirdTermCumulative: null,
+        overallScore: null,
+        promoted: null
+      });
+      setIsLoadingCumulative(false);
+      setCumulativeError('');
+      return;
+    }
+
+    if (!isValidObjectId(studentData._id)) {
+      setCumulativeError('Cumulative result is unavailable.');
+      return;
+    }
+
+    let cancelled = false;
+    setIsLoadingCumulative(true);
+    setCumulativeError('');
+
+    fetch(
+      `${API_BASE_URL}/api/results/student/${studentData._id}/cumulative-averages?className=${encodeURIComponent(selectedClass)}&publishedOnly=true`
+    )
+      .then(res => {
+        if (!res.ok) throw new Error(`Failed to fetch cumulative result: ${res.status}`);
+        return res.json();
+      })
+      .then(data => {
+        if (cancelled) return;
+        setCumulativeSummary({
+          firstTermCumulative: data?.firstTermCumulative ?? null,
+          secondTermCumulative: data?.secondTermCumulative ?? null,
+          thirdTermCumulative: data?.thirdTermCumulative ?? null,
+          overallScore: data?.overallScore ?? null,
+          promoted: data?.promoted ?? null
+        });
+        setIsLoadingCumulative(false);
+      })
+      .catch(err => {
+        if (cancelled) return;
+        setCumulativeError('Cumulative result is currently unavailable.');
+        setIsLoadingCumulative(false);
+        console.error('Error fetching cumulative result:', err);
+      });
+
+    return () => {
+      cancelled = true;
+    };
   }, [studentData, selectedTerm, selectedClass, API_BASE_URL, hasSelected]);
 
   // Fetch achievements if you have a backend endpoint for them
@@ -285,6 +350,25 @@ const ResultsAnalyticsPortal = () => {
 
   // --- ADD THIS LINE RIGHT BEFORE RETURN ---
   const overallResult = filteredResults.find(r => r.subject === 'Overall');
+  const isThirdTermSelected = String(selectedTerm).toLowerCase() === 'third';
+  const displayedCumulativeSummary = {
+    firstTermCumulative: cumulativeSummary.firstTermCumulative ?? overallResult?.firstTermCumulative ?? null,
+    secondTermCumulative: cumulativeSummary.secondTermCumulative ?? overallResult?.secondTermCumulative ?? null,
+    thirdTermCumulative: cumulativeSummary.thirdTermCumulative ?? overallResult?.thirdTermCumulative ?? null,
+    overallScore: cumulativeSummary.overallScore ?? overallResult?.overallScore ?? null,
+    promoted: cumulativeSummary.promoted ?? overallResult?.promoted ?? null
+  };
+  const formatCumulativeAverage = value => {
+    if (value === null || value === undefined || value === '') return '—';
+    const score = Number(value);
+    return Number.isFinite(score) ? score.toFixed(1) : '—';
+  };
+  const cumulativeValuesAvailable = [
+    displayedCumulativeSummary.firstTermCumulative,
+    displayedCumulativeSummary.secondTermCumulative,
+    displayedCumulativeSummary.thirdTermCumulative,
+    displayedCumulativeSummary.overallScore
+  ].some(value => value !== null && value !== undefined && value !== '');
   
 
   const handlePrintResult = async () => {
@@ -584,6 +668,69 @@ const [showMobilePrintWarning, setShowMobilePrintWarning] = useState(false);
                 <div>Academic Session: <span className="font-bold">{overallResult?.academicYear || '____'}</span></div>
                 <div>Average: <span className="font-bold">{overallResult?.average || '____'}</span></div>
               </div>
+
+              {isThirdTermSelected && (
+                <section
+                  className="mx-2 mt-4 overflow-hidden rounded-2xl border border-slate-200 shadow-lg"
+                  style={{
+                    background: 'linear-gradient(135deg, #f8fafc 0%, #eef2ff 48%, #eff6ff 100%)'
+                  }}
+                >
+                  <div className="flex flex-wrap items-center justify-between gap-3 border-b border-slate-200 px-4 py-3">
+                    <div>
+                      <div className="text-xs font-bold uppercase tracking-widest text-indigo-600">
+                        Annual Performance Summary
+                      </div>
+                      <div className="mt-1 text-base font-extrabold text-slate-900">
+                        Third Term Cumulative Result
+                      </div>
+                    </div>
+                    <div className="rounded-full border border-indigo-200 bg-white px-3 py-1 text-xs font-bold text-indigo-700 shadow-sm">
+                      Promotion benchmark: 50.0
+                    </div>
+                  </div>
+
+                  <div className="grid grid-cols-2 gap-2 p-3 sm:grid-cols-3 lg:grid-cols-5">
+                    {[
+                      ['First Term Average', displayedCumulativeSummary.firstTermCumulative],
+                      ['Second Term Average', displayedCumulativeSummary.secondTermCumulative],
+                      ['Third Term Average', displayedCumulativeSummary.thirdTermCumulative],
+                      ['Cumulative Average', displayedCumulativeSummary.overallScore]
+                    ].map(([label, value]) => (
+                      <div key={label} className="rounded-xl border border-white bg-white bg-opacity-90 px-3 py-3 text-center shadow-sm">
+                        <div className="text-xs font-semibold uppercase tracking-wide text-slate-500">{label}</div>
+                        <div className="mt-1 text-xl font-black text-slate-900">
+                          {isLoadingCumulative ? '...' : formatCumulativeAverage(value)}
+                        </div>
+                      </div>
+                    ))}
+
+                    <div className="col-span-2 rounded-xl border border-white bg-white bg-opacity-90 px-3 py-3 text-center shadow-sm sm:col-span-1">
+                      <div className="text-xs font-semibold uppercase tracking-wide text-slate-500">Promoted</div>
+                      <div className="mt-1 flex justify-center">
+                        <span
+                          className={`inline-flex min-w-[72px] items-center justify-center rounded-full px-3 py-1 text-sm font-black tracking-wide ${
+                            displayedCumulativeSummary.promoted === 'Yes'
+                              ? 'bg-emerald-100 text-emerald-700'
+                              : displayedCumulativeSummary.promoted === 'No'
+                                ? 'bg-red-100 text-red-700'
+                                : 'bg-slate-100 text-slate-500'
+                          }`}
+                        >
+                          {isLoadingCumulative ? '...' : (displayedCumulativeSummary.promoted || '—').toUpperCase()}
+                        </span>
+                      </div>
+                    </div>
+                  </div>
+
+                  {!isLoadingCumulative && cumulativeError && !cumulativeValuesAvailable && (
+                    <div className="border-t border-slate-200 px-4 py-2 text-center text-xs font-medium text-slate-500">
+                      {cumulativeError}
+                    </div>
+                  )}
+                </section>
+              )}
+
               <div className="mt-2 text-sm text-gray-700 px-2 w-full">
                 Next Term Begins: <span className="font-bold">{overallResult?.nextTerm || '____'}</span>
               </div>

@@ -9,6 +9,30 @@ import jsPDF from 'jspdf';
 
 const API_BASE_URL = process.env.REACT_APP_API_BASE_URL;
 
+const clampCumulativeScore = value => {
+  if (value === '') return '';
+  const score = Number(value);
+  if (!Number.isFinite(score)) return '';
+  return Math.max(0, Math.min(score, 100));
+};
+
+const calculateCumulativeOverall = (firstTerm, secondTerm, thirdTerm) => {
+  const scores = [firstTerm, secondTerm, thirdTerm].map(value => {
+    if (value === '' || value === null || value === undefined) return null;
+    const score = Number(value);
+    return Number.isFinite(score) ? score : null;
+  });
+  if (scores.some(score => score === null)) return '';
+  return Number((scores.reduce((sum, score) => sum + score, 0) / 3).toFixed(1));
+};
+
+const getPromotionStatus = overallScore => {
+  if (overallScore === '' || overallScore === null || overallScore === undefined) return '';
+  const overall = Number(overallScore);
+  if (!Number.isFinite(overall)) return '';
+  return overall < 50 ? 'No' : 'Yes';
+};
+
 // ✅ localStorage utility functions for persisting subject order
 const STORAGE_KEY_PREFIX = 'spreadsheet_subject_order_';
 
@@ -49,6 +73,7 @@ const Spreadsheet = () => {
   const navigate = useNavigate();
   const selectedClass = location.state?.selectedClass || "";
   const selectedTerm = location.state?.selectedTerm || "";
+  const isThirdTerm = selectedTerm.toLowerCase() === 'third';
   const [students, setStudents] = useState(location.state?.students || []);
   const [editResults, setEditResults] = useState(location.state?.editResults || {});
   const [subjects, setSubjects] = useState([]);
@@ -114,11 +139,15 @@ const Spreadsheet = () => {
   // ✅ Fetch results only (term-dependent) - triggered when term or students change
   const fetchResults = async (studentList) => {
     try {
-      const fetches = studentList.map(student =>
+      const fetches = studentList.map(student => Promise.all([
         fetch(`${API_BASE_URL}/api/results/student/${student._id}/pushed?className=${selectedClass}&term=${selectedTerm}`)
-          .then(res => res.json())
-          .then(results => ({ studentId: student._id, results }))
-      );
+          .then(res => res.json()),
+        isThirdTerm
+          ? fetch(`${API_BASE_URL}/api/results/student/${student._id}/cumulative-averages?className=${selectedClass}`)
+              .then(res => res.ok ? res.json() : null)
+              .catch(() => null)
+          : Promise.resolve(null)
+      ]).then(([results, cumulative]) => ({ studentId: student._id, results, cumulative })));
 
       const resultsArr = await Promise.all(fetches);
       const allSubjectsSet = new Set();
@@ -127,7 +156,7 @@ const Spreadsheet = () => {
       const editMap = {};
       const statusMap = {};
 
-      resultsArr.forEach(({ studentId, results }) => {
+      resultsArr.forEach(({ studentId, results, cumulative }) => {
         map[studentId] = {};
         editMap[studentId] = {};
         const subjects = [];
@@ -161,10 +190,34 @@ const Spreadsheet = () => {
               attentiveness: r.attentiveness ?? "",
               respect: r.respect ?? "",
               attitude: r.attitude ?? "",
-              creativity: r.creativity ?? ""
+              creativity: r.creativity ?? "",
+              firstTermCumulative: r.firstTermCumulative ?? "",
+              secondTermCumulative: r.secondTermCumulative ?? "",
+              thirdTermCumulative: r.thirdTermCumulative ?? "",
+              overallScore: r.overallScore ?? "",
+              promoted: r.promoted ?? getPromotionStatus(r.overallScore)
             };
           }
         });
+
+        if (isThirdTerm) {
+          if (!editMap[studentId]._overall) editMap[studentId]._overall = {};
+          editMap[studentId]._overall.firstTermCumulative = cumulative
+            ? cumulative.firstTermCumulative ?? ""
+            : editMap[studentId]._overall.firstTermCumulative ?? "";
+          editMap[studentId]._overall.secondTermCumulative = cumulative
+            ? cumulative.secondTermCumulative ?? ""
+            : editMap[studentId]._overall.secondTermCumulative ?? "";
+          editMap[studentId]._overall.thirdTermCumulative = cumulative
+            ? cumulative.thirdTermCumulative ?? editMap[studentId]._overall.average ?? ""
+            : editMap[studentId]._overall.thirdTermCumulative ?? editMap[studentId]._overall.average ?? "";
+          editMap[studentId]._overall.overallScore = calculateCumulativeOverall(
+            editMap[studentId]._overall.firstTermCumulative,
+            editMap[studentId]._overall.secondTermCumulative,
+            editMap[studentId]._overall.thirdTermCumulative
+          );
+          editMap[studentId]._overall.promoted = getPromotionStatus(editMap[studentId]._overall.overallScore);
+        }
 
         editMap[studentId].subjects = subjects;
 
@@ -316,6 +369,7 @@ const Spreadsheet = () => {
         [
           "_overallId", "position", "average", "schoolOpened", "present", "absent",
           "teacherComment", "headTeacherRemark", "academicYear", "nextTerm",
+          "firstTermCumulative", "secondTermCumulative", "thirdTermCumulative", "overallScore", "promoted",
           "handwriting", "punctuality", "initiative", "obedience", "honesty",
           "neatness", "attentiveness", "respect", "attitude", "creativity"
         ].forEach(field => {
@@ -341,6 +395,11 @@ const Spreadsheet = () => {
           headTeacherRemark: result.headTeacherRemark ?? "",
           academicYear: result.academicYear ?? "",
           nextTerm: result.nextTerm ?? "",
+          firstTermCumulative: result.firstTermCumulative ?? "",
+          secondTermCumulative: result.secondTermCumulative ?? "",
+          thirdTermCumulative: result.thirdTermCumulative ?? "",
+          overallScore: result.overallScore ?? "",
+          promoted: result.promoted ?? getPromotionStatus(result.overallScore),
           _id: result._overallId ?? ""
         };
       });
@@ -426,6 +485,32 @@ const Spreadsheet = () => {
       if (!updated[studentId]) updated[studentId] = {};
       if (!updated[studentId]._overall) updated[studentId]._overall = {};
       updated[studentId]._overall[field] = value;
+      saveStudentResults(studentId, updated);
+      saveOfflineState({
+        students,
+        editResults: updated,
+        subjects,
+        subjectsOrder
+      });
+      return updated;
+    });
+    setEditedStudents(prev => new Set(prev).add(studentId));
+  };
+
+  const handleCumulativeChange = (studentId, field, value) => {
+    setEditResults(prev => {
+      const updated = { ...prev };
+      if (!updated[studentId]) updated[studentId] = {};
+      if (!updated[studentId]._overall) updated[studentId]._overall = {};
+      const nextOverall = { ...updated[studentId]._overall };
+      nextOverall[field] = clampCumulativeScore(value);
+      nextOverall.overallScore = calculateCumulativeOverall(
+        nextOverall.firstTermCumulative,
+        nextOverall.secondTermCumulative,
+        nextOverall.thirdTermCumulative
+      );
+      nextOverall.promoted = getPromotionStatus(nextOverall.overallScore);
+      updated[studentId] = { ...updated[studentId], _overall: nextOverall };
       saveStudentResults(studentId, updated);
       saveOfflineState({
         students,
@@ -909,6 +994,13 @@ const handleExportPDF = async () => {
             respect: overall.respect,
             attitude: overall.attitude,
             creativity: overall.creativity,
+            ...(isThirdTerm ? {
+              firstTermCumulative: overall.firstTermCumulative,
+              secondTermCumulative: overall.secondTermCumulative,
+              thirdTermCumulative: overall.thirdTermCumulative,
+              overallScore: overall.overallScore,
+              promoted: overall.promoted || undefined
+            } : {}),
             reviewed: false,
             pending: true,
             verified: false
@@ -956,6 +1048,13 @@ const handleExportPDF = async () => {
             respect: overall.respect,
             attitude: overall.attitude,
             creativity: overall.creativity,
+            ...(isThirdTerm ? {
+              firstTermCumulative: overall.firstTermCumulative,
+              secondTermCumulative: overall.secondTermCumulative,
+              thirdTermCumulative: overall.thirdTermCumulative,
+              overallScore: overall.overallScore,
+              promoted: overall.promoted || undefined
+            } : {}),
             reviewed: false,
             pending: true,
             verified: false
@@ -1015,6 +1114,13 @@ const handleExportPDF = async () => {
                 respect: overall.respect,
                 attitude: overall.attitude,
                 creativity: overall.creativity,
+                ...(isThirdTerm ? {
+                  firstTermCumulative: overall.firstTermCumulative,
+                  secondTermCumulative: overall.secondTermCumulative,
+                  thirdTermCumulative: overall.thirdTermCumulative,
+                  overallScore: overall.overallScore,
+                  promoted: overall.promoted || undefined
+                } : {}),
                 reviewed: false,
                 pending: true,
                 verified: false
@@ -1293,13 +1399,24 @@ const handleExportPDF = async () => {
             updated[studentId]._overall.position = autoPosition;
             updated[studentId]._overall.teacherComment = getDeansRemark(autoAverage);
             updated[studentId]._overall.headTeacherRemark = getRectorsRemark(autoAverage);
+            if (isThirdTerm) {
+              updated[studentId]._overall.thirdTermCumulative = clampCumulativeScore(autoAverage);
+              updated[studentId]._overall.overallScore = calculateCumulativeOverall(
+                updated[studentId]._overall.firstTermCumulative,
+                updated[studentId]._overall.secondTermCumulative,
+                updated[studentId]._overall.thirdTermCumulative
+              );
+              updated[studentId]._overall.promoted = getPromotionStatus(
+                updated[studentId]._overall.overallScore
+              );
+            }
             changed = true;
           }
         });
         return changed ? updated : prev;
       });
     }
-  }, [students, editResults, subjectsOrder]);
+  }, [students, editResults, subjectsOrder, isThirdTerm]);
 
   function getGrade(score) {
     if (score >= 75 && score <= 100) return "A1";
@@ -1551,6 +1668,15 @@ const handleExportPDF = async () => {
                 ))}
                 <th className="border px-2 py-1 bg-gray-100">Average</th>
                 <th className="border px-2 py-1 bg-gray-100">Position</th>
+                {isThirdTerm && (
+                  <>
+                    <th className="border px-2 py-1 bg-gray-100">First Term Average</th>
+                    <th className="border px-2 py-1 bg-gray-100">Second Term Average</th>
+                    <th className="border px-2 py-1 bg-gray-100">Third Term Average</th>
+                    <th className="border px-2 py-1 bg-gray-100">Cumulative Average</th>
+                    <th className="border px-2 py-1 bg-gray-100">Promoted</th>
+                  </>
+                )}
                 <th>Handwriting</th>
                 <th>Punctuality</th>
                 <th>Initiative</th>
@@ -1571,7 +1697,7 @@ const handleExportPDF = async () => {
             <tbody>
               {[...Array(10)].map((_, i) => (
                 <tr key={i}>
-                  <td colSpan={subjects.length * 5 + 16}>
+                  <td colSpan={subjects.length * 5 + (isThirdTerm ? 21 : 16)}>
                     <div className="animate-pulse h-6 bg-gray-200 rounded my-2"></div>
                   </td>
                 </tr>
@@ -1698,6 +1824,15 @@ const handleExportPDF = async () => {
                   ))}
                   <th className="border px-2 py-1 bg-gray-100">Average</th>
                   <th className="border px-2 py-1 bg-gray-100">Position</th>
+                  {isThirdTerm && (
+                    <>
+                      <th className="border px-2 py-1 bg-gray-100">First Term Average</th>
+                      <th className="border px-2 py-1 bg-gray-100">Second Term Average</th>
+                      <th className="border px-2 py-1 bg-gray-100">Third Term Average</th>
+                      <th className="border px-2 py-1 bg-gray-100">Cumulative Average</th>
+                      <th className="border px-2 py-1 bg-gray-100">Promoted</th>
+                    </>
+                  )}
                   <th>Handwriting</th>
                   <th>Punctuality</th>
                   <th>Initiative</th>
@@ -1786,6 +1921,44 @@ const handleExportPDF = async () => {
                       })}
                       <td className="border px-2 py-1">{editResults[student._id]?._overall?.average ?? ""}</td>
                       <td className="border px-2 py-1">{editResults[student._id]?._overall?.position ?? ""}</td>
+                      {isThirdTerm && (
+                        <>
+                          {[
+                            ['firstTermCumulative', 'First Term Average'],
+                            ['secondTermCumulative', 'Second Term Average'],
+                            ['thirdTermCumulative', 'Third Term Average']
+                          ].map(([field, label]) => (
+                            <td key={field} className="border px-2 py-1">
+                              <input
+                                type="number"
+                                min="0"
+                                max="100"
+                                step="0.1"
+                                aria-label={label}
+                                value={editResults[student._id]?._overall?.[field] ?? ""}
+                                className="w-20 border rounded px-1 bg-gray-100"
+                                readOnly
+                                disabled
+                              />
+                            </td>
+                          ))}
+                          <td className="border px-2 py-1">
+                            <input
+                              type="number"
+                              min="0"
+                              max="100"
+                              step="0.1"
+                              value={editResults[student._id]?._overall?.overallScore ?? ""}
+                              className="w-20 border rounded px-1 bg-gray-100 font-semibold"
+                              readOnly
+                              disabled
+                            />
+                          </td>
+                          <td className="border px-2 py-1 text-center font-semibold">
+                            {editResults[student._id]?._overall?.promoted ?? ""}
+                          </td>
+                        </>
+                      )}
                       {([
                         "handwriting", "punctuality", "initiative", "obedience", "honesty",
                         "neatness", "attentiveness", "respect", "attitude", "creativity"

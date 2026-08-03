@@ -8,6 +8,13 @@ import Icon from '../../components/AppIcon';
 import Button from '../../components/ui/Button';
 import html2canvas from 'html2canvas';
 
+const getCumulativePromotionStatus = overallScore => {
+  if (overallScore === '' || overallScore === null || overallScore === undefined) return null;
+  const overall = Number(overallScore);
+  if (!Number.isFinite(overall)) return null;
+  return overall < 45 ? 'No' : 'Yes';
+};
+
 const ResultsAnalyticsPortal = () => {
   const [userRole] = useState('student');
   const [selectedExam, setSelectedExam] = useState(null);
@@ -360,7 +367,9 @@ const ResultsAnalyticsPortal = () => {
     thirdTermCumulative: cumulativeSummary.thirdTermCumulative ?? overallResult?.thirdTermCumulative ?? null,
     overallScore: cumulativeSummary.overallScore ?? overallResult?.overallScore ?? null,
     cumulativePosition: cumulativeSummary.cumulativePosition ?? overallResult?.cumulativePosition ?? null,
-    promoted: cumulativeSummary.promoted ?? overallResult?.promoted ?? null
+    promoted: getCumulativePromotionStatus(
+      cumulativeSummary.overallScore ?? overallResult?.overallScore
+    ) ?? cumulativeSummary.promoted ?? overallResult?.promoted ?? null
   };
   const formatCumulativeAverage = value => {
     if (value === null || value === undefined || value === '') return '—';
@@ -691,7 +700,7 @@ const [showMobilePrintWarning, setShowMobilePrintWarning] = useState(false);
                       </div>
                     </div>
                     <div className="rounded-full border border-indigo-200 bg-white px-3 py-1 text-xs font-bold text-indigo-700 shadow-sm">
-                      Promotion benchmark: 50.0
+                      Promotion benchmark: 45.0
                     </div>
                   </div>
 

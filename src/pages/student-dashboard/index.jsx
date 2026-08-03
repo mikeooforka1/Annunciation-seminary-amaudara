@@ -165,9 +165,9 @@ const StudentDashboard = () => {
             >
               &times;
             </button>
-            <h2 className="text-2xl font-bold text-blue-700 mb-2">🎉 Happy New Year 2026!</h2>
+            <h2 className="text-2xl font-bold text-blue-700 mb-2">Download your vacation report🧾</h2>
             <p className="mb-3 text-base font-semibold text-gray-700">
-              Wishing you a prosperous and successful new year from all of us at Annunciation Seminary Amaudara!
+              We hope you had a wonderful holiday season! As we step into the academic session, we encourage you to review your vacation report to reflect on your achievements and set new goals for the upcoming term.
             </p>
             <p className="mb-4 text-sm text-gray-600">
               <span className="font-bold text-primary">Welcome back!</span> We look forward to another year of excellence, growth, and achievement together.

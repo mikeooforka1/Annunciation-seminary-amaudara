@@ -42,7 +42,7 @@ const getPromotionStatus = overallScore => {
   if (overallScore === '' || overallScore === null || overallScore === undefined) return '';
   const overall = Number(overallScore);
   if (!Number.isFinite(overall)) return '';
-  return overall < 50 ? 'No' : 'Yes';
+  return overall < 45 ? 'No' : 'Yes';
 };
 
 const formatOrdinalPosition = position => {
@@ -525,7 +525,7 @@ useEffect(() => {
       }
     });
     overallFields.academicYear = "2025/2026";
-    overallFields.nextTerm = "18/01/2026";
+    overallFields.nextTerm = "25/09/2026";
     const avg = Number(result.average ?? 0);
     overallFields.teacherComment = getDeansRemark(avg);
     overallFields.headTeacherRemark = getRectorsRemark(avg);
@@ -760,7 +760,7 @@ useEffect(() => {
         }
       });
       overallFields.academicYear = "2025/2026";
-      overallFields.nextTerm = "18/01/2026";
+      overallFields.nextTerm = "25/09/2026";
       // --- Set deans and rectors remark dynamically based on average ---
       const avg = Number(overallFields.average ?? 0);
       overallFields.teacherComment = getDeansRemark(avg);

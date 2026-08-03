@@ -30,7 +30,7 @@ const getPromotionStatus = overallScore => {
   if (overallScore === '' || overallScore === null || overallScore === undefined) return '';
   const overall = Number(overallScore);
   if (!Number.isFinite(overall)) return '';
-  return overall < 50 ? 'No' : 'Yes';
+  return overall < 45 ? 'No' : 'Yes';
 };
 
 const formatOrdinalPosition = position => {
@@ -2067,7 +2067,7 @@ const handleExportPDF = async () => {
                         {editResults[student._id]?._overall?.headTeacherRemark ?? ""}
                       </td>
                       <td className="border px-2 py-1">{overall.academicYear ?? "2025/2026"}</td>
-                      <td className="border px-2 py-1">{overall.nextTerm ?? "18/01/2026"}</td>
+                      <td className="border px-2 py-1">{overall.nextTerm ?? "25/09/2026"}</td>
                       <td className="border px-2 py-1">
                         <img
                           src="/assets/images/rector-signature.jpg"

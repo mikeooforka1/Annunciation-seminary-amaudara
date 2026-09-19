@@ -1,12 +1,8 @@
 {
   "rewrites": [
     {
-      "source": "/((?!.*\\.).*)",
-      "destination": "/index.html"
-    },
-    {
-      "source": "/:path*",
-      "destination": "http://185.218.125.5:5007/:path*"
+      "source": "/api/:match*",
+      "destination": "http://185.218.125.5:5007/:match*"
     }
   ]
 }

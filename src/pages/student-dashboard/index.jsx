@@ -80,15 +80,19 @@ const StudentDashboard = () => {
       };
 
   useEffect(() => {
-    // Get student data from localStorage
-    const storedData = localStorage.getItem('studentData');
+    // Check both storage keys safely for cross-portal compatibility
+    const storedData = localStorage.getItem('studentData') || localStorage.getItem('user');
     let parsedData = {};
     if (storedData) {
-      parsedData = JSON.parse(storedData);
-      setStudentData(parsedData);
+      try {
+        parsedData = JSON.parse(storedData);
+        setStudentData(parsedData);
+      } catch (e) {
+        parsedData = {};
+      }
     }
     // Best practice: Check for valid _id before proceeding
-    if (!parsedData._id) {
+    if (!parsedData || !parsedData._id) {
       alert('Session expired or invalid. Please log in again.');
       navigate('/login-authentication');
     }
@@ -98,7 +102,7 @@ const StudentDashboard = () => {
     // Fetch profile as soon as studentData is available
     if (!studentData?._id) return;
     setProfileLoading(true);
-    const API_BASE_URL = process.env.REACT_APP_API_BASE_URL || process.env.REACT_APP_API_URL || "";
+    const API_BASE_URL = process.env.REACT_APP_API_BASE_URL || "";
     fetch(`${API_BASE_URL}/api/profile/${studentData._id}`)
       .then(res => res.ok ? res.json() : null)
       .then(data => {

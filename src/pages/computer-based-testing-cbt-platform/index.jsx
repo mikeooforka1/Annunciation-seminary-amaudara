@@ -24,7 +24,7 @@ function getCountdownString(targetDate) {
 
 const ComputerBasedTestingPlatform = () => {
   const navigate = useNavigate();
-  const API_BASE_URL = process.env.REACT_APP_API_BASE_URL; // <-- Use env variable
+const API_BASE_URL = process.env.REACT_APP_API_BASE_URL || process.env.REACT_APP_API_URL || "";
 
   const [exams, setExams] = useState([]); // All exams (not used directly now)
   const [student, setStudent] = useState(null);

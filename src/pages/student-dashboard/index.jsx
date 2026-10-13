@@ -98,7 +98,7 @@ const StudentDashboard = () => {
     // Fetch profile as soon as studentData is available
     if (!studentData?._id) return;
     setProfileLoading(true);
-    const API_BASE_URL = process.env.REACT_APP_API_BASE_URL || "";
+    const API_BASE_URL = process.env.REACT_APP_API_BASE_URL || process.env.REACT_APP_API_URL || "";
     fetch(`${API_BASE_URL}/api/profile/${studentData._id}`)
       .then(res => res.ok ? res.json() : null)
       .then(data => {

@@ -35,11 +35,39 @@ const LoginForm = ({ onLogin, isLoading }) => {
     if (!cleanRole || !cleanToken) return;
     if (cleanRole !== 'admin' && !cleanClass) return;
 
-    onLogin({ 
-      className: cleanClass, 
-      role: cleanRole, 
-      token: cleanToken 
-    });
+    // Handle authentication request and store both keys locally for cross-portal compatibility
+    fetch('/api/auth/login', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'X-Requested-With': 'XMLHttpRequest'
+      },
+      credentials: 'include',
+      body: JSON.stringify({
+        className: cleanClass,
+        role: cleanRole,
+        token: cleanToken
+      })
+    })
+      .then(res => res.json())
+      .then(data => {
+        if (data.success && data.user) {
+          localStorage.setItem('teacherData', JSON.stringify(data.user));
+          localStorage.setItem('user', JSON.stringify(data.user));
+        }
+        onLogin({ 
+          className: cleanClass, 
+          role: cleanRole, 
+          token: cleanToken 
+        });
+      })
+      .catch(() => {
+        onLogin({ 
+          className: cleanClass, 
+          role: cleanRole, 
+          token: cleanToken 
+        });
+      });
   };
 
   return (

@@ -10,11 +10,15 @@ const TeacherPortal = () => {
   const [studentsList, setStudentsList] = useState([]);
 
   useEffect(() => {
-    const storedData = localStorage.getItem('teacherData');
+    const storedData = localStorage.getItem('teacherData') || localStorage.getItem('user');
     let parsedData = {};
     if (storedData) {
-      parsedData = JSON.parse(storedData);
-      setTeacherData(parsedData);
+      try {
+        parsedData = JSON.parse(storedData);
+        setTeacherData(parsedData);
+      } catch (e) {
+        parsedData = {};
+      }
     }
     if (!parsedData._id) {
       alert('Session expired or invalid. Please log in again.');
@@ -24,11 +28,14 @@ const TeacherPortal = () => {
 
   useEffect(() => {
     if (teacherData?.className && teacherData?._id) {
-  const API_BASE_URL = process.env.REACT_APP_API_BASE_URL || process.env.REACT_APP_API_URL || "";
+      const API_BASE_URL = process.env.REACT_APP_API_BASE_URL || "";
       fetch(
-        `${API_BASE_URL}/api/user/class/${encodeURIComponent(teacherData.className)}/${encodeURIComponent(teacherData.term)}/students`,
+        `${API_BASE_URL}/api/user/class/${encodeURIComponent(teacherData.className)}/${encodeURIComponent(teacherData.term || 'third')}/students`,
         {
           credentials: 'include',
+          headers: {
+            'X-Requested-With': 'XMLHttpRequest'
+          }
         }
       )
         .then(res => res.json())
@@ -43,7 +50,8 @@ const TeacherPortal = () => {
                 }))
               : []
           );
-        });
+        })
+        .catch(err => console.error('Failed fetching students:', err));
     }
   }, [teacherData]);
 
@@ -115,7 +123,7 @@ const TeacherPortal = () => {
             <span
               className="font-heading font-extrabold text-xl mb-1"
               style={{
-                color: '#252c3bff', // dark blue-gray for visibility
+                color: '#252c3bff',
                 textShadow: '0 1px 2px #fff8',
                 letterSpacing: '0.5px'
               }}
@@ -135,7 +143,7 @@ const TeacherPortal = () => {
             <span
               className="font-heading font-extrabold text-xl mb-1"
               style={{
-                color: '#282f3dff', // dark blue-gray for visibility
+                color: '#282f3dff',
                 textShadow: '0 1px 2px #fff8',
                 letterSpacing: '0.5px'
               }}
@@ -203,11 +211,9 @@ const TeacherPortal = () => {
                   key={student.id}
                   className="flex flex-col items-center bg-background border border-border rounded-lg p-3 sm:p-4 shadow-sm hover:shadow-md transition"
                 >
-                  {/* First horizontal line: Avatar */}
                   <span className="w-12 h-12 sm:w-14 sm:h-14 rounded-full bg-primary flex items-center justify-center text-lg sm:text-xl font-bold text-white border-2 border-primary mb-2">
                     {student.name ? student.name.charAt(0).toUpperCase() : "S"}
                   </span>
-                  {/* Second horizontal line: Name and Class */}
                   <div className="w-full text-center">
                     <div className="font-heading font-semibold text-base sm:text-lg text-foreground mb-1">
                       {student.name}
@@ -230,5 +236,3 @@ const TeacherPortal = () => {
 };
 
 export default TeacherPortal;
-
-// --- Mobile adaptive styles are handled by Tailwind's responsive classes (e.g. px-2, w-full, sm:w-auto, grid-cols-1, md:grid-cols-2, etc).

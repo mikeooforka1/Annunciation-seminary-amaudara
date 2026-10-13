@@ -67,7 +67,7 @@ const ResultsAnalyticsPortal = () => {
     }
   }, []);
 
-  const API_BASE_URL = process.env.REACT_APP_API_BASE_URL;
+  const API_BASE_URL = process.env.REACT_APP_API_URL || "";
 
   // Fetch real subjects and exam types from backend
   

@@ -7,7 +7,7 @@ import { loadOfflineState, saveOfflineState } from '../../../utils/offlineQueue'
 import html2canvas from 'html2canvas';
 import jsPDF from 'jspdf';
 
-const API_BASE_URL = process.env.REACT_APP_API_BASE_URL;
+const API_BASE_URL = process.env.REACT_APP_API_URL || "";
 
 const clampCumulativeScore = value => {
   if (value === '') return '';

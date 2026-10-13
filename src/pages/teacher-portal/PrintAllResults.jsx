@@ -15,7 +15,7 @@ const PrintAllResults = () => {
   const [selectedFolderName, setSelectedFolderName] = useState('');
   const [showNoResultsModal, setShowNoResultsModal] = useState(false);
 
-  const API_BASE_URL = process.env.REACT_APP_API_BASE_URL;
+  const API_BASE_URL = process.env.REACT_APP_API_URL || "";
 
   // Auto-select teacher's class from localStorage on mount
   useEffect(() => {

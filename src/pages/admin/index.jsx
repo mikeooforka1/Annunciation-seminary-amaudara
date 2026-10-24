@@ -8,7 +8,7 @@ import NonAcademicStaffList from "./components/non-academic staffs";
 import VerifyResult from "./components/verify-result";
 import { useNavigate, useLocation } from "react-router-dom";
 
-const API_BASE_URL = process.env.REACT_APP_API_URL || "";
+const API_BASE_URL = process.env.REACT_APP_API_BASE_URL || "";
 
 // Reject invalid API payloads before array operations or result processing.
 function requireList(payload, keys, label) {

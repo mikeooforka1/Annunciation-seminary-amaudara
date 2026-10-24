@@ -44,7 +44,7 @@ const manualClassList = [
   { id: 'ss3b', name: 'SS3B' },
 ];
 
-const API_BASE_URL = process.env.REACT_APP_API_URL || "";
+const API_BASE_URL = process.env.REACT_APP_API_BASE_URL || "";
 
 const clampCumulativeScore = value => {
   if (value === '') return '';

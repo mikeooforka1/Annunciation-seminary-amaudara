@@ -32,7 +32,7 @@ async function readListResponse(response, keys, label) {
   return requireList(await response.json(), keys, label);
 }
 
-const API_BASE_URL = process.env.REACT_APP_API_URL || "";
+const API_BASE_URL = process.env.REACT_APP_API_BASE_URL || "";
 
 const clampCumulativeScore = value => {
   if (value === '') return '';

@@ -9,7 +9,10 @@ const LoginAuthentication = () => {
   const [isLoading, setIsLoading] = useState(false);
   const [errorMsg, setErrorMsg] = useState('');
 
-  const API_BASE_URL = process.env.REACT_APP_API_BASE_URL || '';
+  // Use the same API setting as the admin/results pages; retain the old name as a fallback.
+  const API_BASE_URL = (
+    process.env.REACT_APP_API_URL || process.env.REACT_APP_API_BASE_URL || ''
+  ).trim().replace(/\/+$/, '');
 
   const handleLogin = async (credentials) => {
     setIsLoading(true);
@@ -33,7 +36,18 @@ const LoginAuthentication = () => {
         })
       });
 
-      const result = await response.json();
+      const responseText = await response.text();
+      let result;
+      try {
+        result = JSON.parse(responseText);
+      } catch {
+        setErrorMsg('The login endpoint returned an invalid response. Check REACT_APP_API_URL and your API routing, then rebuild the frontend.');
+        return;
+      }
+      if (!result || typeof result !== 'object' || Array.isArray(result)) {
+        setErrorMsg('Login failed: Invalid server authentication response.');
+        return;
+      }
 
       if (!response.ok) {
         setErrorMsg(result.error || 'Login failed. Please try again.');

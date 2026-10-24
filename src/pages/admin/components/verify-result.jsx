@@ -3,6 +3,31 @@ import { useNavigate } from 'react-router-dom';
 import ResultsTable from '../../results-analytics-portal/components/ResultsTable';
 
 // Add ss1c to the manual class list
+// Reject invalid API payloads before array operations or result processing.
+function requireList(payload, keys, label) {
+  if (payload && !Array.isArray(payload) && (payload.success === false || payload.error)) {
+    throw new Error(`${label}: ${payload.message || payload.error || 'request failed'}`);
+  }
+  let list = Array.isArray(payload) ? payload : null;
+  for (const key of keys) {
+    if (!list && Array.isArray(payload?.[key])) list = payload[key];
+    if (!list && Array.isArray(payload?.data?.[key])) list = payload.data[key];
+  }
+  if (!list && Array.isArray(payload?.data)) list = payload.data;
+  if (!list) {
+    throw new Error(`${label}: expected a list. Check REACT_APP_API_URL and the API response.`);
+  }
+  if (list.some(item => item === null || typeof item !== 'object' || Array.isArray(item))) {
+    throw new Error(`${label}: the list contains invalid records.`);
+  }
+  return list;
+}
+
+async function readListResponse(response, keys, label) {
+  if (!response.ok) throw new Error(`${label}: request failed (HTTP ${response.status}).`);
+  return requireList(await response.json(), keys, label);
+}
+
 const manualClassList = [
   { id: 'jss1a', name: 'JSS1A' },
   { id: 'jss1b', name: 'JSS1B' },
@@ -156,7 +181,7 @@ useEffect(() => {
     
     console.log('Fetching students:', studentsUrl);
     fetch(studentsUrl)
-      .then(res => res.json())
+      .then(res => readListResponse(res, ["students", "users"], "Students"))
       .then(data => {
         const sorted = Array.isArray(data)
           ? [...data].sort((a, b) =>
@@ -168,7 +193,8 @@ useEffect(() => {
         setStudents(sorted);
         setLoading(false);
       })
-      .catch(() => {
+      .catch((err) => {
+        setMessage(err.message || "Unable to load students.");
         setStudents([]);
         setLoading(false);
       });
@@ -293,7 +319,7 @@ useEffect(() => {
         const resultsUrl = `${API_BASE_URL}/api/results/student/${student._id}/pushed?className=${normalizedClassName}&term=${normalizedTerm}`;
         const cumulativeUrl = `${API_BASE_URL}/api/results/student/${student._id}/cumulative-averages?className=${normalizedClassName}`;
         return Promise.all([
-          fetch(resultsUrl).then(res => res.json()),
+          fetch(resultsUrl).then(res => readListResponse(res, ["results"], "Student results")),
           normalizedTerm === 'third'
             ? fetch(cumulativeUrl).then(res => res.ok ? res.json() : null).catch(() => null)
             : Promise.resolve(null)
@@ -418,7 +444,8 @@ useEffect(() => {
           }
           setLoading(false);
         })
-        .catch(() => {
+        .catch((err) => {
+          setMessage(err.message || "Unable to load student results.");
           setEditResults({});
           setVerifiedStudents({});
           setLoading(false);
@@ -658,7 +685,7 @@ useEffect(() => {
     const normalizedTerm = selectedTerm ? selectedTerm.toLowerCase() : '';
     const resultsUrl = `${API_BASE_URL}/api/results/student/${studentId}/all?className=${normalizedClassName}&term=${normalizedTerm}`;
     const res = await fetch(resultsUrl);
-    const results = await res.json();
+    const results = await readListResponse(res, ["results"], "Student results");
 
     if (!Array.isArray(results)) return false;
 
@@ -674,7 +701,7 @@ useEffect(() => {
     const normalizedTerm = selectedTerm ? selectedTerm.toLowerCase() : '';
     const resultsUrl = `${API_BASE_URL}/api/results/student/${studentId}/all?className=${normalizedClassName}&term=${normalizedTerm}`;
     const res = await fetch(resultsUrl);
-    const results = await res.json();
+    const results = await readListResponse(res, ["results"], "Student results");
 
     if (!Array.isArray(results)) return false;
 

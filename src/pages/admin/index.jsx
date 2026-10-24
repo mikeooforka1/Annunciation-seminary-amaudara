@@ -10,6 +10,26 @@ import { useNavigate, useLocation } from "react-router-dom";
 
 const API_BASE_URL = process.env.REACT_APP_API_URL || "";
 
+// Reject invalid API payloads before array operations or result processing.
+function requireList(payload, keys, label) {
+  if (payload && !Array.isArray(payload) && (payload.success === false || payload.error)) {
+    throw new Error(`${label}: ${payload.message || payload.error || 'request failed'}`);
+  }
+  let list = Array.isArray(payload) ? payload : null;
+  for (const key of keys) {
+    if (!list && Array.isArray(payload?.[key])) list = payload[key];
+    if (!list && Array.isArray(payload?.data?.[key])) list = payload.data[key];
+  }
+  if (!list && Array.isArray(payload?.data)) list = payload.data;
+  if (!list) {
+    throw new Error(`${label}: expected a list. Check REACT_APP_API_URL and the API response.`);
+  }
+  if (list.some(item => item === null || typeof item !== 'object' || Array.isArray(item))) {
+    throw new Error(`${label}: the list contains invalid records.`);
+  }
+  return list;
+}
+
 const adminCards = [
   {
     key: "students",
@@ -87,9 +107,9 @@ const AdminDashboard = () => {
     setErrorMsg("");
     try {
       const res = await axios.get(`${API_BASE_URL}/api/user/class-list`);
-      setClasses(res.data || []);
+      setClasses(requireList(res.data, ["classes"], "Classes"));
     } catch (err) {
-      setErrorMsg("Failed to fetch classes.");
+      setErrorMsg(err.message || "Failed to fetch classes.");
     }
     setLoading(false);
   };
@@ -99,9 +119,9 @@ const AdminDashboard = () => {
     setErrorMsg("");
     try {
       const res = await axios.get(`${API_BASE_URL}/api/user?role=teacher`);
-      setTeachers(res.data || []);
+      setTeachers(requireList(res.data, ["teachers", "users"], "Teachers"));
     } catch (err) {
-      setErrorMsg("Failed to fetch teachers.");
+      setErrorMsg(err.message || "Failed to fetch teachers.");
     }
     setLoading(false);
   };
@@ -111,9 +131,9 @@ const AdminDashboard = () => {
     setErrorMsg("");
     try {
       const res = await axios.get(`${API_BASE_URL}/api/formators`);
-      setFormators(res.data || []);
+      setFormators(requireList(res.data, ["formators"], "Formators"));
     } catch (err) {
-      setErrorMsg("Failed to fetch formators.");
+      setErrorMsg(err.message || "Failed to fetch formators.");
     }
     setLoading(false);
   };
@@ -123,9 +143,9 @@ const AdminDashboard = () => {
     setErrorMsg("");
     try {
       const res = await axios.get(`${API_BASE_URL}/api/non-academic`);
-      setNonAcademic(res.data || []);
+      setNonAcademic(requireList(res.data, ["nonAcademic", "staff"], "Non-academic staff"));
     } catch (err) {
-      setErrorMsg("Failed to fetch non-academic staff.");
+      setErrorMsg(err.message || "Failed to fetch non-academic staff.");
     }
     setLoading(false);
   };
@@ -138,9 +158,9 @@ const AdminDashboard = () => {
       const studentsRes = await axios.get(
         `${API_BASE_URL}/api/user/class/${className}/all/students`
       );
-      setStudents(studentsRes.data || []);
+      setStudents(requireList(studentsRes.data, ["students", "users"], "Students"));
     } catch (err) {
-      setErrorMsg("Failed to fetch class students.");
+      setErrorMsg(err.message || "Failed to fetch class students.");
     }
     setLoading(false);
   };
@@ -363,7 +383,7 @@ const AdminDashboard = () => {
                   </div>
                   <div className="mb-2">
                     <div className="text-4xl sm:text-5xl font-bold text-slate-900">
-                      {classes.reduce((acc, cls) => acc + (cls.studentCount || 0), 0)}
+                      {classes.reduce((acc, cls) => acc + (Number.isFinite(Number(cls.studentCount)) ? Number(cls.studentCount) : 0), 0)}
                     </div>
                     <div className="text-slate-600 font-medium mt-2">Students Enrolled</div>
                   </div>
@@ -456,7 +476,7 @@ const AdminDashboard = () => {
               <div className="flex-1">
                 <div className="mb-2 text-lg font-semibold text-primary">
                   Total Students in School:{" "}
-                  {classes.reduce((acc, cls) => acc + (cls.studentCount || 0), 0)}
+                  {classes.reduce((acc, cls) => acc + (Number.isFinite(Number(cls.studentCount)) ? Number(cls.studentCount) : 0), 0)}
                 </div>
                 <h2 className="font-heading text-xl">All Classes</h2>
               </div>

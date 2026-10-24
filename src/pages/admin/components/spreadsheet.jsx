@@ -7,6 +7,31 @@ import { loadOfflineState, saveOfflineState } from '../../../utils/offlineQueue'
 import html2canvas from 'html2canvas';
 import jsPDF from 'jspdf';
 
+// Reject invalid API payloads before array operations or result processing.
+function requireList(payload, keys, label) {
+  if (payload && !Array.isArray(payload) && (payload.success === false || payload.error)) {
+    throw new Error(`${label}: ${payload.message || payload.error || 'request failed'}`);
+  }
+  let list = Array.isArray(payload) ? payload : null;
+  for (const key of keys) {
+    if (!list && Array.isArray(payload?.[key])) list = payload[key];
+    if (!list && Array.isArray(payload?.data?.[key])) list = payload.data[key];
+  }
+  if (!list && Array.isArray(payload?.data)) list = payload.data;
+  if (!list) {
+    throw new Error(`${label}: expected a list. Check REACT_APP_API_URL and the API response.`);
+  }
+  if (list.some(item => item === null || typeof item !== 'object' || Array.isArray(item))) {
+    throw new Error(`${label}: the list contains invalid records.`);
+  }
+  return list;
+}
+
+async function readListResponse(response, keys, label) {
+  if (!response.ok) throw new Error(`${label}: request failed (HTTP ${response.status}).`);
+  return requireList(await response.json(), keys, label);
+}
+
 const API_BASE_URL = process.env.REACT_APP_API_URL || "";
 
 const clampCumulativeScore = value => {
@@ -82,7 +107,8 @@ const getSubjectOrderFromStorage = (classId, term) => {
   const key = `${STORAGE_KEY_PREFIX}${classId}_${term}`;
   try {
     const stored = localStorage.getItem(key);
-    return stored ? JSON.parse(stored) : null;
+    const parsed = stored ? JSON.parse(stored) : null;
+    return Array.isArray(parsed) ? parsed : null;
   } catch (err) {
     console.error('Failed to load subject order from localStorage:', err);
     return null;
@@ -105,7 +131,8 @@ const Spreadsheet = () => {
   const selectedClass = location.state?.selectedClass || "";
   const selectedTerm = location.state?.selectedTerm || "";
   const isThirdTerm = selectedTerm.toLowerCase() === 'third';
-  const [students, setStudents] = useState(location.state?.students || []);
+  const [dataError, setDataError] = useState("");
+  const [students, setStudents] = useState(Array.isArray(location.state?.students) ? location.state.students : []);
   const [editResults, setEditResults] = useState(location.state?.editResults || {});
   const [subjects, setSubjects] = useState([]);
   const [resultsMap, setResultsMap] = useState({});
@@ -153,7 +180,7 @@ const Spreadsheet = () => {
   const fetchData = async () => {
     try {
       const res = await fetch(`${API_BASE_URL}/api/user/class/${selectedClass}/all/students`);
-      let studentData = await res.json();
+      let studentData = await readListResponse(res, ["students", "users"], "Students");
       studentData = Array.isArray(studentData)
         ? [...studentData].sort((a, b) =>
             (a.name || a.fullName || a.username || '').localeCompare(
@@ -163,16 +190,18 @@ const Spreadsheet = () => {
         : [];
       setStudents(studentData);
     } catch (err) {
+      setDataError(err.message || "Unable to load students.");
       setStudents([]);
     }
   };
 
   // ✅ Fetch results only (term-dependent) - triggered when term or students change
   const fetchResults = async (studentList) => {
+    setDataError("");
     try {
       const fetches = studentList.map(student => Promise.all([
         fetch(`${API_BASE_URL}/api/results/student/${student._id}/pushed?className=${selectedClass}&term=${selectedTerm}`)
-          .then(res => res.json()),
+          .then(res => readListResponse(res, ["results"], "Student results")),
         isThirdTerm
           ? fetch(`${API_BASE_URL}/api/results/student/${student._id}/cumulative-averages?className=${selectedClass}`)
               .then(res => res.ok ? res.json() : null)
@@ -346,6 +375,7 @@ const Spreadsheet = () => {
       }
       setLoading(false);
     } catch (err) {
+      setDataError(err.message || "Unable to load student results.");
       setSubjects([]);
       setSubjectsOrder([]);
       setResultsMap({});
@@ -360,7 +390,7 @@ const Spreadsheet = () => {
     let didSetFromState = false;
 
     if (
-      location.state?.students &&
+      Array.isArray(location.state?.students) &&
       location.state?.editResults &&
       location.state?.verifiedStudents
     ) {
@@ -467,7 +497,7 @@ const Spreadsheet = () => {
       (async () => {
         const offlineState = await loadOfflineState();
         if (offlineState) {
-          setStudents(offlineState.students || []);
+          setStudents(Array.isArray(offlineState.students) ? offlineState.students : []);
           setEditResults(offlineState.editResults || {});
           setSubjects(offlineState.subjects || []);
           setSubjectsOrder(offlineState.subjectsOrder || []);
@@ -966,7 +996,7 @@ const handleExportPDF = async () => {
     const updatedEditResults = { ...editResults };
     for (const studentId of editedStudents) {
       const res = await fetch(`${API_BASE_URL}/api/results/student/${studentId}/pushed?className=${selectedClass}&term=${selectedTerm}`);
-      const results = await res.json();
+      const results = await readListResponse(res, ["results"], "Student results");
       const studentResult = {};
       const subjects = [];
       results.forEach(r => {
@@ -1284,7 +1314,7 @@ const handleExportPDF = async () => {
             try {
               const resArr = await fetch(
                 `${API_BASE_URL}/api/results/student/${studentId}/pushed?className=${added.className}&term=${added.term}`
-              ).then(r => r.json());
+              ).then(r => readListResponse(r, ["results"], "Student results"));
 
               const matchingResult = resArr.find(r => r.subject === added.subject);
               if (matchingResult && matchingResult._id) {
@@ -1643,6 +1673,7 @@ const handleExportPDF = async () => {
   };
   return (
     <div className="p-4">
+      {dataError && <div role="alert" className="m-4 rounded-lg border border-red-200 bg-red-50 p-4 text-red-700">{dataError}</div>}
       {/* Online/Offline Status Indicator */}
       <div className="flex items-center mb-4">
         <span

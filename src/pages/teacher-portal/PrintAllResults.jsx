@@ -15,7 +15,7 @@ const PrintAllResults = () => {
   const [selectedFolderName, setSelectedFolderName] = useState('');
   const [showNoResultsModal, setShowNoResultsModal] = useState(false);
 
-  const API_BASE_URL = process.env.REACT_APP_API_URL || "";
+  const API_BASE_URL = (process.env.REACT_APP_API_BASE_URL || process.env.REACT_APP_API_URL || '').trim().replace(/\/+$/, '');
 
   // Auto-select teacher's class from localStorage on mount
   useEffect(() => {
@@ -27,27 +27,68 @@ const PrintAllResults = () => {
     }
   }, []);
 
+  // Students must be loaded for the exact selected class AND term.
   useEffect(() => {
-    if (className) {
-      fetch(`${API_BASE_URL}/api/user/class/${className}/students`)
-        .then(res => res.json())
-        .then(data => setStudents(data));
-    }
-  }, [className]);
+    let cancelled = false;
+    const loadStudents = async () => {
+      if (!className || !term) {
+        setStudents([]);
+        return;
+      }
+      if (!API_BASE_URL) {
+        console.error('[PrintAllResults] API base URL is missing. Set REACT_APP_API_BASE_URL or REACT_APP_API_URL.');
+        setStudents([]);
+        return;
+      }
+      try {
+        const url = `${API_BASE_URL}/api/user/class/${encodeURIComponent(className)}/${encodeURIComponent(term)}/students`;
+        const res = await fetch(url, { credentials: 'include' });
+        if (!res.ok) throw new Error(`Student request failed (${res.status})`);
+        const data = await res.json();
+        if (!Array.isArray(data)) throw new Error('Student endpoint returned an unexpected response.');
+        if (!cancelled) setStudents(data);
+      } catch (err) {
+        console.error('[PrintAllResults] Failed to fetch students for selected class/term:', err);
+        if (!cancelled) setStudents([]);
+      }
+    };
+    loadStudents();
+    return () => { cancelled = true; };
+  }, [className, term]);
 
-  const fetchResults = () => {
+  const fetchResults = async () => {
     if (!className || !term) {
-      alert("Please select both class and term.");
+      alert('Please select both class and term.');
+      return;
+    }
+    if (!API_BASE_URL) {
+      alert('API base URL is missing. Set REACT_APP_API_BASE_URL or REACT_APP_API_URL in the frontend environment, then rebuild the frontend.');
       return;
     }
     setLoading(true);
-    fetch(`${API_BASE_URL}/api/results/class/${className}/${term}`)
-      .then(res => res.json())
-      .then(data => {
-        console.log("Fetched results:", data);
-        setResults(data);
-        setLoading(false);
-      });
+    try {
+      const encodedClass = encodeURIComponent(className);
+      const encodedTerm = encodeURIComponent(term);
+      const [studentsRes, resultsRes] = await Promise.all([
+        fetch(`${API_BASE_URL}/api/user/class/${encodedClass}/${encodedTerm}/students`, { credentials: 'include' }),
+        fetch(`${API_BASE_URL}/api/results/class/${encodedClass}/${encodedTerm}`, { credentials: 'include' })
+      ]);
+      if (!studentsRes.ok) throw new Error(`Student request failed (${studentsRes.status}).`);
+      if (!resultsRes.ok) throw new Error(`Results request failed (${resultsRes.status}).`);
+      const [studentsData, resultsData] = await Promise.all([studentsRes.json(), resultsRes.json()]);
+      if (!Array.isArray(studentsData)) throw new Error('Student endpoint returned an unexpected response.');
+      if (!Array.isArray(resultsData)) throw new Error('Results endpoint returned an unexpected response.');
+      setStudents(studentsData);
+      setResults(resultsData);
+      console.log(`Fetched ${studentsData.length} students and ${resultsData.length} result records for ${className} / ${term}.`);
+    } catch (err) {
+      console.error('[PrintAllResults] Failed to fetch selected-term data:', err);
+      setStudents([]);
+      setResults([]);
+      alert(err.message || 'Unable to fetch results for the selected class and term.');
+    } finally {
+      setLoading(false);
+    }
   };
 
   // Group results by studentId

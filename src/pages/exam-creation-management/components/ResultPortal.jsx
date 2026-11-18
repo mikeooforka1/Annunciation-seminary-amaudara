@@ -11,8 +11,7 @@ const terms = [
     { value: 'third', label: 'Third Term' }
 ];
 
-const API_BASE_URL = process.env.REACT_APP_API_BASE_URL || ""; 
-
+const API_BASE_URL = (process.env.REACT_APP_API_BASE_URL || process.env.REACT_APP_API_URL || '').trim().replace(/\/+$/, '');
 function getGrade(score) {
   if (score >= 75 && score <= 100) return "A1";
   if (score >= 70 && score < 75) return "B2";
@@ -173,12 +172,24 @@ useEffect(() => {
         selectedTerm &&
         isValidObjectId(selectedStudent._id)
       ) {
+        if (!API_BASE_URL) {
+          setErrorMsg('API base URL is missing. Set REACT_APP_API_BASE_URL or REACT_APP_API_URL in the frontend environment.');
+          return;
+        }
         fetch(
-          `${API_BASE_URL}/api/results/student/${selectedStudent._id}/all?className=${teacherData.className}&term=${selectedTerm}`
+          `${API_BASE_URL}/api/results/student/${encodeURIComponent(selectedStudent._id)}/all?className=${encodeURIComponent(teacherData.className)}&term=${encodeURIComponent(selectedTerm)}`,
+          { credentials: 'include' }
         )
-          .then(res => res.json())
+          .then(async res => {
+            if (!res.ok) {
+              const body = await res.text().catch(() => '');
+              throw new Error(`Student result request failed (${res.status})${body ? `: ${body.slice(0, 180)}` : ''}`);
+            }
+            return res.json();
+          })
           .then(backendData => {
-            if (!backendData || backendData.length === 0) return;
+            if (!Array.isArray(backendData)) throw new Error('Student result endpoint returned an unexpected response.');
+            if (backendData.length === 0) return;
 
             // --- Collect all subjects from backend ---
             const backendSubjects = backendData
@@ -326,7 +337,7 @@ useEffect(() => {
             console.error('[ERROR] Error fetching backend data for student:', err);
           });
       }
-    }, [selectedStudent, teacherData, selectedTerm, subjects]);
+    }, [selectedStudent, teacherData, selectedTerm, API_BASE_URL]);
 
     // 4. Save result data for selected student to localStorage (including subjects)
     useEffect(() => {
@@ -356,14 +367,22 @@ useEffect(() => {
         setStudents([]);
         if (teacherData?.className && selectedTerm) {
             try {
-                const res = await fetch(
-                    `${API_BASE_URL}/api/user/class/${encodeURIComponent(teacherData.className)}/${selectedTerm}/students`
-                );
-                if (!res.ok) throw new Error('Failed to fetch students');
+                if (!API_BASE_URL) {
+                    throw new Error('API base URL is missing. Set REACT_APP_API_BASE_URL or REACT_APP_API_URL in the frontend environment.');
+                }
+                const url = `${API_BASE_URL}/api/user/class/${encodeURIComponent(teacherData.className)}/${encodeURIComponent(selectedTerm)}/students`;
+                const res = await fetch(url, { credentials: 'include' });
+                if (!res.ok) {
+                    const body = await res.text().catch(() => '');
+                    throw new Error(`Student request failed (${res.status})${body ? `: ${body.slice(0, 180)}` : ''}`);
+                }
                 const data = await res.json();
-                setStudents(Array.isArray(data) ? data : []);
+                if (!Array.isArray(data)) throw new Error('Student endpoint returned an unexpected response.');
+                setStudents(data);
             } catch (err) {
+                console.error('[ResultPortal] Failed to fetch students for selected class/term:', err);
                 setStudents([]);
+                setErrorMsg(err.message || 'Unable to fetch students for the selected term.');
             }
         }
         setIsLoadingStudents(false);
@@ -375,16 +394,27 @@ useEffect(() => {
         if (teacherData?.className && selectedTerm) {
             setIsLoadingResults(true);
             console.log('Fetching results for class:', teacherData.className, 'term:', selectedTerm);
+            if (!API_BASE_URL) {
+                setTeacherResults([]);
+                setErrorMsg('API base URL is missing. Set REACT_APP_API_BASE_URL or REACT_APP_API_URL in the frontend environment.');
+                setIsLoadingResults(false);
+                return;
+            }
             fetch(`${API_BASE_URL}/api/results/class/${encodeURIComponent(teacherData.className)}/${encodeURIComponent(selectedTerm)}`, {
                 credentials: 'include'
             })
-                .then(res => {
+                .then(async res => {
                     console.log('Fetch response status:', res.status);
+                    if (!res.ok) {
+                        const body = await res.text().catch(() => '');
+                        throw new Error(`Results request failed (${res.status})${body ? `: ${body.slice(0, 180)}` : ''}`);
+                    }
                     return res.json();
                 })
                 .then(data => {
+                    if (!Array.isArray(data)) throw new Error('Results endpoint returned an unexpected response.');
                     console.log('Fetched data:', data);
-                    setTeacherResults(Array.isArray(data) ? data : []);
+                    setTeacherResults(data);
                     // Merge previous state to preserve input
                     const newResults = { ...results };
                     const newCaScores = { ...caScores };
@@ -465,7 +495,7 @@ useEffect(() => {
                 })
                 .finally(() => setIsLoadingResults(false));
         }
-    }, [teacherData, selectedTerm, students, subjects]);
+    }, [teacherData, selectedTerm]);
 
     // Map fetched results to local state
     useEffect(() => {

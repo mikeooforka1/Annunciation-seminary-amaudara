@@ -10,25 +10,36 @@ const TeacherPortal = () => {
   const [studentsList, setStudentsList] = useState([]);
 
   useEffect(() => {
-    const storedData = localStorage.getItem('teacherData') || localStorage.getItem('user');
-    let parsedData = {};
+    // Login stores the authenticated session in sessionStorage. Read it first;
+    // localStorage remains as a fallback for older sessions/builds.
+    const storedData =
+      sessionStorage.getItem('teacherData') ||
+      sessionStorage.getItem('user') ||
+      localStorage.getItem('teacherData') ||
+      localStorage.getItem('user');
+
+    let parsedData = null;
     if (storedData) {
       try {
         parsedData = JSON.parse(storedData);
-        setTeacherData(parsedData);
-      } catch (e) {
-        parsedData = {};
+      } catch (error) {
+        console.error('Unable to parse the stored teacher session:', error);
       }
     }
-    if (!parsedData._id) {
+
+    if (parsedData && parsedData._id) {
+      setTeacherData(parsedData);
+    } else {
+      sessionStorage.removeItem('teacherData');
+      sessionStorage.removeItem('user');
       alert('Session expired or invalid. Please log in again.');
-      navigate('/login-authentication');
+      navigate('/login-authentication', { replace: true });
     }
   }, [navigate]);
 
   useEffect(() => {
     if (teacherData?.className && teacherData?._id) {
-      const API_BASE_URL = process.env.REACT_APP_API_BASE_URL || "";
+      const API_BASE_URL = (process.env.REACT_APP_API_URL || process.env.REACT_APP_API_BASE_URL || '').trim().replace(/\/+$/, '');
       fetch(
         `${API_BASE_URL}/api/user/class/${encodeURIComponent(teacherData.className)}/${encodeURIComponent(teacherData.term || 'third')}/students`,
         {
@@ -56,9 +67,13 @@ const TeacherPortal = () => {
   }, [teacherData]);
 
   const handleLogout = () => {
+    sessionStorage.removeItem('user');
+    sessionStorage.removeItem('teacherData');
+    sessionStorage.removeItem('userName');
+    // Clear legacy entries too, so an old localStorage session cannot be reused.
     localStorage.removeItem('user');
     localStorage.removeItem('teacherData');
-    navigate('/login-authentication');
+    navigate('/login-authentication', { replace: true });
   };
 
   if (!teacherData || !teacherData._id) {

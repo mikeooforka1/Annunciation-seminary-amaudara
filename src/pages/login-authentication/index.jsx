@@ -64,7 +64,7 @@ const LoginAuthentication = () => {
       // Sanitize stored payload to prevent storage poisoning
       const sanitizedUser = {
         name: String(result.user.name || ''),
-        role: String(result.user.role || ''),
+        role: String(result.user.role || cleanRole).trim().toLowerCase(),
         className: String(result.user.className || ''),
         term: String(result.user.term || ''),
         _id: String(result.user._id || ''),
@@ -75,16 +75,18 @@ const LoginAuthentication = () => {
       sessionStorage.setItem('user', JSON.stringify(sanitizedUser));
       sessionStorage.setItem('userName', sanitizedUser.name);
 
-      if (result.user.role === 'teacher') {
+      if (sanitizedUser.role === 'teacher') {
         sessionStorage.setItem('teacherData', JSON.stringify({
           ...result.user,
-          _id: result.user._id
+          ...sanitizedUser,
+          _id: sanitizedUser._id,
+          role: 'teacher'
         }));
         window.location.replace('/teacher-portal');
         return;
       }
 
-      if (result.user.role === 'student') {
+      if (sanitizedUser.role === 'student') {
         sessionStorage.setItem('studentData', JSON.stringify({
           ...result.user,
           _id: result.user._id,
@@ -98,7 +100,7 @@ const LoginAuthentication = () => {
         return;
       }
 
-      if (result.user.role === 'admin') {
+      if (sanitizedUser.role === 'admin') {
         sessionStorage.setItem('adminData', JSON.stringify({
           ...result.user,
           _id: result.user._id

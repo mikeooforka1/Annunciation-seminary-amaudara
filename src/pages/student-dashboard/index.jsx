@@ -80,22 +80,35 @@ const StudentDashboard = () => {
       };
 
   useEffect(() => {
-    // Check both storage keys safely for cross-portal compatibility
-    const storedData = localStorage.getItem('studentData') || localStorage.getItem('user');
-    let parsedData = {};
+    // Read the same session stores written by LoginAuthentication.
+    // sessionStorage is preferred for the current tab; localStorage remains
+    // a compatibility fallback for older login flows and existing sessions.
+    const storedData =
+      sessionStorage.getItem('studentData') ||
+      sessionStorage.getItem('user') ||
+      localStorage.getItem('studentData') ||
+      localStorage.getItem('user');
+
+    let parsedData = null;
     if (storedData) {
       try {
         parsedData = JSON.parse(storedData);
-        setStudentData(parsedData);
-      } catch (e) {
-        parsedData = {};
+      } catch (error) {
+        console.error('Unable to parse stored student session:', error);
       }
     }
-    // Best practice: Check for valid _id before proceeding
-    if (!parsedData || !parsedData._id) {
-      alert('Session expired or invalid. Please log in again.');
-      navigate('/login-authentication');
+
+    if (parsedData && parsedData._id) {
+      setStudentData(parsedData);
+      return;
     }
+
+    // Remove only invalid student identity entries. Do not redirect merely
+    // because the profile API is unavailable; profile loading is handled below.
+    sessionStorage.removeItem('studentData');
+    localStorage.removeItem('studentData');
+    alert('Session expired or invalid. Please log in again.');
+    navigate('/login-authentication', { replace: true });
   }, [navigate]);
 
   useEffect(() => {

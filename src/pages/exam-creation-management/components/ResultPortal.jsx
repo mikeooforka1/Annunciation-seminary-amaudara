@@ -11,7 +11,8 @@ const terms = [
     { value: 'third', label: 'Third Term' }
 ];
 
-const API_BASE_URL = process.env.REACT_APP_API_BASE_URL;
+const API_BASE_URL = process.env.REACT_APP_API_BASE_URL || ""; 
+
 function getGrade(score) {
   if (score >= 75 && score <= 100) return "A1";
   if (score >= 70 && score < 75) return "B2";

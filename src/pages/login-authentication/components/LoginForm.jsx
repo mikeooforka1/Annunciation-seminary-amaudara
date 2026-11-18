@@ -24,10 +24,17 @@ const LoginForm = ({ onLogin, isLoading }) => {
   const [token, setToken] = useState('');
   const [showToken, setShowToken] = useState(false);
 
+  const handleRoleChange = (event) => {
+    const nextRole = event.target.value;
+    setRole(nextRole);
+    if (nextRole === 'admin') setClassName('');
+  };
+
   const handleSubmit = (e) => {
     e.preventDefault();
 
-    // Client-side sanitization and length restriction
+    // LoginAuthentication owns the only authentication request and session write.
+    // This form only validates and forwards the credentials.
     const cleanClass = typeof className === 'string' ? className.trim() : '';
     const cleanRole = typeof role === 'string' ? role.trim().toLowerCase() : '';
     const cleanToken = typeof token === 'string' ? token.trim() : '';
@@ -35,59 +42,33 @@ const LoginForm = ({ onLogin, isLoading }) => {
     if (!cleanRole || !cleanToken) return;
     if (cleanRole !== 'admin' && !cleanClass) return;
 
-    // Handle authentication request and store both keys locally for cross-portal compatibility
-    fetch('/api/auth/login', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'X-Requested-With': 'XMLHttpRequest'
-      },
-      credentials: 'include',
-      body: JSON.stringify({
-        className: cleanClass,
-        role: cleanRole,
-        token: cleanToken
-      })
-    })
-      .then(res => res.json())
-      .then(data => {
-        if (data.success && data.user) {
-          localStorage.setItem('teacherData', JSON.stringify(data.user));
-          localStorage.setItem('user', JSON.stringify(data.user));
-        }
-        onLogin({ 
-          className: cleanClass, 
-          role: cleanRole, 
-          token: cleanToken 
-        });
-      })
-      .catch(() => {
-        onLogin({ 
-          className: cleanClass, 
-          role: cleanRole, 
-          token: cleanToken 
-        });
-      });
+    onLogin({
+      className: cleanClass,
+      role: cleanRole,
+      token: cleanToken
+    });
   };
 
   return (
     <form onSubmit={handleSubmit} className="space-y-5" autoComplete="off">
-      {/* 1. Select Class */}
-      <div>
-        <label className="block text-sm font-medium mb-1">Class</label>
-        <select
-          className="w-full border rounded-lg px-3 py-2 focus:outline-none focus:ring"
-          value={className}
-          onChange={e => setClassName(e.target.value)}
-          required={role !== 'admin'}
-          autoComplete="off"
-        >
-          <option value="">Select Class</option>
-          {classOptions.map(opt => (
-            <option key={opt.value} value={opt.value}>{opt.label}</option>
-          ))}
-        </select>
-      </div>
+      {/* Class is required for students/teachers, but not for administrators. */}
+      {role !== 'admin' && (
+        <div>
+          <label className="block text-sm font-medium mb-1">Class</label>
+          <select
+            className="w-full border rounded-lg px-3 py-2 focus:outline-none focus:ring"
+            value={className}
+            onChange={e => setClassName(e.target.value)}
+            required
+            autoComplete="off"
+          >
+            <option value="">Select Class</option>
+            {classOptions.map(opt => (
+              <option key={opt.value} value={opt.value}>{opt.label}</option>
+            ))}
+          </select>
+        </div>
+      )}
 
       {/* 2. Select Role */}
       <div>
@@ -95,7 +76,7 @@ const LoginForm = ({ onLogin, isLoading }) => {
         <select
           className="w-full border rounded-lg px-3 py-2 focus:outline-none focus:ring"
           value={role}
-          onChange={e => setRole(e.target.value)}
+          onChange={handleRoleChange}
           required
           autoComplete="off"
         >

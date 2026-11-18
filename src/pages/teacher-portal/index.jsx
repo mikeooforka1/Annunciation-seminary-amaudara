@@ -39,8 +39,8 @@ const TeacherPortal = () => {
 
   useEffect(() => {
     if (teacherData?.className && teacherData?._id) {
-      const API_BASE_URL = (process.env.REACT_APP_API_URL || process.env.REACT_APP_API_BASE_URL || '').trim().replace(/\/+$/, '');
-      fetch(
+     const API_BASE_URL = process.env.REACT_APP_API_BASE_URL || "";
+           fetch(
         `${API_BASE_URL}/api/user/class/${encodeURIComponent(teacherData.className)}/${encodeURIComponent(teacherData.term || 'third')}/students`,
         {
           credentials: 'include',

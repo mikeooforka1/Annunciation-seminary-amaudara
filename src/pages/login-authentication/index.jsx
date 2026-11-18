@@ -72,8 +72,13 @@ const LoginAuthentication = () => {
         loginTime: new Date().toISOString()
       };
 
+      // Keep the authenticated identity in both storage areas because
+      // existing dashboards and shared app guards still read localStorage.
+      // Never store the submitted token/password in browser storage.
       sessionStorage.setItem('user', JSON.stringify(sanitizedUser));
       sessionStorage.setItem('userName', sanitizedUser.name);
+      localStorage.setItem('user', JSON.stringify(sanitizedUser));
+      localStorage.setItem('userName', sanitizedUser.name);
 
       if (sanitizedUser.role === 'teacher') {
         sessionStorage.setItem('teacherData', JSON.stringify({
@@ -87,15 +92,21 @@ const LoginAuthentication = () => {
       }
 
       if (sanitizedUser.role === 'student') {
-        sessionStorage.setItem('studentData', JSON.stringify({
+        const studentPayload = {
           ...result.user,
-          _id: result.user._id,
+          ...sanitizedUser,
+          _id: sanitizedUser._id,
+          role: 'student',
+          isAuthenticated: true,
           gradeLevel: result.user.gradeLevel || result.user.className || "",
           personal: result.user.personal || {},
           academic: result.user.academic || {},
           className: result.user.className || "",
           term: result.user.term || ""
-        }));
+        };
+
+        sessionStorage.setItem('studentData', JSON.stringify(studentPayload));
+        localStorage.setItem('studentData', JSON.stringify(studentPayload));
         window.location.replace('/student-dashboard');
         return;
       }

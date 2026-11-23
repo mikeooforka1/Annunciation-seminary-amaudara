@@ -75,6 +75,10 @@ const AdminDashboard = () => {
   const [loading, setLoading] = useState(false);
   const [errorMsg, setErrorMsg] = useState("");
   const [successMsg, setSuccessMsg] = useState("");
+  const [currentAcademicYear, setCurrentAcademicYear] = useState("");
+  const [academicYearDraft, setAcademicYearDraft] = useState("");
+  const [academicYearLoading, setAcademicYearLoading] = useState(true);
+  const [academicYearSaving, setAcademicYearSaving] = useState(false);
   const navigate = useNavigate();
   const location = useLocation();
   const [editingStudentId, setEditingStudentId] = useState(null);
@@ -90,6 +94,56 @@ const AdminDashboard = () => {
     fetchFormators();
     fetchNonAcademic();
   }, []);
+ 
+  useEffect(() => {
+    let active = true;
+    setAcademicYearLoading(true);
+    axios.get(`${API_BASE_URL}/api/results/academic-year/current`)
+      .then(res => {
+        if (!active) return;
+        const year = res.data?.academicYear || '';
+        setCurrentAcademicYear(year);
+        setAcademicYearDraft(year);
+      })
+      .catch(err => {
+        if (active) setErrorMsg(err.response?.data?.error || 'Unable to load the current academic year setting.');
+      })
+      .finally(() => {
+        if (active) setAcademicYearLoading(false);
+      });
+    return () => { active = false; };
+  }, []);
+
+  const saveCurrentAcademicYear = async () => {
+    const year = academicYearDraft.trim();
+    if (!/^\d{4}\/\d{4}$/.test(year) || Number(year.split('/')[1]) !== Number(year.split('/')[0]) + 1) {
+      setErrorMsg('Enter a valid academic year, for example 2026/2027.');
+      return;
+    }
+    let adminId = '';
+    try { adminId = JSON.parse(localStorage.getItem('adminData') || '{}')._id || ''; } catch {}
+    if (!adminId) {
+      setErrorMsg('Administrator session not found. Please sign in again.');
+      return;
+    }
+    setAcademicYearSaving(true);
+    setErrorMsg('');
+    try {
+      const res = await axios.put(`${API_BASE_URL}/api/results/academic-year/current`, {
+        academicYear: year,
+        adminId
+      });
+      const savedYear = res.data?.academicYear || year;
+      setCurrentAcademicYear(savedYear);
+      setAcademicYearDraft(savedYear);
+      setSuccessMsg(`Current academic year set to ${savedYear}.`);
+      setTimeout(() => setSuccessMsg(''), 3500);
+    } catch (err) {
+      setErrorMsg(err.response?.data?.error || 'Unable to save the current academic year.');
+    } finally {
+      setAcademicYearSaving(false);
+    }
+  };
 
  useEffect(() => {
   if (location.state?.showSection === "verify") {
@@ -338,6 +392,39 @@ const AdminDashboard = () => {
             ))}
           </div>
         </div>
+      )}
+
+      {!showSection && (
+        <section className="max-w-7xl mx-auto w-full px-4 sm:px-6 lg:px-8 pt-6">
+          <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm sm:p-6">
+            <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
+              <div className="max-w-xl">
+                <p className="text-xs font-bold uppercase tracking-[0.16em] text-primary">Academic session settings</p>
+                <h2 className="mt-1 text-lg font-bold text-slate-900">Current academic year</h2>
+                <p className="mt-1 text-sm text-slate-600">Set the active school session. Verify Results will default to this year while still allowing previous sessions to be selected.</p>
+                <p className="mt-2 text-sm text-slate-700">
+                  Currently active: <strong>{academicYearLoading ? 'Loading…' : (currentAcademicYear || 'Not configured')}</strong>
+                </p>
+              </div>
+              <div className="flex w-full flex-col gap-2 sm:flex-row md:max-w-md">
+                <label className="sr-only" htmlFor="admin-current-academic-year">Current academic year</label>
+                <input
+                  id="admin-current-academic-year"
+                  type="text"
+                  inputMode="numeric"
+                  placeholder="2026/2027"
+                  value={academicYearDraft}
+                  onChange={e => setAcademicYearDraft(e.target.value)}
+                  disabled={academicYearLoading || academicYearSaving}
+                  className="min-w-0 flex-1 rounded-xl border border-slate-300 bg-white px-4 py-3 text-sm text-slate-900 outline-none transition focus:border-primary focus:ring-2 focus:ring-primary/20"
+                />
+                <Button onClick={saveCurrentAcademicYear} disabled={academicYearLoading || academicYearSaving || !academicYearDraft.trim()}>
+                  {academicYearSaving ? 'Saving…' : 'Save academic year'}
+                </Button>
+              </div>
+            </div>
+          </div>
+        </section>
       )}
 
       {/* Main Content */}
@@ -666,6 +753,7 @@ const AdminDashboard = () => {
             <VerifyResult
               initialClass={location.state?.selectedClass}
               initialTerm={location.state?.selectedTerm}
+              currentAcademicYear={currentAcademicYear}
             />
           </>
         )}

@@ -112,10 +112,22 @@ const LoginAuthentication = () => {
       }
 
       if (sanitizedUser.role === 'admin') {
-        sessionStorage.setItem('adminData', JSON.stringify({
+        // Keep the administrator identity in both storage areas.
+        // The admin dashboard's academic-year setting and older admin
+        // components may read localStorage, while session-aware components
+        // may read sessionStorage.
+        const adminPayload = {
           ...result.user,
-          _id: result.user._id
-        }));
+          ...sanitizedUser,
+          _id: sanitizedUser._id,
+          role: 'admin',
+          isAuthenticated: true
+        };
+        const serializedAdmin = JSON.stringify(adminPayload);
+
+        sessionStorage.setItem('adminData', serializedAdmin);
+        localStorage.setItem('adminData', serializedAdmin);
+
         window.location.replace('/admin');
         return;
       }

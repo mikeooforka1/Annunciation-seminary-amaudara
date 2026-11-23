@@ -432,39 +432,57 @@ const ResultsAnalyticsPortal = () => {
     link.click();
   };
 
-  const manualClassOptions = [
-    'JSS1A', 'JSS1B',
-    'JSS2A', 'JSS2B',
-    'JSS3A', 'JSS3B',
-    'SS1A', 'SS1B', 'SS1C', // <-- Added SS1C
-    'SS2A', 'SS2B',
-    'SS3A', 'SS3B'
-  ];
-
-  const [classOptions, setClassOptions] = useState(manualClassOptions);
+  // Class choices come exclusively from the backend so the dropdown never
+  // mixes hard-coded defaults with database classes.
+  const [classOptions, setClassOptions] = useState([]);
+  const [classOptionsLoading, setClassOptionsLoading] = useState(true);
+  const [classOptionsError, setClassOptionsError] = useState('');
 
   useEffect(() => {
-    fetch(`${API_BASE_URL}/api/user/classes/all`)
-      .then(res => res.json())
-      .then(data => {
-        if (Array.isArray(data)) {
-          // Merge backend classes with manual list, avoiding duplicates
-          const backendClasses = data
-            .filter(cls => typeof cls === 'string' && !manualClassOptions.includes(cls))
-            .map(cls => cls);
-          setClassOptions([...manualClassOptions, ...backendClasses]);
+    const controller = new AbortController();
+    setClassOptionsLoading(true);
+    setClassOptionsError('');
+
+    fetch(`${API_BASE_URL}/api/user/classes/all`, { signal: controller.signal })
+      .then(async res => {
+        if (!res.ok) throw new Error(`Could not load classes (${res.status}).`);
+        return res.json();
+      })
+      .then(payload => {
+        const data = Array.isArray(payload)
+          ? payload
+          : Array.isArray(payload?.classes)
+            ? payload.classes
+            : Array.isArray(payload?.data)
+              ? payload.data
+              : [];
+
+        const unique = new Map();
+        data.forEach(item => {
+          const raw = typeof item === 'string'
+            ? item
+            : item?.className || item?.id || item?.value || item?.name || '';
+          const value = String(raw).trim();
+          if (!value) return;
+          const key = value.toLowerCase();
+          if (!unique.has(key)) unique.set(key, value.toUpperCase());
+        });
+
+        setClassOptions(Array.from(unique.values()).sort((a, b) => a.localeCompare(b)));
+        if (unique.size === 0) setClassOptionsError('No classes are currently available from the school database.');
+      })
+      .catch(err => {
+        if (err.name !== 'AbortError') {
+          setClassOptions([]);
+          setClassOptionsError(err.message || 'Unable to load classes from the backend.');
         }
       })
-      .catch(() => {
-        setClassOptions(manualClassOptions); // fallback to manual list
+      .finally(() => {
+        if (!controller.signal.aborted) setClassOptionsLoading(false);
       });
-  }, [API_BASE_URL]);
 
-  // Helper to check if previous class should be shown
-  const showPreviousClass =
-    studentData?.className &&
-    !manualClassOptions.includes(studentData.className) &&
-    selectedClass !== studentData.className;
+    return () => controller.abort();
+  }, [API_BASE_URL]);
 
   // Reset results/loading when class/term changes before "Continue"
   useEffect(() => {
@@ -521,25 +539,26 @@ const [showMobilePrintWarning, setShowMobilePrintWarning] = useState(false);
                   onChange={e => setSelectedClass(e.target.value)}
                   className="border rounded px-3 py-2"
                 >
-                  <option value="">Select Class</option>
+                  <option value="">{classOptionsLoading ? 'Loading classes...' : 'Select Class'}</option>
                   {classOptions.map(cls => (
-                    <option key={cls} value={cls}>{cls}</option>
+                    <option key={cls.toLowerCase()} value={cls}>{cls}</option>
                   ))}
-                  {showPreviousClass && (
-                    <option value={studentData.className}>{studentData.className} (Previous)</option>
-                  )}
                 </select>
+                {classOptionsError && (
+                  <p className="mt-2 text-xs text-red-600" role="alert">{classOptionsError}</p>
+                )}
               </div>
             </div>
             <Button
               variant="default"
               onClick={() => {
-                if (selectedTerm && selectedClass) {
+                if (selectedTerm && selectedClass && classOptions.includes(selectedClass)) {
                   setHasSelected(true);
                 } else {
-                  alert('Please select both class and term.');
+                  alert('Please select a term and a class provided by the school database.');
                 }
               }}
+              disabled={classOptionsLoading || classOptions.length === 0}
               className="w-full"
             >
               Continue
@@ -877,14 +896,28 @@ const [showMobilePrintWarning, setShowMobilePrintWarning] = useState(false);
       />
 
       {isLoadingResults && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-40">
-          <div className="bg-white rounded-lg shadow-xl p-8 max-w-sm w-full text-center">
-            <Icon name="Loader" size={32} className="animate-spin text-primary mb-4" />
-            <h2 className="font-heading text-xl font-bold mb-2 text-primary">Loading results...</h2>
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/55 backdrop-blur-sm px-4" role="status" aria-live="polite">
+          <div className="w-full max-w-md overflow-hidden rounded-2xl border border-white/20 bg-white shadow-2xl">
+            <div className="h-1.5 w-full overflow-hidden bg-slate-100">
+              <div className="h-full w-1/3 animate-[result-loading_1.4s_ease-in-out_infinite] rounded-full bg-primary" />
+            </div>
+            <div className="p-7 text-center">
+              <div className="mx-auto mb-5 flex h-16 w-16 items-center justify-center rounded-2xl bg-primary/10">
+                <Icon name="Loader" size={32} className="animate-spin text-primary" />
+              </div>
+              <p className="text-xs font-bold uppercase tracking-[0.18em] text-primary">Academic records</p>
+              <h2 className="mt-2 text-xl font-bold text-slate-900">Preparing your result</h2>
+              <p className="mt-2 text-sm leading-6 text-slate-500">Please wait while we securely retrieve and organize your published scores.</p>
+              <div className="mt-6 space-y-2">
+                <div className="h-2 animate-pulse rounded-full bg-slate-100" />
+                <div className="mx-auto h-2 w-4/5 animate-pulse rounded-full bg-slate-100" />
+              </div>
+            </div>
           </div>
         </div>
       )}
 
+      <style>{`@keyframes result-loading { 0% { transform: translateX(-120%); } 100% { transform: translateX(360%); } }`}</style>
       {showNoResultsModal && !isLoadingResults && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-40">
           <div className="bg-white rounded-lg shadow-xl p-8 max-w-sm w-full text-center">

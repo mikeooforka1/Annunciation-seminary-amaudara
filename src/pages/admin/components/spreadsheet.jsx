@@ -92,9 +92,9 @@ const calculateCumulativePositionMap = entries => {
 // ✅ localStorage utility functions for persisting subject order
 const STORAGE_KEY_PREFIX = 'spreadsheet_subject_order_';
 
-const saveSubjectOrderToStorage = (classId, term, order) => {
+const saveSubjectOrderToStorage = (classId, term, order, academicYear = '') => {
   if (!classId || !term) return;
-  const key = `${STORAGE_KEY_PREFIX}${classId}_${term}`;
+  const key = `${STORAGE_KEY_PREFIX}${classId}_${term}_${academicYear || 'unspecified'}`;
   try {
     localStorage.setItem(key, JSON.stringify(order));
   } catch (err) {
@@ -102,11 +102,13 @@ const saveSubjectOrderToStorage = (classId, term, order) => {
   }
 };
 
-const getSubjectOrderFromStorage = (classId, term) => {
+const getSubjectOrderFromStorage = (classId, term, academicYear = '') => {
   if (!classId || !term) return null;
-  const key = `${STORAGE_KEY_PREFIX}${classId}_${term}`;
+  const key = `${STORAGE_KEY_PREFIX}${classId}_${term}_${academicYear || 'unspecified'}`;
   try {
-    const stored = localStorage.getItem(key);
+    // Preserve existing users' saved subject order from the pre-year-aware key.
+    const stored = localStorage.getItem(key)
+      || localStorage.getItem(`${STORAGE_KEY_PREFIX}${classId}_${term}`);
     const parsed = stored ? JSON.parse(stored) : null;
     return Array.isArray(parsed) ? parsed : null;
   } catch (err) {
@@ -115,9 +117,9 @@ const getSubjectOrderFromStorage = (classId, term) => {
   }
 };
 
-const clearSubjectOrderFromStorage = (classId, term) => {
+const clearSubjectOrderFromStorage = (classId, term, academicYear = '') => {
   if (!classId || !term) return;
-  const key = `${STORAGE_KEY_PREFIX}${classId}_${term}`;
+  const key = `${STORAGE_KEY_PREFIX}${classId}_${term}_${academicYear || 'unspecified'}`;
   try {
     localStorage.removeItem(key);
   } catch (err) {
@@ -130,6 +132,9 @@ const Spreadsheet = () => {
   const navigate = useNavigate();
   const selectedClass = location.state?.selectedClass || "";
   const selectedTerm = location.state?.selectedTerm || "";
+  const selectedAcademicYear = location.state?.selectedAcademicYear
+    || Object.values(location.state?.editResults || {}).find(result => result?.academicYear)?.academicYear
+    || "";
   const isThirdTerm = selectedTerm.toLowerCase() === 'third';
   const [dataError, setDataError] = useState("");
   const [students, setStudents] = useState(Array.isArray(location.state?.students) ? location.state.students : []);
@@ -200,7 +205,7 @@ const Spreadsheet = () => {
     setDataError("");
     try {
       const fetches = studentList.map(student => Promise.all([
-        fetch(`${API_BASE_URL}/api/results/student/${student._id}/pushed?className=${selectedClass}&term=${selectedTerm}`)
+        fetch(`${API_BASE_URL}/api/results/student/${student._id}/pushed?className=${selectedClass}&term=${selectedTerm}${selectedAcademicYear ? `&academicYear=${encodeURIComponent(selectedAcademicYear)}` : ''}`)
           .then(res => readListResponse(res, ["results"], "Student results")),
         isThirdTerm
           ? fetch(`${API_BASE_URL}/api/results/student/${student._id}/cumulative-averages?className=${selectedClass}`)
@@ -217,11 +222,16 @@ const Spreadsheet = () => {
       const statusMap = {};
 
       resultsArr.forEach(({ studentId, results, cumulative }) => {
+        const overallForYear = results.find(r => r.subject === "Overall");
+        const recordAcademicYear = overallForYear?.academicYear || results.find(r => r.academicYear)?.academicYear || '';
+        const resultsForYear = selectedAcademicYear
+          ? (recordAcademicYear === selectedAcademicYear ? results : [])
+          : results;
         map[studentId] = {};
         editMap[studentId] = {};
         const subjects = [];
 
-        results.forEach(r => {
+        resultsForYear.forEach(r => {
           if (r.subject && r.subject !== "Overall") {
             subjects.push(r.subject);
             map[studentId][r.subject] = r;
@@ -292,7 +302,7 @@ const Spreadsheet = () => {
         });
 
         // Build status map from the fetched results
-        const subjectResults = results.filter(r => r.subject && r.subject !== "Overall");
+        const subjectResults = resultsForYear.filter(r => r.subject && r.subject !== "Overall");
         let isReviewed = false;
         let isVerified = false;
         let isPending = false;
@@ -322,7 +332,7 @@ const Spreadsheet = () => {
       });
 
       // ✅ Load saved subject order from localStorage and apply it
-      const savedOrder = getSubjectOrderFromStorage(selectedClass, selectedTerm);
+      const savedOrder = getSubjectOrderFromStorage(selectedClass, selectedTerm, selectedAcademicYear);
       let finalOrder = allSubjectsOrdered;
 
       if (savedOrder && savedOrder.length > 0) {
@@ -370,7 +380,7 @@ const Spreadsheet = () => {
         fetch(`${API_BASE_URL}/api/results/update-cumulative-positions`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ className: selectedClass })
+          body: JSON.stringify({ className: selectedClass, academicYear: selectedAcademicYear })
         }).catch(() => {});
       }
       setLoading(false);
@@ -410,7 +420,7 @@ const Spreadsheet = () => {
       });
 
       // ✅ Load saved subject order from localStorage and apply it
-      const savedOrder = getSubjectOrderFromStorage(selectedClass, selectedTerm);
+      const savedOrder = getSubjectOrderFromStorage(selectedClass, selectedTerm, selectedAcademicYear);
       let finalSubjectsOrder = allSubjectsOrdered;
 
       if (savedOrder && savedOrder.length > 0) {
@@ -654,7 +664,7 @@ const Spreadsheet = () => {
     setSubjectsOrder(newSubjectsOrder);
 
     // ✅ Save to localStorage when subject is removed
-    saveSubjectOrderToStorage(selectedClass, selectedTerm, newSubjectsOrder);
+    saveSubjectOrderToStorage(selectedClass, selectedTerm, newSubjectsOrder, selectedAcademicYear);
 
     if (navigator.onLine) {
       for (const resultId of subjectResultIds) {
@@ -765,7 +775,7 @@ const Spreadsheet = () => {
     setSubjectsOrder(updatedSubjectsOrder);
 
     // ✅ Save to localStorage when subject is added
-    saveSubjectOrderToStorage(selectedClass, selectedTerm, updatedSubjectsOrder);
+    saveSubjectOrderToStorage(selectedClass, selectedTerm, updatedSubjectsOrder, selectedAcademicYear);
 
     if (navigator.onLine) {
       try {
@@ -824,7 +834,8 @@ const Spreadsheet = () => {
         className: selectedClass,
         term: selectedTerm,
         subject,
-        studentIds: students.map(s => s._id)
+        studentIds: students.map(s => s._id),
+        academicYear: selectedAcademicYear
       });
     }
 
@@ -853,7 +864,7 @@ const handleExportPDF = async () => {
     const url = window.URL.createObjectURL(blob);
     const a = document.createElement('a');
     a.href = url;
-    a.download = `${selectedClass}_${selectedTerm}_Results.pdf`;
+    a.download = `${selectedClass}_${selectedAcademicYear || "academic-year"}_${selectedTerm}_Results.pdf`;
     a.click();
     
     setIsExportingPDF(false);
@@ -922,7 +933,7 @@ const handleExportPDF = async () => {
       setSubjects(updatedSubjects);
       setSubjectsOrder(updatedSubjectsOrder);
       // ✅ Save to localStorage when new subject is added for individual
-      saveSubjectOrderToStorage(selectedClass, selectedTerm, updatedSubjectsOrder);
+      saveSubjectOrderToStorage(selectedClass, selectedTerm, updatedSubjectsOrder, selectedAcademicYear);
     }
 
     if (navigator.onLine) {
@@ -995,11 +1006,16 @@ const handleExportPDF = async () => {
   const fetchUpdatedResultsForEdited = async () => {
     const updatedEditResults = { ...editResults };
     for (const studentId of editedStudents) {
-      const res = await fetch(`${API_BASE_URL}/api/results/student/${studentId}/pushed?className=${selectedClass}&term=${selectedTerm}`);
+      const res = await fetch(`${API_BASE_URL}/api/results/student/${studentId}/pushed?className=${selectedClass}&term=${selectedTerm}${selectedAcademicYear ? `&academicYear=${encodeURIComponent(selectedAcademicYear)}` : ''}`);
       const results = await readListResponse(res, ["results"], "Student results");
+      const overallForYear = results.find(r => r.subject === "Overall");
+      const recordAcademicYear = overallForYear?.academicYear || results.find(r => r.academicYear)?.academicYear || '';
+      const resultsForYear = selectedAcademicYear
+        ? (recordAcademicYear === selectedAcademicYear ? results : [])
+        : results;
       const studentResult = {};
       const subjects = [];
-      results.forEach(r => {
+      resultsForYear.forEach(r => {
         if (r.subject && r.subject !== "Overall") {
           subjects.push(r.subject);
           studentResult[r.subject] = {
@@ -1582,7 +1598,7 @@ const handleExportPDF = async () => {
     setDragOverSubject(null);
 
     // ✅ Save to localStorage for persistence across page refresh/navigation
-    saveSubjectOrderToStorage(selectedClass, selectedTerm, newOrder);
+    saveSubjectOrderToStorage(selectedClass, selectedTerm, newOrder, selectedAcademicYear);
 
     // Also save to offline state
     saveOfflineState({
@@ -1647,7 +1663,8 @@ const handleExportPDF = async () => {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           className: selectedClass,
-          term: selectedTerm
+          term: selectedTerm,
+          academicYear: selectedAcademicYear
         })
       });
 
@@ -1700,6 +1717,7 @@ const handleExportPDF = async () => {
               showSection: "verify",
               selectedClass,
               selectedTerm,
+              selectedAcademicYear,
             },
           })
         }
@@ -1711,6 +1729,7 @@ const handleExportPDF = async () => {
       <h2 className="text-xl font-bold mb-4">
         Spreadsheet View for {selectedClass.toUpperCase()}
         {selectedTerm && ` (${selectedTerm.charAt(0).toUpperCase() + selectedTerm.slice(1)} Term)`}
+        {selectedAcademicYear && ` · ${selectedAcademicYear}`}
       </h2>
 
       {anyReviewedOrVerified && (
@@ -1759,62 +1778,36 @@ const handleExportPDF = async () => {
       
 
       {loading && (
-        <div>
-          <table className="min-w-max border border-gray-300">
-            <thead>
-              <tr>
-                <th className="border px-2 py-1 bg-gray-100">Student Name</th>
-                {subjectsOrder.map(subject => (
-                  <React.Fragment key={subject}>
-                    <th className="border px-2 py-1 bg-gray-100">{subject} CAT</th>
-                    <th className="border px-2 py-1 bg-gray-100">{subject} Exam</th>
-                    <th className="border px-2 py-1 bg-gray-100">{subject} Total</th>
-                    <th className="border px-2 py-1 bg-gray-100">{subject} Grade</th>
-                    <th className="border px-2 py-1 bg-gray-100">{subject} Remark</th>
-                  </React.Fragment>
-                ))}
-                <th className="border px-2 py-1 bg-gray-100">Average</th>
-                <th className="border px-2 py-1 bg-gray-100">Position</th>
-                {isThirdTerm && (
-                  <>
-                    <th className="border px-2 py-1 bg-gray-100">First Term Average</th>
-                    <th className="border px-2 py-1 bg-gray-100">Second Term Average</th>
-                    <th className="border px-2 py-1 bg-gray-100">Third Term Average</th>
-                    <th className="border px-2 py-1 bg-gray-100">Cumulative Average</th>
-                    <th className="border px-2 py-1 bg-gray-100">Promoted</th>
-                  </>
-                )}
-                <th>Handwriting</th>
-                <th>Punctuality</th>
-                <th>Initiative</th>
-                <th>Obedience</th>
-                <th>Honesty</th>
-                <th>Neatness</th>
-                <th>Attentiveness</th>
-                <th>Respect</th>
-                <th>Attitude</th>
-                <th>Creativity</th>
-                <th className="border px-2 py-1 bg-gray-100">Deans Remark</th>
-                <th className="border px-2 py-1 bg-gray-100">Rectors Remark</th>
-                <th className="border px-2 py-1 bg-gray-100">Academic Session</th>
-                <th className="border px-2 py-1 bg-gray-100">Next Term Begins</th>
-                <th className="border px-2 py-1 bg-gray-100">Rector's Signature</th>
-              </tr>
-            </thead>
-            <tbody>
-              {[...Array(10)].map((_, i) => (
-                <tr key={i}>
-                  <td colSpan={subjects.length * 5 + (isThirdTerm ? 21 : 16)}>
-                    <div className="animate-pulse h-6 bg-gray-200 rounded my-2"></div>
-                  </td>
-                </tr>
+        <div className="my-6 overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-xl" role="status" aria-live="polite">
+          <div className="h-1.5 overflow-hidden bg-slate-100">
+            <div className="h-full w-1/3 animate-[spreadsheet-progress_1.5s_ease-in-out_infinite] rounded-full bg-blue-600" />
+          </div>
+          <div className="p-6 sm:p-8">
+            <div className="flex flex-col items-center text-center">
+              <div className="mb-4 flex h-14 w-14 items-center justify-center rounded-2xl bg-blue-50">
+                <span className="h-7 w-7 animate-spin rounded-full border-[3px] border-blue-200 border-t-blue-700" />
+              </div>
+              <p className="text-xs font-bold uppercase tracking-[0.18em] text-blue-700">Spreadsheet workspace</p>
+              <h3 className="mt-2 text-xl font-bold text-slate-900">Preparing class results</h3>
+              <p className="mt-2 max-w-lg text-sm text-slate-500">
+                Fetching {selectedClass.toUpperCase()}{selectedAcademicYear ? ` · ${selectedAcademicYear}` : ''}{selectedTerm ? ` · ${selectedTerm} term` : ''} and arranging student scores. Please keep this page open.
+              </p>
+            </div>
+            <div className="mt-7 overflow-hidden rounded-xl border border-slate-200">
+              <div className="grid grid-cols-4 gap-3 bg-slate-50 p-3">
+                {[1, 2, 3, 4].map(item => <div key={item} className="h-3 animate-pulse rounded bg-slate-200" />)}
+              </div>
+              {[1, 2, 3, 4, 5].map(row => (
+                <div key={row} className="grid grid-cols-4 gap-3 border-t border-slate-100 p-3">
+                  {[1, 2, 3, 4].map(cell => <div key={cell} className="h-4 animate-pulse rounded bg-slate-100" />)}
+                </div>
               ))}
-            </tbody>
-          </table>
-          <div>Loading students and results...</div>
+            </div>
+          </div>
         </div>
       )}
-     {!loading && selectedClass && (
+      <style>{`@keyframes spreadsheet-progress { 0% { transform: translateX(-120%); } 100% { transform: translateX(360%); } }`}</style>
+      {!loading && selectedClass && (
   <div id="printable-table">
     <div
       style={{
@@ -2097,7 +2090,7 @@ const handleExportPDF = async () => {
                       <td className="border px-2 py-1">
                         {editResults[student._id]?._overall?.headTeacherRemark ?? ""}
                       </td>
-                      <td className="border px-2 py-1">{overall.academicYear ?? "2025/2026"}</td>
+                      <td className="border px-2 py-1">{overall.academicYear || selectedAcademicYear || "—"}</td>
                       <td className="border px-2 py-1">{overall.nextTerm ?? "25/09/2026"}</td>
                       <td className="border px-2 py-1">
                         <img

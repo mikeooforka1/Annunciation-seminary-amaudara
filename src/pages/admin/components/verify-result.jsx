@@ -28,22 +28,6 @@ async function readListResponse(response, keys, label) {
   return requireList(await response.json(), keys, label);
 }
 
-const manualClassList = [
-  { id: 'jss1a', name: 'JSS1A' },
-  { id: 'jss1b', name: 'JSS1B' },
-  { id: 'jss2a', name: 'JSS2A' },
-  { id: 'jss2b', name: 'JSS2B' },
-  { id: 'jss3a', name: 'JSS3A' },
-  { id: 'jss3b', name: 'JSS3B' },
-  { id: 'ss1a', name: 'SS1A' },
-  { id: 'ss1b', name: 'SS1B' },
-  { id: 'ss1c', name: 'SS1C' }, // Added
-  { id: 'ss2a', name: 'SS2A' },
-  { id: 'ss2b', name: 'SS2B' },
-  { id: 'ss3a', name: 'SS3A' },
-  { id: 'ss3b', name: 'SS3B' },
-];
-
 const API_BASE_URL = process.env.REACT_APP_API_BASE_URL || "";
 
 const clampCumulativeScore = value => {
@@ -102,15 +86,15 @@ const calculateCumulativePositionMap = entries => {
 };
 
 // Add this helper function:
-async function updateAllPositions(className, term, positionsMap) {
+async function updateAllPositions(className, term, positionsMap, academicYear) {
   await fetch(`${API_BASE_URL}/api/results/update-positions`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ className, term, positions: positionsMap })
+    body: JSON.stringify({ className, term, academicYear, positions: positionsMap })
   });
 }
 
-const VerifyResult = () => {
+const VerifyResult = ({ currentAcademicYear = '' }) => {
   const navigate = useNavigate();
   const [selectedClass, setSelectedClass] = useState(null);
   const [students, setStudents] = useState([]);
@@ -119,6 +103,7 @@ const VerifyResult = () => {
   const [viewingStudent, setViewingStudent] = useState(null);
   const [tokenInput, setTokenInput] = useState('');
   const [loading, setLoading] = useState(false);
+  const [loadingStage, setLoadingStage] = useState('');
   const [allVerified, setAllVerified] = useState(false);
   const [selectedTerm, setSelectedTerm] = useState('');
   const [adminId, setAdminId] = useState('');
@@ -126,7 +111,11 @@ const VerifyResult = () => {
   const [reviewLoading, setReviewLoading] = useState(false);
   const [refreshKey, setRefreshKey] = useState(0);
   const [classVerificationLoading, setClassVerificationLoading] = useState(false);
-  const [classList, setClassList] = useState(manualClassList);
+  const [classList, setClassList] = useState([]);
+  const [classListLoading, setClassListLoading] = useState(true);
+  const [classListError, setClassListError] = useState('');
+  const [availableAcademicYears, setAvailableAcademicYears] = useState([]);
+  const [selectedAcademicYear, setSelectedAcademicYear] = useState('');
   const [confirmRemoveSubject, setConfirmRemoveSubject] = useState(null); // subject name to confirm
   const [studentTokenInput, setStudentTokenInput] = useState('');
   const [studentVerificationLoading, setStudentVerificationLoading] = useState(false);
@@ -149,57 +138,156 @@ const VerifyResult = () => {
     }
   }, []);
 
-  // Fetch additional classes from backend
+  // Class list is sourced exclusively from the backend.
   useEffect(() => {
-    fetch(`${API_BASE_URL}/api/user/classes/all`)
-      .then(res => res.json())
-      .then(data => {
-        if (Array.isArray(data)) {
-          // Support both string and object formats from backend
-          const backendClasses = data
-            .map(cls =>
-              typeof cls === 'string'
-                ? { id: cls.toLowerCase(), name: cls.toUpperCase() }
-                : { id: cls.id?.toLowerCase() || '', name: cls.name || (cls.id ? cls.id.toUpperCase() : '') }
-            )
-            .filter(cls => cls.id && !manualClassList.some(m => m.id === cls.id));
-          setClassList([...manualClassList, ...backendClasses]);
+    const controller = new AbortController();
+    setClassListLoading(true);
+    setClassListError('');
+
+    fetch(`${API_BASE_URL}/api/user/classes/all`, { signal: controller.signal })
+      .then(async res => {
+        if (!res.ok) throw new Error(`Could not load classes (${res.status}).`);
+        return res.json();
+      })
+      .then(payload => {
+        const data = Array.isArray(payload)
+          ? payload
+          : Array.isArray(payload?.classes)
+            ? payload.classes
+            : Array.isArray(payload?.data)
+              ? payload.data
+              : [];
+
+        const unique = new Map();
+        data.forEach(item => {
+          const raw = typeof item === 'string'
+            ? item
+            : item?.className || item?.id || item?.value || item?.name || '';
+          const id = String(raw).trim().toLowerCase();
+          if (!id) return;
+          if (!unique.has(id)) {
+            unique.set(id, {
+              id,
+              name: (typeof item === 'object' && item?.name) ? item.name : id.toUpperCase()
+            });
+          }
+        });
+
+        const backendClasses = Array.from(unique.values()).sort((a, b) => a.name.localeCompare(b.name));
+        setClassList(backendClasses);
+        if (!backendClasses.length) setClassListError('No classes were returned by the school database.');
+      })
+      .catch(err => {
+        if (err.name !== 'AbortError') {
+          setClassList([]);
+          setClassListError(err.message || 'Unable to load classes from the backend.');
         }
       })
-      .catch(() => {
-        setClassList(manualClassList); // fallback to manual list
+      .finally(() => {
+        if (!controller.signal.aborted) setClassListLoading(false);
       });
+
+    return () => controller.abort();
   }, [API_BASE_URL]);
+
+  // Reset the selection so the first results request retrieves ALL stored
+  // academic years. The year list is then discovered from the returned result
+  // records, as in the earlier working implementation.
+  useEffect(() => {
+    setSelectedAcademicYear('');
+    setAvailableAcademicYears(currentAcademicYear ? [currentAcademicYear] : []);
+    setEditResults({});
+    setVerifiedStudents({});
+  }, [selectedClass, selectedTerm, currentAcademicYear]);
+
+  // Supplement result-based year discovery with the backend year index.
+  // Do not select a year here: the first pushed-results request must remain
+  // unfiltered so it can discover every historical year stored on result rows.
+  useEffect(() => {
+    if (!selectedClass || !selectedTerm) return;
+    const controller = new AbortController();
+
+    fetch(`${API_BASE_URL}/api/results/academic-years?className=${encodeURIComponent(selectedClass)}&term=${encodeURIComponent(selectedTerm)}`, {
+      signal: controller.signal
+    })
+      .then(async response => {
+        if (!response.ok) {
+          throw new Error(`Academic years request failed (${response.status}).`);
+        }
+        return response.json();
+      })
+      .then(payload => {
+        const apiYears = Array.isArray(payload?.years)
+          ? payload.years
+          : Array.isArray(payload?.data?.years)
+            ? payload.data.years
+            : Array.isArray(payload?.data)
+              ? payload.data
+              : [];
+
+        const normalizedYears = apiYears
+          .map(year => String(year ?? '').trim())
+          .filter(Boolean);
+
+        setAvailableAcademicYears(previous => {
+          const merged = [...new Set([
+            ...previous,
+            currentAcademicYear,
+            ...normalizedYears
+          ].filter(Boolean))];
+
+          return merged.sort((a, b) =>
+            (Number(String(b).split(/[/-]/)[0]) || 0) -
+            (Number(String(a).split(/[/-]/)[0]) || 0)
+          );
+        });
+      })
+      .catch(error => {
+        // The pushed-results discovery below is the primary/fallback source.
+        // A missing optional index endpoint must not block historical years.
+        if (error.name !== 'AbortError') {
+          console.warn('Academic-year index unavailable; using result-record discovery.', error);
+        }
+      });
+
+    return () => controller.abort();
+  }, [selectedClass, selectedTerm, currentAcademicYear]);
 
   // Fetch students and their pushed results when class is selected
  // Fetch students and their pushed results when class is selected
 useEffect(() => {
+  const controller = new AbortController();
+  let active = true;
   if (selectedClass) {
     setLoading(true);
-    // ✅ Fetch ALL students in the class (no term filter)
-    let studentsUrl = `${API_BASE_URL}/api/user/class/${selectedClass}/all/students`;
-    
-    console.log('Fetching students:', studentsUrl);
-    fetch(studentsUrl)
+    setLoadingStage(`Loading students in ${selectedClass.toUpperCase()}…`);
+    const studentsUrl = `${API_BASE_URL}/api/user/class/${encodeURIComponent(selectedClass)}/all/students`;
+    fetch(studentsUrl, { signal: controller.signal })
       .then(res => readListResponse(res, ["students", "users"], "Students"))
       .then(data => {
-        const sorted = Array.isArray(data)
-          ? [...data].sort((a, b) =>
-              (a.name || a.fullName || a.username || '').localeCompare(
-                b.name || b.fullName || b.username || ''
-              )
-            )
-          : [];
+        if (!active) return;
+        const sorted = [...data].sort((a, b) =>
+          (a.name || a.fullName || a.username || '').localeCompare(
+            b.name || b.fullName || b.username || ''
+          )
+        );
         setStudents(sorted);
+        setLoadingStage('');
         setLoading(false);
       })
-      .catch((err) => {
+      .catch(err => {
+        if (!active || err.name === 'AbortError') return;
         setMessage(err.message || "Unable to load students.");
         setStudents([]);
+        setLoadingStage('');
         setLoading(false);
       });
   }
-}, [selectedClass]);  // ✅ Remove selectedTerm from dependencies - only fetch when class changes
+  return () => {
+    active = false;
+    controller.abort();
+  };
+}, [selectedClass]);  // Student roster is class-dependent, not term-dependent.
 
   // Clear results when term changes so we fetch fresh data
   
@@ -311,21 +399,30 @@ useEffect(() => {
   }, [students, editResults, selectedTerm]); // <-- add editResults here!
   // Fetch pushed results for each student (refactored)
   useEffect(() => {
+    const controller = new AbortController();
+    let cancelled = false;
     if (students.length > 0 && selectedTerm) {
       setLoading(true);
+      setLoadingStage(`Fetching ${selectedClass.toUpperCase()} results for ${selectedAcademicYear || 'the selected academic year'} · ${selectedTerm} term…`);
+      setEditResults({});
+      setVerifiedStudents({});
       const normalizedClassName = selectedClass ? selectedClass.toLowerCase() : '';
       const normalizedTerm = selectedTerm ? selectedTerm.toLowerCase() : '';
       const fetchPromises = students.map(student => {
-        const resultsUrl = `${API_BASE_URL}/api/results/student/${student._id}/pushed?className=${normalizedClassName}&term=${normalizedTerm}`;
-        const cumulativeUrl = `${API_BASE_URL}/api/results/student/${student._id}/cumulative-averages?className=${normalizedClassName}`;
+        const resultsUrl = `${API_BASE_URL}/api/results/student/${student._id}/pushed?className=${normalizedClassName}&term=${normalizedTerm}${selectedAcademicYear ? `&academicYear=${encodeURIComponent(selectedAcademicYear)}` : ''}`;
+        const cumulativeUrl = `${API_BASE_URL}/api/results/student/${student._id}/cumulative-averages?className=${normalizedClassName}${selectedAcademicYear ? `&academicYear=${encodeURIComponent(selectedAcademicYear)}` : ''}`;
         return Promise.all([
-          fetch(resultsUrl).then(res => readListResponse(res, ["results"], "Student results")),
+          fetch(resultsUrl, { signal: controller.signal }).then(res => readListResponse(res, ["results"], "Student results")),
           normalizedTerm === 'third'
-            ? fetch(cumulativeUrl).then(res => res.ok ? res.json() : null).catch(() => null)
+            ? fetch(cumulativeUrl, { signal: controller.signal }).then(res => res.ok ? res.json() : null).catch(error => { if (error.name === 'AbortError') throw error; return null; })
             : Promise.resolve(null)
         ]).then(([results, cumulative]) => {
-            // --- Use this mapping here ---
+            // Academic year is stored on the student's Overall result record;
+            // subject rows belong to that same academic-year result set.
+            const overallForYear = results.find(r => r.subject === 'Overall');
+            const recordYear = overallForYear?.academicYear || results.find(r => r.academicYear)?.academicYear || '';
             const mapped = {};
+            mapped.academicYear = recordYear;
             const subjects = [];
             let isReviewed = false;
             let isVerified = false;
@@ -411,15 +508,51 @@ useEffect(() => {
 
       Promise.all(fetchPromises)
         .then(resultsArray => {
+          if (cancelled) return;
           const newEditResults = {};
           const newVerifiedStudents = {};
+          const discoveredYears = Array.from(new Set(
+            resultsArray
+              .map(({ resultObj }) => String(resultObj.academicYear || '').trim())
+              .filter(Boolean)
+          )).sort((a, b) => {
+            const aStart = Number(String(a).split(/[/-]/)[0]) || 0;
+            const bStart = Number(String(b).split(/[/-]/)[0]) || 0;
+            return bStart - aStart;
+          });
+          const mergedYears = [...new Set([
+            currentAcademicYear,
+            ...availableAcademicYears,
+            ...discoveredYears
+          ].filter(Boolean))]
+            .sort((a, b) =>
+              (Number(String(b).split(/[/-]/)[0]) || 0) -
+              (Number(String(a).split(/[/-]/)[0]) || 0)
+            );
+
+          // The records themselves are authoritative for historical years.
+          // Keep the configured current year even when it has no results yet.
+          if (mergedYears.length) setAvailableAcademicYears(mergedYears);
+
+          const effectiveAcademicYear = selectedAcademicYear
+            ? selectedAcademicYear
+            : (currentAcademicYear || discoveredYears[0] || mergedYears[0] || '');
+
+          if (!selectedAcademicYear && effectiveAcademicYear) {
+            setSelectedAcademicYear(effectiveAcademicYear);
+          }
           const cumulativePositionMap = normalizedTerm === 'third'
-            ? calculateCumulativePositionMap(resultsArray.map(({ studentId, resultObj }) => ({
-                studentId,
-                overallScore: resultObj.overallScore
-              })))
+            ? calculateCumulativePositionMap(resultsArray
+                .filter(({ resultObj }) => !effectiveAcademicYear || resultObj.academicYear === effectiveAcademicYear)
+                .map(({ studentId, resultObj }) => ({
+                  studentId,
+                  overallScore: resultObj.overallScore
+                })))
             : {};
           resultsArray.forEach(({ studentId, resultObj }) => {
+            if (effectiveAcademicYear && resultObj.academicYear !== effectiveAcademicYear) {
+              return;
+            }
             if (normalizedTerm === 'third') {
               resultObj.cumulativePosition = cumulativePositionMap[studentId] || '';
             }
@@ -439,19 +572,26 @@ useEffect(() => {
             fetch(`${API_BASE_URL}/api/results/update-cumulative-positions`, {
               method: 'POST',
               headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify({ className: normalizedClassName })
+              body: JSON.stringify({ className: normalizedClassName, academicYear: effectiveAcademicYear || selectedAcademicYear })
             }).catch(() => {});
           }
+          setLoadingStage('');
           setLoading(false);
         })
         .catch((err) => {
+          if (cancelled || err.name === 'AbortError') return;
           setMessage(err.message || "Unable to load student results.");
           setEditResults({});
           setVerifiedStudents({});
+          setLoadingStage('');
           setLoading(false);
         });
     }
-  }, [students, selectedClass, selectedTerm, refreshKey]);
+    return () => {
+      cancelled = true;
+      controller.abort();
+    };
+  }, [students, selectedClass, selectedTerm, selectedAcademicYear, refreshKey, currentAcademicYear]);
 
   // Handle result modification
   const handleResultChange = (studentId, field, value) => {
@@ -527,6 +667,7 @@ useEffect(() => {
         minScore: subj.minScore ?? '',
         grade: subj.grade ?? '',
         remark: subj.remark ?? '',
+        ...(selectedAcademicYear ? { academicYear: selectedAcademicYear } : {}),
         reviewed: false,
         pending: true,
         verified: false
@@ -551,7 +692,7 @@ useEffect(() => {
         overallFields[field] = result[field];
       }
     });
-    overallFields.academicYear = "2025/2026";
+    if (selectedAcademicYear) overallFields.academicYear = selectedAcademicYear;
     overallFields.nextTerm = "25/09/2026";
     const avg = Number(result.average ?? 0);
     overallFields.teacherComment = getDeansRemark(avg);
@@ -683,7 +824,7 @@ useEffect(() => {
   const checkStudentReviewed = async (studentId) => {
     const normalizedClassName = selectedClass ? selectedClass.toLowerCase() : '';
     const normalizedTerm = selectedTerm ? selectedTerm.toLowerCase() : '';
-    const resultsUrl = `${API_BASE_URL}/api/results/student/${studentId}/all?className=${normalizedClassName}&term=${normalizedTerm}`;
+    const resultsUrl = `${API_BASE_URL}/api/results/student/${studentId}/all?className=${normalizedClassName}&term=${normalizedTerm}${selectedAcademicYear ? `&academicYear=${encodeURIComponent(selectedAcademicYear)}` : ''}`;
     const res = await fetch(resultsUrl);
     const results = await readListResponse(res, ["results"], "Student results");
 
@@ -699,7 +840,7 @@ useEffect(() => {
   const checkStudentVerified = async (studentId) => {
     const normalizedClassName = selectedClass ? selectedClass.toLowerCase() : '';
     const normalizedTerm = selectedTerm ? selectedTerm.toLowerCase() : '';
-    const resultsUrl = `${API_BASE_URL}/api/results/student/${studentId}/all?className=${normalizedClassName}&term=${normalizedTerm}`;
+    const resultsUrl = `${API_BASE_URL}/api/results/student/${studentId}/all?className=${normalizedClassName}&term=${normalizedTerm}${selectedAcademicYear ? `&academicYear=${encodeURIComponent(selectedAcademicYear)}` : ''}`;
     const res = await fetch(resultsUrl);
     const results = await readListResponse(res, ["results"], "Student results");
 
@@ -786,7 +927,7 @@ useEffect(() => {
           : editResults[studentId][field];
         }
       });
-      overallFields.academicYear = "2025/2026";
+      if (selectedAcademicYear) overallFields.academicYear = selectedAcademicYear;
       overallFields.nextTerm = "25/09/2026";
       // --- Set deans and rectors remark dynamically based on average ---
       const avg = Number(overallFields.average ?? 0);
@@ -810,7 +951,8 @@ useEffect(() => {
         body: JSON.stringify({
           studentId,
           className: normalizedClassName,
-          term: normalizedTerm
+          term: normalizedTerm,
+          academicYear: selectedAcademicYear
         }),
         headers: { 'Content-Type': 'application/json' }
       });
@@ -859,6 +1001,7 @@ useEffect(() => {
       body: JSON.stringify({
         className: selectedClass,
         term: selectedTerm,
+        academicYear: selectedAcademicYear,
         token: tokenInput // <-- use the actual input value
       })
     })
@@ -1013,7 +1156,18 @@ for (const student of students) {
           {message}
         </div>
       )}
-      {!selectedClass && (
+      {!selectedClass && classListLoading && (
+        <div className="rounded-2xl border border-border bg-card p-6 text-center text-muted-foreground shadow-sm">
+          <span className="mx-auto mb-3 block h-8 w-8 animate-spin rounded-full border-4 border-primary/20 border-t-primary" />
+          Loading classes from the school database...
+        </div>
+      )}
+      {!selectedClass && classListError && (
+        <div className="mb-4 rounded-xl border border-red-200 bg-red-50 p-4 text-sm text-red-700" role="alert">
+          {classListError}
+        </div>
+      )}
+      {!selectedClass && !classListLoading && classList.length > 0 && (
         <div className="grid grid-cols-2 sm:grid-cols-3 gap-4 mb-8">
           {classList.map(cls => (
             <div
@@ -1028,7 +1182,37 @@ for (const student of students) {
         </div>
       )}
 
-      {loading && <p>Loading students...</p>}
+      {loading && (
+        <div className="my-6 overflow-hidden rounded-2xl border border-border bg-card shadow-lg" role="status" aria-live="polite">
+          <div className="h-1.5 overflow-hidden bg-muted">
+            <div className="h-full w-1/3 animate-[verify-progress_1.5s_ease-in-out_infinite] rounded-full bg-primary" />
+          </div>
+          <div className="p-6 sm:p-8">
+            <div className="flex flex-col items-center text-center">
+              <div className="mb-4 flex h-14 w-14 items-center justify-center rounded-2xl bg-primary/10">
+                <span className="h-7 w-7 animate-spin rounded-full border-[3px] border-primary/20 border-t-primary" />
+              </div>
+              <p className="text-xs font-bold uppercase tracking-[0.18em] text-primary">Results workspace</p>
+              <h3 className="mt-2 text-xl font-bold text-foreground">{loadingStage || 'Fetching academic results'}</h3>
+              <p className="mt-2 max-w-lg text-sm text-muted-foreground">
+                Loading {selectedClass?.toUpperCase() || 'class'}{selectedAcademicYear ? ` · ${selectedAcademicYear}` : ''}{selectedTerm ? ` · ${selectedTerm} term` : ''}. Please wait while records are organized.
+              </p>
+            </div>
+            <div className="mx-auto mt-7 grid max-w-3xl grid-cols-1 gap-3 sm:grid-cols-3">
+              {[1, 2, 3].map(item => (
+                <div key={item} className="rounded-xl border border-border bg-muted/30 p-4">
+                  <div className="mb-3 h-3 w-2/3 animate-pulse rounded bg-muted" />
+                  <div className="h-6 w-1/2 animate-pulse rounded bg-muted" />
+                </div>
+              ))}
+            </div>
+            <div className="mt-5 space-y-2">
+              {[1, 2, 3].map(item => <div key={item} className="h-2 animate-pulse rounded-full bg-muted" />)}
+            </div>
+          </div>
+        </div>
+      )}
+      <style>{`@keyframes verify-progress { 0% { transform: translateX(-120%); } 100% { transform: translateX(360%); } }`}</style>
 
       {selectedClass && (
         <div className="mb-4">
@@ -1057,6 +1241,21 @@ for (const student of students) {
             <option value="second">Second Term</option>
             <option value="third">Third Term</option>
           </select>
+          {selectedTerm && availableAcademicYears.length > 0 && (
+            <span className="ml-3 inline-flex flex-wrap items-center gap-2">
+              <label htmlFor="verify-academic-year" className="font-semibold">Academic Year:</label>
+              <select
+                id="verify-academic-year"
+                value={selectedAcademicYear}
+                onChange={e => setSelectedAcademicYear(e.target.value)}
+                className="min-w-[150px] rounded-lg border border-border bg-background px-3 py-2 text-sm shadow-sm focus:outline-none focus:ring-2 focus:ring-primary"
+              >
+                {availableAcademicYears.map(year => (
+                  <option key={year} value={year}>{year}</option>
+                ))}
+              </select>
+            </span>
+          )}
         </div>
       )}
 
@@ -1106,6 +1305,7 @@ for (const student of students) {
     state: {
       selectedClass,
       selectedTerm,
+      selectedAcademicYear,
       students,
       editResults, // pass the processed results object
       verifiedStudents
@@ -1642,7 +1842,7 @@ for (const student of students) {
                                 position: editResults[student._id]?.position || ''
                               }));
                               // 2. Update all positions in backend
-                              await updateAllPositions(selectedClass, selectedTerm, positionsArray);
+                              await updateAllPositions(selectedClass, selectedTerm, positionsArray, selectedAcademicYear);
 
                               setVerifiedStudents(prev => ({
                                 ...prev,

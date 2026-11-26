@@ -72,21 +72,37 @@ const LoginAuthentication = () => {
         loginTime: new Date().toISOString()
       };
 
+      // Start with a clean client-side identity so a previous role/session
+      // cannot be mistaken for the newly authenticated account. The actual
+      // authenticated session is maintained by the server-issued cookie
+      // (credentials: 'include'); the submitted login token is not a session token.
+      const authStorageKeys = [
+        'user', 'userName', 'teacherData', 'studentData', 'adminData',
+        'accessToken', 'authToken', 'token', 'sessionToken', 'jwt'
+      ];
+      authStorageKeys.forEach(key => {
+        sessionStorage.removeItem(key);
+        localStorage.removeItem(key);
+      });
+
       // Keep the authenticated identity in both storage areas because
       // existing dashboards and shared app guards still read localStorage.
-      // Never store the submitted token/password in browser storage.
       sessionStorage.setItem('user', JSON.stringify(sanitizedUser));
       sessionStorage.setItem('userName', sanitizedUser.name);
       localStorage.setItem('user', JSON.stringify(sanitizedUser));
       localStorage.setItem('userName', sanitizedUser.name);
 
       if (sanitizedUser.role === 'teacher') {
-        sessionStorage.setItem('teacherData', JSON.stringify({
+        const teacherPayload = {
           ...result.user,
           ...sanitizedUser,
           _id: sanitizedUser._id,
-          role: 'teacher'
-        }));
+          role: 'teacher',
+          isAuthenticated: true
+        };
+        const serializedTeacher = JSON.stringify(teacherPayload);
+        sessionStorage.setItem('teacherData', serializedTeacher);
+        localStorage.setItem('teacherData', serializedTeacher);
         window.location.replace('/teacher-portal');
         return;
       }

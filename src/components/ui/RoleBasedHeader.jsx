@@ -55,16 +55,19 @@ const RoleBasedHeader = ({
   };
 
   const handleLogout = () => {
-    // Clear all authentication/session data
-    localStorage.removeItem('studentData');
-    localStorage.removeItem('teacherData');
-    localStorage.removeItem('userName');
-    localStorage.removeItem('authToken');
-    sessionStorage.clear();
-    // Optionally, clear cookies if used for auth
-    // document.cookie = "token=; expires=Thu, 01 Jan 1970 00:00:00 UTC; path=/;";
-    // Redirect to landing page (not login)
-    window.location.replace('/landing-page');
+    // Remove only authentication-related client state from both stores.
+    // The login flow uses a server-managed cookie (potentially HttpOnly), which
+    // JavaScript cannot revoke or clear. Server-side invalidation requires the
+    // backend's actual logout endpoint; do not guess an endpoint here.
+    const authStorageKeys = [
+      'user', 'userName', 'teacherData', 'studentData', 'adminData',
+      'accessToken', 'authToken', 'token', 'sessionToken', 'jwt'
+    ];
+    authStorageKeys.forEach(key => {
+      localStorage.removeItem(key);
+      sessionStorage.removeItem(key);
+    });
+    window.location.replace('/login-authentication');
   };
 
   const navigationItems = getNavigationItems();

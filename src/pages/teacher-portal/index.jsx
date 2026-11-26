@@ -3,6 +3,51 @@ import WelcomeBanner from './components/WelcomeBanner';
 import DashboardWidgets from './components/DashboardWidgets';
 import { useNavigate } from 'react-router-dom';
 
+
+const getStoredAuthToken = (teacher = null) => {
+  const tokenFields = ['accessToken', 'authToken', 'token', 'sessionToken', 'jwt'];
+  const readObjectToken = value => {
+    if (!value || typeof value !== 'object') return '';
+    for (const key of tokenFields) {
+      if (typeof value[key] === 'string' && value[key].trim()) return value[key].trim();
+    }
+    for (const nestedKey of ['auth', 'session', 'data']) {
+      const nested = value[nestedKey];
+      if (nested && typeof nested === 'object') {
+        for (const key of tokenFields) {
+          if (typeof nested[key] === 'string' && nested[key].trim()) return nested[key].trim();
+        }
+      }
+    }
+    return '';
+  };
+  const fromTeacher = readObjectToken(teacher);
+  if (fromTeacher) return fromTeacher;
+  for (const storage of [sessionStorage, localStorage]) {
+    for (const key of tokenFields) {
+      const value = storage.getItem(key);
+      if (value && value.trim()) return value.trim();
+    }
+    for (const key of ['teacherData', 'user']) {
+      try {
+        const token = readObjectToken(JSON.parse(storage.getItem(key) || 'null'));
+        if (token) return token;
+      } catch {}
+    }
+  }
+  return '';
+};
+
+const authenticatedFetch = (url, options = {}, teacher = null) => {
+  const headers = new Headers(options.headers || {});
+  const token = getStoredAuthToken(teacher);
+  if (token && !headers.has('Authorization')) {
+    headers.set('Authorization', /^Bearer\s/i.test(token) ? token : `Bearer ${token}`);
+  }
+  if (!headers.has('X-Requested-With')) headers.set('X-Requested-With', 'XMLHttpRequest');
+  return fetch(url, { ...options, headers, credentials: options.credentials || 'include' });
+};
+
 const TeacherPortal = () => {
   const [teacherData, setTeacherData] = useState(null);
   const navigate = useNavigate();
@@ -39,15 +84,12 @@ const TeacherPortal = () => {
 
   useEffect(() => {
     if (teacherData?.className && teacherData?._id) {
-     const API_BASE_URL = process.env.REACT_APP_API_BASE_URL || "";
-           fetch(
+     const API_BASE_URL = (process.env.REACT_APP_API_BASE_URL || process.env.REACT_APP_API_URL || '').trim().replace(/\/+$/, '');
+           authenticatedFetch(
         `${API_BASE_URL}/api/user/class/${encodeURIComponent(teacherData.className)}/${encodeURIComponent(teacherData.term || 'third')}/students`,
         {
-          credentials: 'include',
-          headers: {
-            'X-Requested-With': 'XMLHttpRequest'
-          }
-        }
+          credentials: 'include'
+        }, teacherData
       )
         .then(res => res.json())
         .then(data => {
@@ -67,12 +109,14 @@ const TeacherPortal = () => {
   }, [teacherData]);
 
   const handleLogout = () => {
-    sessionStorage.removeItem('user');
-    sessionStorage.removeItem('teacherData');
-    sessionStorage.removeItem('userName');
-    // Clear legacy entries too, so an old localStorage session cannot be reused.
-    localStorage.removeItem('user');
-    localStorage.removeItem('teacherData');
+    const authStorageKeys = [
+      'user', 'userName', 'teacherData', 'studentData', 'adminData',
+      'accessToken', 'authToken', 'token', 'sessionToken', 'jwt'
+    ];
+    authStorageKeys.forEach(key => {
+      sessionStorage.removeItem(key);
+      localStorage.removeItem(key);
+    });
     navigate('/login-authentication', { replace: true });
   };
 
@@ -170,7 +214,9 @@ const TeacherPortal = () => {
           {/* Set Result Card */}
           <div
             className="bg-red-100 border border-red-400 rounded-lg shadow hover:shadow-lg transition cursor-pointer flex flex-col items-center justify-center p-6"
-            onClick={() => navigate('/result-portal')}
+            onClick={() => navigate('/result-portal', {
+              state: { teacherData, authToken: getStoredAuthToken(teacherData) }
+            })}
           >
             <span className="text-red-600 text-3xl mb-2">
               <i className="fas fa-chart-bar" />

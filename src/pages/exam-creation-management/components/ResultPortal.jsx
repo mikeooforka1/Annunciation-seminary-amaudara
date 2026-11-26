@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { useLocation } from 'react-router-dom';
 import { TbFidgetSpinner } from "react-icons/tb";
 import RoleBasedHeader from '../../../components/ui/RoleBasedHeader';
 import Button from '../../../components/ui/Button';
@@ -12,6 +13,9 @@ const terms = [
 ];
 
 const API_BASE_URL = (process.env.REACT_APP_API_BASE_URL || process.env.REACT_APP_API_URL || '').trim().replace(/\/+$/, '');
+
+
+
 function getGrade(score) {
   if (score >= 75 && score <= 100) return "A1";
   if (score >= 70 && score < 75) return "B2";
@@ -32,7 +36,17 @@ function getRemark(grade) {
   return "";
 }
 const ResultPortal = () => {
+    const location = useLocation();
     const [teacherData, setTeacherData] = useState(null);
+
+    // The supplied login implementation authenticates with a server-managed
+    // cookie. Always include that cookie; do not treat the one-time login
+    // credential as a reusable Bearer/session token.
+    const apiFetch = (url, options = {}) => {
+      const headers = new Headers(options.headers || {});
+      if (!headers.has('X-Requested-With')) headers.set('X-Requested-With', 'XMLHttpRequest');
+      return fetch(url, { ...options, headers, credentials: 'include' });
+    };
     const [selectedTerm, setSelectedTerm] = useState('');
     const [students, setStudents] = useState([]);
     const [subjects, setSubjects] = useState([]);
@@ -137,7 +151,7 @@ const ResultPortal = () => {
    // ...existing code...
 useEffect(() => {
   if (teacherData?.className && selectedTerm) {
-    fetch(`${API_BASE_URL}/api/results/class/${encodeURIComponent(teacherData.className)}/${encodeURIComponent(selectedTerm)}`)
+    apiFetch(`${API_BASE_URL}/api/results/class/${encodeURIComponent(teacherData.className)}/${encodeURIComponent(selectedTerm)}`)
       .then(res => res.json())
       .then(data => {
         // Only include subjects that are not deleted
@@ -176,7 +190,7 @@ useEffect(() => {
           setErrorMsg('API base URL is missing. Set REACT_APP_API_BASE_URL or REACT_APP_API_URL in the frontend environment.');
           return;
         }
-        fetch(
+        apiFetch(
           `${API_BASE_URL}/api/results/student/${encodeURIComponent(selectedStudent._id)}/all?className=${encodeURIComponent(teacherData.className)}&term=${encodeURIComponent(selectedTerm)}`,
           { credentials: 'include' }
         )
@@ -354,41 +368,120 @@ useEffect(() => {
       }
     }, [results, caScores, overall, subjects, selectedStudent, teacherData, selectedTerm]);
 
-    // Get teacher data from localStorage
+    // Prefer teacher/session context passed by the Teacher Portal.
+    // Fall back to sessionStorage first, then legacy localStorage.
     useEffect(() => {
-        const stored = localStorage.getItem('teacherData');
-        if (stored) setTeacherData(JSON.parse(stored));
-    }, []);
+      const routeTeacher = location.state?.teacherData;
+      const storedData =
+        sessionStorage.getItem('teacherData') ||
+        sessionStorage.getItem('user') ||
+        localStorage.getItem('teacherData') ||
+        localStorage.getItem('user');
 
-    // Fetch all students registered under this class and term
-   useEffect(() => {
-    const fetchStudents = async () => {
+      let parsedData = routeTeacher || null;
+      if (!parsedData && storedData) {
+        try {
+          parsedData = JSON.parse(storedData);
+        } catch (error) {
+          console.error('[ResultPortal] Unable to parse stored teacher session:', error);
+        }
+      }
+
+      if (parsedData && parsedData._id) {
+        setTeacherData(parsedData);
+      } else {
+        setErrorMsg('Teacher session is missing or invalid. Please return to the Teacher Portal and sign in again.');
+      }
+    }, [location.state]);
+
+    // Fetch the class roster independently of the result records.
+    // This mirrors the working reference portal while protecting against stale requests.
+    useEffect(() => {
+      let active = true;
+      const controller = new AbortController();
+
+      const fetchStudents = async () => {
         setIsLoadingStudents(true);
         setStudents([]);
-        if (teacherData?.className && selectedTerm) {
-            try {
-                if (!API_BASE_URL) {
-                    throw new Error('API base URL is missing. Set REACT_APP_API_BASE_URL or REACT_APP_API_URL in the frontend environment.');
-                }
-                const url = `${API_BASE_URL}/api/user/class/${encodeURIComponent(teacherData.className)}/${encodeURIComponent(selectedTerm)}/students`;
-                const res = await fetch(url, { credentials: 'include' });
-                if (!res.ok) {
-                    const body = await res.text().catch(() => '');
-                    throw new Error(`Student request failed (${res.status})${body ? `: ${body.slice(0, 180)}` : ''}`);
-                }
-                const data = await res.json();
-                if (!Array.isArray(data)) throw new Error('Student endpoint returned an unexpected response.');
-                setStudents(data);
-            } catch (err) {
-                console.error('[ResultPortal] Failed to fetch students for selected class/term:', err);
-                setStudents([]);
-                setErrorMsg(err.message || 'Unable to fetch students for the selected term.');
-            }
+        setSelectedStudent(null);
+        setErrorMsg('');
+
+        if (!teacherData?.className || !selectedTerm) {
+          setIsLoadingStudents(false);
+          return;
         }
-        setIsLoadingStudents(false);
-    };
-    fetchStudents();
-}, [teacherData, selectedTerm]);
+
+        try {
+          if (!API_BASE_URL) {
+            throw new Error('API base URL is missing. Set REACT_APP_API_BASE_URL or REACT_APP_API_URL in the frontend environment.');
+          }
+
+          const url = `${API_BASE_URL}/api/user/class/${encodeURIComponent(teacherData.className)}/${encodeURIComponent(selectedTerm)}/students`;
+          const response = await apiFetch(url, {
+            credentials: 'include',
+            signal: controller.signal
+          });
+
+          if (!response.ok) {
+            const body = await response.text().catch(() => '');
+            throw new Error(`Student request failed (${response.status})${body ? `: ${body.slice(0, 180)}` : ''}`);
+          }
+
+          const payload = await response.json();
+          // Accept the direct-array response used by the reference portal and
+          // common API envelopes without changing the backend contract.
+          const roster = Array.isArray(payload)
+            ? payload
+            : Array.isArray(payload?.students)
+              ? payload.students
+              : Array.isArray(payload?.data)
+                ? payload.data
+                : Array.isArray(payload?.data?.students)
+                  ? payload.data.students
+                  : null;
+
+          if (!roster) {
+            throw new Error('Student endpoint returned an unexpected response. Expected a student array.');
+          }
+
+          const normalizedStudents = roster
+            .filter(student =>
+              student &&
+              (student._id || student.id) &&
+              typeof student.name === 'string' &&
+              student.name.trim()
+            )
+            .map(student => ({
+              ...student,
+              _id: String(student._id || student.id),
+              name: student.name.trim()
+            }));
+
+          if (active) {
+            setStudents(normalizedStudents);
+            if (normalizedStudents.length === 0) {
+              setErrorMsg('No students were returned for this class and term.');
+            }
+          }
+        } catch (err) {
+          if (err.name !== 'AbortError' && active) {
+            console.error('[ResultPortal] Failed to fetch students for selected class/term:', err);
+            setStudents([]);
+            setErrorMsg(err.message || 'Unable to fetch students for the selected term.');
+          }
+        } finally {
+          if (active) setIsLoadingStudents(false);
+        }
+      };
+
+      fetchStudents();
+
+      return () => {
+        active = false;
+        controller.abort();
+      };
+    }, [teacherData?.className, selectedTerm]);
+
     // Fetch teacher's results for the class and term
     useEffect(() => {
         if (teacherData?.className && selectedTerm) {
@@ -400,7 +493,7 @@ useEffect(() => {
                 setIsLoadingResults(false);
                 return;
             }
-            fetch(`${API_BASE_URL}/api/results/class/${encodeURIComponent(teacherData.className)}/${encodeURIComponent(selectedTerm)}`, {
+            apiFetch(`${API_BASE_URL}/api/results/class/${encodeURIComponent(teacherData.className)}/${encodeURIComponent(selectedTerm)}`, {
                 credentials: 'include'
             })
                 .then(async res => {
@@ -597,7 +690,7 @@ useEffect(() => {
           const pushedStatus = {};
           for (const student of students) {
             try {
-              const res = await fetch(
+              const res = await apiFetch(
                 `${API_BASE_URL}/api/results/student/${student._id}/pushed?className=${encodeURIComponent(teacherData.className)}&term=${encodeURIComponent(selectedTerm)}`
               );
               const pushedResults = await res.json();
@@ -717,13 +810,19 @@ useEffect(() => {
         };
       }
       // Always update the average field in results for UI binding
-      setResults(prev => ({
-        ...prev,
-        [studentId]: {
-          ...(prev[studentId] || {}),
-          average: autoAverage,
-        },
-      }));
+      setResults(prev => {
+        const currentStudentResults = prev[studentId] || {};
+        if (Number(currentStudentResults.average) === autoAverage) {
+          return prev;
+        }
+        return {
+          ...prev,
+          [studentId]: {
+            ...currentStudentResults,
+            average: autoAverage,
+          },
+        };
+      });
     });
     setOverall(newOverall);
   }
@@ -733,7 +832,7 @@ useEffect(() => {
 // Add this useEffect to fetch subjects from backend
 useEffect(() => {
   if (teacherData?.className && selectedTerm) {
-    fetch(`${API_BASE_URL}/api/class-subjects/${encodeURIComponent(teacherData.className)}?term=${encodeURIComponent(selectedTerm)}`)
+    apiFetch(`${API_BASE_URL}/api/class-subjects/${encodeURIComponent(teacherData.className)}?term=${encodeURIComponent(selectedTerm)}`)
       .then(res => res.json())
       .then(subjects => {
         setSubjects(Array.isArray(subjects) ? subjects : []);
@@ -746,7 +845,7 @@ const handleAddSubject = async () => {
   if (subject && !subjects.includes(subject)) {
     const updatedSubjects = [...subjects, subject];
     // Update backend
-    await fetch(`${API_BASE_URL}/api/class-subjects/set`, {
+    await apiFetch(`${API_BASE_URL}/api/class-subjects/set`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
@@ -757,7 +856,7 @@ const handleAddSubject = async () => {
     });
     setNewSubject('');
     // Refetch subjects from backend
-    fetch(`${API_BASE_URL}/api/class-subjects/${encodeURIComponent(teacherData.className)}?term=${encodeURIComponent(selectedTerm)}`)
+    apiFetch(`${API_BASE_URL}/api/class-subjects/${encodeURIComponent(teacherData.className)}?term=${encodeURIComponent(selectedTerm)}`)
       .then(res => res.json())
       .then(subjects => {
         setSubjects(Array.isArray(subjects) ? subjects : []);
@@ -771,7 +870,7 @@ const handleAddSubject = async () => {
 const handleRemoveSubject = async (subject) => {
   const updatedSubjects = subjects.filter(s => s !== subject);
   // Update backend
-  await fetch(`${API_BASE_URL}/api/class-subjects/set`, {
+  await apiFetch(`${API_BASE_URL}/api/class-subjects/set`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({
@@ -781,7 +880,7 @@ const handleRemoveSubject = async (subject) => {
     }),
   });
   // Refetch subjects from backend
-  fetch(`${API_BASE_URL}/api/class-subjects/${encodeURIComponent(teacherData.className)}?term=${encodeURIComponent(selectedTerm)}`)
+  apiFetch(`${API_BASE_URL}/api/class-subjects/${encodeURIComponent(teacherData.className)}?term=${encodeURIComponent(selectedTerm)}`)
     .then(res => res.json())
     .then(subjects => {
       setSubjects(Array.isArray(subjects) ? subjects : []);
@@ -858,7 +957,7 @@ const handleRemoveSubject = async (subject) => {
     for (const student of students) {
       // Always use buildSaveAllPayload to include average, C.A.T, Exam, etc.
       const savePayload = buildSaveAllPayload(student._id, false); // isPush: false for save
-      const res = await fetch(`${API_BASE_URL}/api/results/save-all`, {
+      const res = await apiFetch(`${API_BASE_URL}/api/results/save-all`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(savePayload),
@@ -889,7 +988,7 @@ const handlePushIndividualResult = async (studentId) => {
   try {
     // Always use buildSaveAllPayload to include average, C.A.T, Exam, etc.
     const savePayload = buildSaveAllPayload(studentId, true); // isPush: true for push
-    const saveRes = await fetch(`${API_BASE_URL}/api/results/save-all`, {
+    const saveRes = await apiFetch(`${API_BASE_URL}/api/results/save-all`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(savePayload),
@@ -901,7 +1000,7 @@ const handlePushIndividualResult = async (studentId) => {
     for (const subject of subjects) {
       const score = results?.[studentId]?.[subject];
       if (score !== undefined && score !== '') {
-        await fetch(`${API_BASE_URL}/api/results/set`, {
+        await apiFetch(`${API_BASE_URL}/api/results/set`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
@@ -918,7 +1017,7 @@ const handlePushIndividualResult = async (studentId) => {
 
       const caScore = caScores?.[studentId]?.[subject];
       if (caScore !== undefined && caScore !== '') {
-        await fetch(`${API_BASE_URL}/api/results/set`, {
+        await apiFetch(`${API_BASE_URL}/api/results/set`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
@@ -936,7 +1035,7 @@ const handlePushIndividualResult = async (studentId) => {
     const overallScore = overall?.[studentId]?.overallScore;
     const position = overall?.[studentId]?.position;
     if (overallScore || position) {
-      const res = await fetch(`${API_BASE_URL}/api/results/set`, {
+      const res = await apiFetch(`${API_BASE_URL}/api/results/set`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -970,7 +1069,7 @@ const handlePushIndividualResult = async (studentId) => {
       // Clear dirty flag
       setDirtyStudents(prev => ({ ...prev, [studentId]: false }));
       setIsLoadingResults(true); // Show spinner while fetching
-      fetch(`${API_BASE_URL}/api/results/class/${encodeURIComponent(teacherData.className)}/${encodeURIComponent(selectedTerm)}`, {
+      apiFetch(`${API_BASE_URL}/api/results/class/${encodeURIComponent(teacherData.className)}/${encodeURIComponent(selectedTerm)}`, {
         credentials: 'include'
       })
         .then(res => res.json())
@@ -980,7 +1079,7 @@ const handlePushIndividualResult = async (studentId) => {
         .finally(() => setIsLoadingResults(false));
 
             // --- Re-fetch pushed status for the student (only confirm, never undo) ---
-      fetch(`${API_BASE_URL}/api/results/student/${studentId}/pushed?className=${encodeURIComponent(teacherData.className)}&term=${encodeURIComponent(selectedTerm)}`, {
+      apiFetch(`${API_BASE_URL}/api/results/student/${studentId}/pushed?className=${encodeURIComponent(teacherData.className)}&term=${encodeURIComponent(selectedTerm)}`, {
         credentials: 'include'
       })
         .then(res => res.json())
@@ -1082,7 +1181,7 @@ useEffect(() => {
             Object.keys(caScores[selectedStudent._id] || {}).length > 0 ||
             Object.keys(overall[selectedStudent._id] || {}).length > 0
           ) {
-            fetch(`${API_BASE_URL}/api/results/save-all`, {
+            apiFetch(`${API_BASE_URL}/api/results/save-all`, {
               method: 'POST',
               headers: { 'Content-Type': 'application/json' },
               body: JSON.stringify(payload),
@@ -1107,7 +1206,7 @@ useEffect(() => {
     selectedTerm &&
     isValidObjectId(selectedStudent._id)
   ) {
-    fetch(
+    apiFetch(
       `${API_BASE_URL}/api/results/student/${selectedStudent._id}/all?className=${teacherData.className}&term=${selectedTerm}`
     )
       .then(res => res.json())
@@ -1706,7 +1805,7 @@ useEffect(() => {
                         const payload = buildSaveAllPayload(selectedStudent._id, false);
 
                         try {
-                          const res = await fetch(`${API_BASE_URL}/api/results/save-all`, {
+                          const res = await apiFetch(`${API_BASE_URL}/api/results/save-all`, {
                             method: 'POST',
                             headers: { 'Content-Type': 'application/json' },
                             body: JSON.stringify(payload),
@@ -1874,15 +1973,15 @@ useEffect(() => {
         <TbFidgetSpinner className="animate-spin text-5xl text-primary mb-2" />
         <span className="text-primary font-medium">Loading students...</span>
     </div>
-) : (
+) : students.length > 0 ? (
     <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4">
         {students.map(student => (
-            <div
+            <button
+                type="button"
                 key={student._id}
-                className="relative bg-card border border-border rounded-lg shadow p-4 flex flex-col items-center cursor-pointer hover:bg-primary/10 transition"
+                className="relative w-full text-left bg-card border border-border rounded-lg shadow p-4 flex flex-col items-center cursor-pointer hover:bg-primary/10 transition focus:outline-none focus:ring-2 focus:ring-primary"
                 onClick={() => setSelectedStudent(student)}
             >
-                {/* Pushed badge */}
                 {resultsPushed[student._id] && (
                     <span className="absolute top-2 left-2 bg-green-600 text-white text-xs font-bold px-2 py-1 rounded shadow z-10">
                         Pushed
@@ -1892,9 +1991,16 @@ useEffect(() => {
                   {student.name ? student.name.charAt(0).toUpperCase() : "S"}
                 </span>
                 <span className="font-body font-medium text-foreground">{student.name}</span>
-                <span className="text-xs text-muted-foreground">{student.className}</span>
-            </div>
+                <span className="text-xs text-muted-foreground">{student.className || teacherData?.className}</span>
+            </button>
         ))}
+    </div>
+) : (
+    <div className="rounded-lg border border-border bg-card px-6 py-10 text-center">
+      <p className="font-semibold text-foreground">No students to display</p>
+      <p className="mt-1 text-sm text-muted-foreground">
+        {errorMsg || 'No students were found for the selected class and term.'}
+      </p>
     </div>
 )}
 
